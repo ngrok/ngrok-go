@@ -1,0 +1,32 @@
+replace or publish tlsutil
+
+PERF:
+Investigate use of buffered io? Optionally? When would you flush?
+Use a ring buffer?
+Mitigate allocation of windowupdates (pool?)
+
+DOCS:
+Doc heartbeat and TypedStreamSession
+Doc Accept() returning an error only when the session is closed
+Write a more extensive example
+Document the muxado wire protocol
+
+TESTING:
+tests for heartbeat
+tests for typedstream
+test for stream exhaustion
+test for short read of data frame
+tests for window manager
+tests for buffer
+re-enable stream tests
+More session tests
+More stream tests
+frame/framer tests - return proper error types, hand unknown type frames
+
+### Low priority:
+extension: Move high throughput connections to their own connections
+window_manager needs to support a deadline
+inboundbuffer deadline support
+add Reset() stream API?
+eliminate unlikely race on s.remoteDebug between handleFrame() and die()
+don't send reset if the stream is fully closed

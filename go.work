@@ -1,0 +1,22 @@
+// General workspace notes:
+// This is mostly here so that gopls/vscode will quit yelling at me. The modules
+// seem to work just fine without it. The replace's are duplicated everywhere
+// because `go mod tidy` & co seem to ignore the ones at the workspace level.
+// See: https://github.com/golang/go/issues/50750.
+
+go 1.18
+
+use (
+	.
+	./example
+	./log
+	./log/log15adapter
+	./log/pgxadapter
+)
+
+replace (
+	github.com/ngrok/libngrok-go v0.0.0 => ./
+	github.com/ngrok/libngrok-go/log v0.0.0 => ./log
+	github.com/ngrok/libngrok-go/log/log15adapter v0.0.0 => ./log/log15adapter
+	github.com/ngrok/libngrok-go/log/pgxadapter v0.0.0 => ./log/pgxadapter
+)

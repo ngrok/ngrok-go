@@ -1,0 +1,9 @@
+decide what the deal is with handler functions returning errors vs setting the Error property of the response message
+shutdown in progress shouldn't cause permanent failure
+hostname in Auth for virtual hosting?
+
+Test cases!
+Improve logging
+Improve error handling:
+- decide when to wrap errors, when to retry and when to fail permanently
+add travis builds
