@@ -19,7 +19,6 @@ import (
 	"github.com/ngrok/libngrok-go/internal/muxado"
 	tunnel_client "github.com/ngrok/libngrok-go/internal/tunnel/client"
 	"github.com/ngrok/libngrok-go/internal/tunnel/proto"
-	"github.com/ngrok/libngrok-go/log"
 	"golang.org/x/net/proxy"
 )
 
@@ -194,7 +193,7 @@ func (cfg *ConnectConfig) WithLog15(logger log15.Logger) *ConnectConfig {
 // `pgxadapter`.
 // If the provided `Logger` also implements the `log15.Logger` interface, it
 // will be used directly.
-func (cfg *ConnectConfig) WithLogger(logger log.Logger) *ConnectConfig {
+func (cfg *ConnectConfig) WithLogger(logger Logger) *ConnectConfig {
 	cfg.Logger = toLog15(logger)
 	return cfg
 }
