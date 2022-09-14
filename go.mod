@@ -5,15 +5,14 @@ go 1.18
 require (
 	github.com/inconshreveable/log15 v0.0.0-20201112154412-8562bdadbbac
 	github.com/jpillora/backoff v1.0.0
-	github.com/ngrok/libngrok-go/log v0.0.0
 	github.com/stretchr/testify v1.8.0
 	google.golang.org/protobuf v1.28.1
 )
 
 require (
-	github.com/kr/pretty v0.1.0 // indirect
-	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
-	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect
+	github.com/google/go-cmp v0.5.8 // indirect
+	github.com/kr/text v0.2.0 // indirect
+	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 )
 
 require (
@@ -28,5 +27,3 @@ require (
 	golang.org/x/sys v0.0.0-20220728004956-3c1f35247d10 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/ngrok/libngrok-go/log => ./log
