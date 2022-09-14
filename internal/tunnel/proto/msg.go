@@ -16,10 +16,10 @@ const (
 	AuthReq                 ReqType = 0
 	BindReq                 ReqType = 1
 	UnbindReq               ReqType = 2
-	ProxyReq                ReqType = 3
 	StartTunnelWithLabelReq ReqType = 7
 
 	// sent from the server to the client
+	ProxyReq   ReqType = 3
 	RestartReq ReqType = 4
 	StopReq    ReqType = 5
 	UpdateReq  ReqType = 6
@@ -75,8 +75,8 @@ type AuthExtra struct {
 }
 
 type Fingerprint struct {
-	M []string // mac addresses
-	D []string // disk serial numbers
+	M []string
+	D []string
 }
 
 // A server responds to an Auth message with an
