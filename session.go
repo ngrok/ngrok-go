@@ -105,8 +105,6 @@ type ConnectConfig struct {
 
 	CallbackErrors CallbackErrors
 
-	Cookie string
-
 	Logger log15.Logger
 }
 
@@ -198,11 +196,6 @@ func (cfg *ConnectConfig) WithLocalCallbacks(callbacks LocalCallbacks) *ConnectC
 
 func (cfg *ConnectConfig) WithRemoteCallbacks(callbacks RemoteCallbacks) *ConnectConfig {
 	cfg.RemoteCallbacks = callbacks
-	return cfg
-}
-
-func (cfg *ConnectConfig) WithReconnectCookie(cookie string) *ConnectConfig {
-	cfg.Cookie = cookie
 	return cfg
 }
 
@@ -315,8 +308,6 @@ func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
 		RestartUnsupportedError: remoteRestartErr,
 		StopUnsupportedError:    remoteStopErr,
 		UpdateUnsupportedError:  remoteUpdateErr,
-
-		Cookie: cfg.Cookie,
 
 		// TODO: More fields here?
 	}
