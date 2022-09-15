@@ -28,13 +28,6 @@ type Session interface {
 	Close() error
 
 	StartTunnel(ctx context.Context, cfg TunnelConfig) (Tunnel, error)
-
-	SrvInfo() (SrvInfo, error)
-	AuthResp() AuthResp
-
-	Heartbeat() (time.Duration, error)
-
-	Latency() <-chan time.Duration
 }
 
 const (
