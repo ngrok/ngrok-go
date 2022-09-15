@@ -47,7 +47,7 @@ const (
 	RegionIN = "in"
 )
 
-//go:embed ngrok.ca.crt
+//go:embed assets/ngrok.ca.crt
 var defaultCACert []byte
 
 const defaultServer = "tunnel.ngrok.com:443"
