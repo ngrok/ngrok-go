@@ -36,34 +36,17 @@ func (cfg *TLSCommon[T]) toProtoConfig() *pb_agent.MiddlewareConfiguration_Mutua
 	return opts
 }
 
-type TLSKeypair struct {
-	KeyPEM  []byte
-	CertPEM []byte
-}
-
-func (kp *TLSKeypair) toProtoConfig() *pb_agent.MiddlewareConfiguration_TLSTermination {
-	if kp == nil {
-		return nil
-	}
-
-	return &pb_agent.MiddlewareConfiguration_TLSTermination{
-		Key:  kp.KeyPEM,
-		Cert: kp.CertPEM,
-	}
-}
-
 type TLSConfig struct {
 	TLSCommon[TLSConfig]
 	CommonConfig[TLSConfig]
 
-	TerminateKeypair *TLSKeypair
+	KeyPEM  []byte
+	CertPEM []byte
 }
 
-func (cfg *TLSConfig) WithEdgeTermination(certPEM, keyPEM []byte) *TLSConfig {
-	cfg.TerminateKeypair = &TLSKeypair{
-		CertPEM: certPEM,
-		KeyPEM:  keyPEM,
-	}
+func (cfg *TLSConfig) WithTermination(certPEM, keyPEM []byte) *TLSConfig {
+	cfg.CertPEM = certPEM
+	cfg.KeyPEM = keyPEM
 	return cfg
 }
 
@@ -78,28 +61,31 @@ func TLSOptions() *TLSConfig {
 	return opts
 }
 
-func (tls *TLSConfig) toProtoConfig() *proto.TLSOptions {
+func (cfg *TLSConfig) toProtoConfig() *proto.TLSOptions {
 	opts := &proto.TLSOptions{
-		Hostname:   tls.TLSCommon.Domain,
-		ProxyProto: proto.ProxyProto(tls.CommonConfig.ProxyProto),
+		Hostname:   cfg.TLSCommon.Domain,
+		ProxyProto: proto.ProxyProto(cfg.CommonConfig.ProxyProto),
 	}
 
-	opts.IPRestriction = tls.CIDRRestrictions.toProtoConfig()
+	opts.IPRestriction = cfg.CIDRRestrictions.toProtoConfig()
 
-	opts.MutualTLSAtEdge = tls.TLSCommon.toProtoConfig()
+	opts.MutualTLSAtEdge = cfg.TLSCommon.toProtoConfig()
 
-	opts.TLSTermination = tls.TerminateKeypair.toProtoConfig()
+	opts.TLSTermination = &pb_agent.MiddlewareConfiguration_TLSTermination{
+		Key:  cfg.KeyPEM,
+		Cert: cfg.CertPEM,
+	}
 
 	return opts
 }
 
-func (tls *TLSConfig) tunnelConfig() tunnelConfig {
+func (cfg *TLSConfig) tunnelConfig() tunnelConfig {
 	return tunnelConfig{
-		forwardsTo: tls.ForwardsTo,
+		forwardsTo: cfg.ForwardsTo,
 		proto:      "tls",
-		opts:       tls.toProtoConfig(),
+		opts:       cfg.toProtoConfig(),
 		extra: proto.BindExtra{
-			Metadata: tls.Metadata,
+			Metadata: cfg.Metadata,
 		},
 	}
 }
