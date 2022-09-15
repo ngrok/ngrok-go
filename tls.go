@@ -44,7 +44,7 @@ type TLSConfig struct {
 	CertPEM []byte
 }
 
-func (cfg *TLSConfig) WithEdgeTermination(certPEM, keyPEM []byte) *TLSConfig {
+func (cfg *TLSConfig) WithTermination(certPEM, keyPEM []byte) *TLSConfig {
 	cfg.CertPEM = certPEM
 	cfg.KeyPEM = keyPEM
 	return cfg
