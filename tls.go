@@ -61,31 +61,31 @@ func TLSOptions() *TLSConfig {
 	return opts
 }
 
-func (tls *TLSConfig) toProtoConfig() *proto.TLSOptions {
+func (cfg *TLSConfig) toProtoConfig() *proto.TLSOptions {
 	opts := &proto.TLSOptions{
-		Hostname:   tls.TLSCommon.Domain,
-		ProxyProto: proto.ProxyProto(tls.CommonConfig.ProxyProto),
+		Hostname:   cfg.TLSCommon.Domain,
+		ProxyProto: proto.ProxyProto(cfg.CommonConfig.ProxyProto),
 	}
 
-	opts.IPRestriction = tls.CIDRRestrictions.toProtoConfig()
+	opts.IPRestriction = cfg.CIDRRestrictions.toProtoConfig()
 
-	opts.MutualTLSAtEdge = tls.TLSCommon.toProtoConfig()
+	opts.MutualTLSAtEdge = cfg.TLSCommon.toProtoConfig()
 
 	opts.TLSTermination = &pb_agent.MiddlewareConfiguration_TLSTermination{
-		Key:  tls.KeyPEM,
-		Cert: tls.CertPEM,
+		Key:  cfg.KeyPEM,
+		Cert: cfg.CertPEM,
 	}
 
 	return opts
 }
 
-func (tls *TLSConfig) tunnelConfig() tunnelConfig {
+func (cfg *TLSConfig) tunnelConfig() tunnelConfig {
 	return tunnelConfig{
-		forwardsTo: tls.ForwardsTo,
+		forwardsTo: cfg.ForwardsTo,
 		proto:      "tls",
-		opts:       tls.toProtoConfig(),
+		opts:       cfg.toProtoConfig(),
 		extra: proto.BindExtra{
-			Metadata: tls.Metadata,
+			Metadata: cfg.Metadata,
 		},
 	}
 }
