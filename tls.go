@@ -36,34 +36,17 @@ func (cfg *TLSCommon[T]) toProtoConfig() *pb_agent.MiddlewareConfiguration_Mutua
 	return opts
 }
 
-type TLSKeypair struct {
-	KeyPEM  []byte
-	CertPEM []byte
-}
-
-func (kp *TLSKeypair) toProtoConfig() *pb_agent.MiddlewareConfiguration_TLSTermination {
-	if kp == nil {
-		return nil
-	}
-
-	return &pb_agent.MiddlewareConfiguration_TLSTermination{
-		Key:  kp.KeyPEM,
-		Cert: kp.CertPEM,
-	}
-}
-
 type TLSConfig struct {
 	TLSCommon[TLSConfig]
 	CommonConfig[TLSConfig]
 
-	TerminateKeypair *TLSKeypair
+	KeyPEM  []byte
+	CertPEM []byte
 }
 
 func (cfg *TLSConfig) WithEdgeTermination(certPEM, keyPEM []byte) *TLSConfig {
-	cfg.TerminateKeypair = &TLSKeypair{
-		CertPEM: certPEM,
-		KeyPEM:  keyPEM,
-	}
+	cfg.CertPEM = certPEM
+	cfg.KeyPEM = keyPEM
 	return cfg
 }
 
@@ -88,7 +71,10 @@ func (tls *TLSConfig) toProtoConfig() *proto.TLSOptions {
 
 	opts.MutualTLSAtEdge = tls.TLSCommon.toProtoConfig()
 
-	opts.TLSTermination = tls.TerminateKeypair.toProtoConfig()
+	opts.TLSTermination = &pb_agent.MiddlewareConfiguration_TLSTermination{
+		Key:  tls.KeyPEM,
+		Cert: tls.CertPEM,
+	}
 
 	return opts
 }
