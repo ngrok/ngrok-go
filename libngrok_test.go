@@ -669,3 +669,11 @@ func TestErrors(t *testing.T) {
 	require.ErrorAs(t, err, &startErr)
 	require.IsType(t, &TCPConfig{}, startErr.Context.Config)
 }
+
+func TestNonExported(t *testing.T) {
+	ctx := context.Background()
+
+	sess := setupSession(ctx, t, nil)
+
+	require.NotEmpty(t, sess.(interface{ Region() string }).Region())
+}

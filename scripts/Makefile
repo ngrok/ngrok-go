@@ -20,3 +20,7 @@ test:
 .PHONY: coverage
 coverage: test
 	go tool cover -html cover.out
+
+docs:
+	godoc -index -http 127.0.0.1:6060 & \
+		xdg-open http://127.0.0.1:6060

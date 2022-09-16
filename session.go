@@ -28,13 +28,6 @@ type Session interface {
 	Close() error
 
 	StartTunnel(ctx context.Context, cfg TunnelConfig) (Tunnel, error)
-
-	SrvInfo() (SrvInfo, error)
-	AuthResp() AuthResp
-
-	Heartbeat() (time.Duration, error)
-
-	Latency() <-chan time.Duration
 }
 
 const (
@@ -111,8 +104,6 @@ type ConnectConfig struct {
 	RemoteCallbacks RemoteCallbacks
 
 	CallbackErrors CallbackErrors
-
-	Cookie string
 
 	Logger log15.Logger
 }
@@ -205,11 +196,6 @@ func (cfg *ConnectConfig) WithLocalCallbacks(callbacks LocalCallbacks) *ConnectC
 
 func (cfg *ConnectConfig) WithRemoteCallbacks(callbacks RemoteCallbacks) *ConnectConfig {
 	cfg.RemoteCallbacks = callbacks
-	return cfg
-}
-
-func (cfg *ConnectConfig) WithReconnectCookie(cookie string) *ConnectConfig {
-	cfg.Cookie = cookie
 	return cfg
 }
 
@@ -323,8 +309,6 @@ func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
 		StopUnsupportedError:    remoteStopErr,
 		UpdateUnsupportedError:  remoteUpdateErr,
 
-		Cookie: cfg.Cookie,
-
 		// TODO: More fields here?
 	}
 
@@ -340,8 +324,15 @@ func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
 		}
 
 		session.setInner(&sessionInner{
-			Session:  sess,
-			AuthResp: resp,
+			Session:         sess,
+			Region:          resp.Extra.Region,
+			ProtoVersion:    resp.Version,
+			ServerVersion:   resp.Extra.Version,
+			ClientID:        resp.Extra.Region,
+			AccountName:     resp.Extra.AccountName,
+			PlanName:        resp.Extra.PlanName,
+			Banner:          resp.Extra.Banner,
+			SessionDuration: resp.Extra.SessionDuration,
 		})
 
 		if cfg.LocalCallbacks.OnHeartbeat != nil {
@@ -413,7 +404,15 @@ type sessionImpl struct {
 
 type sessionInner struct {
 	tunnel_client.Session
-	AuthResp proto.AuthResp
+
+	Region          string
+	ProtoVersion    string
+	ServerVersion   string
+	ClientID        string
+	AccountName     string
+	PlanName        string
+	Banner          string
+	SessionDuration int64
 }
 
 func (s *sessionImpl) inner() *sessionInner {
@@ -457,22 +456,37 @@ func (s *sessionImpl) StartTunnel(ctx context.Context, cfg TunnelConfig) (Tunnel
 	}, nil
 }
 
-type SrvInfo proto.SrvInfoResp
-type AuthResp proto.AuthResp
+// The rest of the `sessionImpl` methods are non-public, but can be
+// interface-asserted if they're *really* needed. These are exempt from any
+// stability guarantees and subject to change without notice.
 
-func (s *sessionImpl) AuthResp() AuthResp {
-	return AuthResp(s.inner().AuthResp)
+func (s *sessionImpl) ProtoVersion() string {
+	return s.inner().ProtoVersion
 }
-
-func (s *sessionImpl) SrvInfo() (SrvInfo, error) {
-	resp, err := s.inner().SrvInfo()
-	return SrvInfo(resp), err
+func (s *sessionImpl) ServerVersion() string {
+	return s.inner().ServerVersion
 }
-
+func (s *sessionImpl) ClientID() string {
+	return s.inner().ClientID
+}
+func (s *sessionImpl) AccountName() string {
+	return s.inner().AccountName
+}
+func (s *sessionImpl) PlanName() string {
+	return s.inner().PlanName
+}
+func (s *sessionImpl) Banner() string {
+	return s.inner().Banner
+}
+func (s *sessionImpl) SessionDuration() int64 {
+	return s.inner().SessionDuration
+}
+func (s *sessionImpl) Region() string {
+	return s.inner().Region
+}
 func (s *sessionImpl) Heartbeat() (time.Duration, error) {
 	return s.inner().Heartbeat()
 }
-
 func (s *sessionImpl) Latency() <-chan time.Duration {
 	return s.inner().Latency()
 }

@@ -27,7 +27,6 @@ func main() {
 	ctx := context.Background()
 
 	stopRequested := false
-	reconnectCookie := ""
 	hostname := ""
 
 	logger := log15.New()
@@ -36,7 +35,6 @@ func main() {
 	for {
 		opts := libngrok.ConnectOptions().
 			WithAuthToken(os.Getenv("NGROK_TOKEN")).
-			WithReconnectCookie(reconnectCookie).
 			WithServer(os.Getenv("NGROK_SERVER")).
 			WithRegion(os.Getenv("NGROK_REGION")).
 			WithLogger(log15adapter.NewLogger(logger)).
@@ -66,13 +64,6 @@ func main() {
 
 		sess, err := libngrok.Connect(ctx, opts)
 		exitErr(err)
-
-		reconnectCookie = sess.AuthResp().Extra.Cookie
-
-		info, err := sess.SrvInfo()
-		exitErr(err)
-
-		fmt.Println("info: ", info)
 
 		tun, err := sess.StartTunnel(ctx, libngrok.
 			HTTPOptions().
