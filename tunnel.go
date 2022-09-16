@@ -4,12 +4,14 @@ import (
 	"context"
 	"net"
 	"net/http"
+	"time"
 
 	tunnel_client "github.com/ngrok/libngrok-go/internal/tunnel/client"
 )
 
 type Tunnel interface {
 	CloseWithContext(context.Context) error
+	Close() error
 
 	ForwardsTo() string
 	Metadata() string
@@ -50,7 +52,9 @@ func (t *tunnelImpl) Accept() (net.Conn, error) {
 }
 
 func (t *tunnelImpl) Close() error {
-	return t.Tunnel.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	return t.CloseWithContext(ctx)
 }
 
 func (t *tunnelImpl) CloseWithContext(_ context.Context) error {
