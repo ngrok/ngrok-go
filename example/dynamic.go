@@ -88,7 +88,7 @@ func manageTunnels(ctx context.Context, sess libngrok.Session) http.Handler {
 				WithOAuth(libngrok.OAuthProvider(provider).
 					AllowEmail(allowed)))
 			if err != nil {
-				httpResp(w, http.StatusInternalServerError, "error starting tunnel\n")
+				httpResp(w, http.StatusInternalServerError, "error starting tunnel: %v\n", err)
 				return
 			}
 
