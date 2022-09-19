@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"net/http/httputil"
-	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -33,7 +32,6 @@ func main() {
 	log15.Root().SetHandler(log15.LvlFilterHandler(log15.LvlInfo, log15.StdoutHandler))
 
 	restart := true
-	domain := ""
 
 	ctx := context.Background()
 
@@ -55,12 +53,8 @@ func main() {
 		))
 
 		tun := unwrap(sess.StartTunnel(ctx, libngrok.HTTPOptions().
-			WithDomain(domain).
 			WithForwardsTo("tunnel management"),
 		))
-
-		u := unwrap(url.Parse(tun.URL()))
-		domain = u.Hostname()
 
 		log15.Info("managing tunnels", "url", tun.URL())
 
