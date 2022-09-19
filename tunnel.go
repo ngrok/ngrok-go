@@ -10,7 +10,13 @@ import (
 )
 
 type Tunnel interface {
+	// Closing a tunnel is an operation that involves sending a "close" message
+	// over the existing session. Since this is subject to network latency,
+	// packet loss, etc., it is most correct to provide a context. See also
+	// `Close`, which matches the `io.Closer` interface method.
 	CloseWithContext(context.Context) error
+	// Convenience method that calls `CloseWithContext` with a default timeout
+	// of 5 seconds.
 	Close() error
 
 	ForwardsTo() string
