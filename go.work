@@ -8,7 +8,7 @@ go 1.18
 
 use (
 	.
-	./example
+	./examples
 	./log
 	./log/log15adapter
 	./log/pgxadapter
