@@ -2,17 +2,16 @@ package main
 
 import (
 	"context"
-	"crypto/x509"
-	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/inconshreveable/log15"
+
 	ngrok "github.com/ngrok/ngrok-go"
+	"github.com/ngrok/ngrok-go/examples/common"
 	"github.com/ngrok/ngrok-go/log/log15adapter"
 )
 
@@ -51,26 +50,14 @@ func main() {
 				},
 			})
 
-		if caPath := os.Getenv("NGROK_CA"); caPath != "" {
-			caBytes, err := ioutil.ReadFile(caPath)
-			exitErr(err)
-			pool := x509.NewCertPool()
-			ok := pool.AppendCertsFromPEM(caBytes)
-			if !ok {
-				exitErr(errors.New("failed to add CA Certificates"))
-			}
-			opts.WithCA(pool)
-		}
+		sess := common.Unwrap(ngrok.Connect(ctx, opts))
 
-		sess, err := ngrok.Connect(ctx, opts)
-		exitErr(err)
-
-		tun, err := sess.StartTunnel(ctx, ngrok.
+		tun := common.Unwrap(sess.StartTunnel(ctx, ngrok.
 			HTTPOptions().
 			WithDomain(hostname).
-			WithMetadata(`{"foo":"bar"}`),
-		)
-		exitErr(err)
+			WithMetadata(`{"foo":"bar"}`).
+			WithForwardsTo("foobarbaz"),
+		))
 
 		l := tun.AsHTTP()
 		fmt.Println("url: ", l.URL())
