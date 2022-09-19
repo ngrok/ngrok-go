@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"net/http"
-	"net/url"
 	"os"
 
 	"github.com/davecgh/go-spew/spew"
@@ -20,7 +19,6 @@ func main() {
 	ctx := context.Background()
 
 	stopRequested := false
-	hostname := ""
 
 	logger := log15.New()
 	logger.SetHandler(log15.LvlFilterHandler(log15.LvlInfo, log15.StderrHandler))
@@ -48,7 +46,6 @@ func main() {
 
 		tun := common.Unwrap(sess.StartTunnel(ctx, ngrok.
 			HTTPOptions().
-			WithDomain(hostname).
 			WithMetadata(`{"foo":"bar"}`).
 			WithForwardsTo("foobarbaz"),
 		))
@@ -56,11 +53,7 @@ func main() {
 		l := tun.AsHTTP()
 		log15.Info("started tunnel", "url", l.URL())
 
-		u, err := url.Parse(l.URL())
-		common.ExitErr(err)
-		hostname = u.Hostname()
-
-		err = l.Serve(ctx, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		err := l.Serve(ctx, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			spew.Fdump(w, r)
 		}))
 		if err != nil {
