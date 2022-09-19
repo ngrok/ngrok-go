@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"net/http/httputil"
 	"os"
@@ -12,16 +11,8 @@ import (
 
 	"github.com/inconshreveable/log15"
 	"github.com/ngrok/ngrok-go"
+	"github.com/ngrok/ngrok-go/examples/common"
 )
-
-func unwrap[T any](out T, err error) T {
-	if err != nil {
-		log15.Error("unwrapped error", "error", err)
-		os.Exit(1)
-	}
-
-	return out
-}
 
 func httpResp(w http.ResponseWriter, code int, msg string, args ...any) {
 	w.WriteHeader(code)
@@ -36,7 +27,7 @@ func main() {
 	ctx := context.Background()
 
 	for restart {
-		sess := unwrap(ngrok.Connect(ctx, ngrok.ConnectOptions().
+		sess := common.Unwrap(ngrok.Connect(ctx, ngrok.ConnectOptions().
 			WithLog15(log15.Root()).
 			WithRemoteCallbacks(ngrok.RemoteCallbacks{
 				OnStop: func(ctx context.Context, sess ngrok.Session) error {
@@ -52,7 +43,7 @@ func main() {
 			WithAuthtoken(os.Getenv("NGROK_TOKEN")),
 		))
 
-		tun := unwrap(sess.StartTunnel(ctx, ngrok.HTTPOptions().
+		tun := common.Unwrap(sess.StartTunnel(ctx, ngrok.HTTPOptions().
 			WithForwardsTo("tunnel management"),
 		))
 
@@ -88,10 +79,13 @@ func manageTunnels(ctx context.Context, sess ngrok.Session) http.Handler {
 
 			tunnels.Store(tun.ID(), tun)
 
-			go tun.AsHTTP().Serve(ctx, dumpRequest())
+			go func() {
+				err := tun.AsHTTP().Serve(ctx, dumpRequest())
+				log15.Info("tunnel closed:", err)
+			}()
 
 			httpResp(w, http.StatusOK, "%s: %s\n", tun.ID(), tun.URL())
-			log.Printf("Started tunnel for %s on %s: %s\n", allowed, provider, tun.URL())
+			log15.Info("started tunnel", "user", allowed, "provider", provider, "url", tun.URL())
 			return
 		}
 

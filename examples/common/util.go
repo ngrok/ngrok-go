@@ -1,6 +1,10 @@
 package common
 
-import "log"
+import (
+	"fmt"
+	"log"
+	"os"
+)
 
 func Unwrap[T any](out T, err error) T {
 	if err != nil {
@@ -8,4 +12,11 @@ func Unwrap[T any](out T, err error) T {
 	}
 
 	return out
+}
+
+func ExitErr(err error) {
+	if err != nil {
+		fmt.Println("error:", err)
+		os.Exit(1)
+	}
 }

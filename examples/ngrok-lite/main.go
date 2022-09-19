@@ -11,7 +11,8 @@ import (
 	"os"
 	"sync"
 
-	"github.com/ngrok/libngrok-go"
+	"github.com/inconshreveable/log15"
+	"github.com/ngrok/ngrok-go"
 	"github.com/ngrok/ngrok-go/examples/common"
 	"golang.org/x/sync/errgroup"
 )
@@ -42,6 +43,8 @@ func handleConn(ctx context.Context, dest string, conn net.Conn) error {
 }
 
 func main() {
+	log15.Root().SetHandler(log15.LvlFilterHandler(log15.LvlInfo, log15.StdoutHandler))
+
 	if len(os.Args) != 2 {
 		usage(os.Args[0])
 	}
@@ -49,11 +52,12 @@ func main() {
 	dest := os.Args[1]
 
 	ctx := context.Background()
-	sess := common.Unwrap(libngrok.Connect(ctx, libngrok.ConnectOptions().WithAuthToken(os.Getenv("NGROK_TOKEN"))))
+	sess := common.Unwrap(ngrok.Connect(ctx, ngrok.ConnectOptions().
+		WithAuthtoken(os.Getenv("NGROK_TOKEN"))))
 
-	tun := common.Unwrap(sess.StartTunnel(ctx, libngrok.HTTPOptions()))
+	tun := common.Unwrap(sess.StartTunnel(ctx, ngrok.HTTPOptions()))
 
-	fmt.Println("Tunnel created:", tun.URL())
+	log15.Info("tunnel created", "url", tun.URL())
 
 	l := tun.AsListener()
 
@@ -62,16 +66,16 @@ func main() {
 	for {
 		conn, err := l.Accept()
 		if err != nil {
-			fmt.Println("failed to accept connection:", err)
+			log15.Error("failed to accept connection", "error", err)
 			break
 		}
 
-		fmt.Println("Accepted connection from", conn.RemoteAddr())
+		log15.Info("accepted connection", "remote", conn.RemoteAddr())
 
 		g.Add(1)
 		go func() {
 			err := handleConn(ctx, dest, conn)
-			fmt.Println("connection closed:", err)
+			log15.Info("connection closed", "error", err)
 			g.Done()
 		}()
 	}

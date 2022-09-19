@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"net/url"
 	"os"
@@ -15,14 +14,9 @@ import (
 	"github.com/ngrok/ngrok-go/log/log15adapter"
 )
 
-func exitErr(err error) {
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-}
-
 func main() {
+	log15.Root().SetHandler(log15.LvlFilterHandler(log15.LvlInfo, log15.StdoutHandler))
+
 	ctx := context.Background()
 
 	stopRequested := false
@@ -40,12 +34,12 @@ func main() {
 			WithMetadata("Hello, world!").
 			WithRemoteCallbacks(ngrok.RemoteCallbacks{
 				OnStop: func(_ context.Context, sess ngrok.Session) error {
-					fmt.Println("got remote stop")
+					log15.Info("got remote stop")
 					stopRequested = true
 					return nil
 				},
 				OnRestart: func(_ context.Context, sess ngrok.Session) error {
-					fmt.Println("got remote restart")
+					log15.Info("got remote restart")
 					return nil
 				},
 			})
@@ -60,21 +54,21 @@ func main() {
 		))
 
 		l := tun.AsHTTP()
-		fmt.Println("url: ", l.URL())
+		log15.Info("started tunnel", "url", l.URL())
 
 		u, err := url.Parse(l.URL())
-		exitErr(err)
+		common.ExitErr(err)
 		hostname = u.Hostname()
 
 		err = l.Serve(ctx, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			spew.Fdump(w, r)
 		}))
 		if err != nil {
-			fmt.Println("http server exited:", err)
+			log15.Info("http server exited", "error", err)
 		}
 
 		if stopRequested {
-			fmt.Println("exiting")
+			log15.Info("exiting")
 			os.Exit(0)
 		}
 	}
