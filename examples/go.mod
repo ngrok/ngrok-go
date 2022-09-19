@@ -11,6 +11,7 @@ require (
 
 require (
 	github.com/go-stack/stack v1.8.1 // indirect
+	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/jpillora/backoff v1.0.0 // indirect
 	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
