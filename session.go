@@ -108,53 +108,53 @@ type ConnectConfig struct {
 	Logger log15.Logger
 }
 
-func ConnectOptions() *ConnectConfig {
-	return &ConnectConfig{}
+func ConnectOptions() ConnectConfig {
+	return ConnectConfig{}
 }
 
-func (cfg *ConnectConfig) WithMetadata(meta string) *ConnectConfig {
+func (cfg ConnectConfig) WithMetadata(meta string) ConnectConfig {
 	cfg.Metadata = meta
 	return cfg
 }
 
-func (cfg *ConnectConfig) WithDialer(dialer Dialer) *ConnectConfig {
+func (cfg ConnectConfig) WithDialer(dialer Dialer) ConnectConfig {
 	cfg.Dialer = dialer
 	return cfg
 }
 
-func (cfg *ConnectConfig) WithProxyURL(url *url.URL) *ConnectConfig {
+func (cfg ConnectConfig) WithProxyURL(url *url.URL) ConnectConfig {
 	cfg.ProxyURL = url
 	return cfg
 }
 
-func (cfg *ConnectConfig) WithResolver(resolver *net.Resolver) *ConnectConfig {
+func (cfg ConnectConfig) WithResolver(resolver *net.Resolver) ConnectConfig {
 	cfg.Resolver = resolver
 	return cfg
 }
 
-func (cfg *ConnectConfig) WithAuthToken(token string) *ConnectConfig {
+func (cfg ConnectConfig) WithAuthToken(token string) ConnectConfig {
 	cfg.AuthToken = token
 	return cfg
 }
 
-func (cfg *ConnectConfig) WithRegion(region string) *ConnectConfig {
+func (cfg ConnectConfig) WithRegion(region string) ConnectConfig {
 	if region != "" {
 		cfg.ServerAddr = fmt.Sprintf("tunnel.%s.ngrok.com:443", region)
 	}
 	return cfg
 }
 
-func (cfg *ConnectConfig) WithServer(addr string) *ConnectConfig {
+func (cfg ConnectConfig) WithServer(addr string) ConnectConfig {
 	cfg.ServerAddr = addr
 	return cfg
 }
 
-func (cfg *ConnectConfig) WithCA(pool *x509.CertPool) *ConnectConfig {
+func (cfg ConnectConfig) WithCA(pool *x509.CertPool) ConnectConfig {
 	cfg.CAPool = pool
 	return cfg
 }
 
-func (cfg *ConnectConfig) WithHeartbeatTolerance(tolerance time.Duration) *ConnectConfig {
+func (cfg ConnectConfig) WithHeartbeatTolerance(tolerance time.Duration) ConnectConfig {
 	if cfg.HeartbeatConfig == nil {
 		cfg.HeartbeatConfig = muxado.NewHeartbeatConfig()
 	}
@@ -162,7 +162,7 @@ func (cfg *ConnectConfig) WithHeartbeatTolerance(tolerance time.Duration) *Conne
 	return cfg
 }
 
-func (cfg *ConnectConfig) WithHeartbeatInterval(interval time.Duration) *ConnectConfig {
+func (cfg ConnectConfig) WithHeartbeatInterval(interval time.Duration) ConnectConfig {
 	if cfg.HeartbeatConfig == nil {
 		cfg.HeartbeatConfig = muxado.NewHeartbeatConfig()
 	}
@@ -173,7 +173,7 @@ func (cfg *ConnectConfig) WithHeartbeatInterval(interval time.Duration) *Connect
 // Log to a log15.Logger.
 // This is the logging interface that the internals use, so this is the most
 // direct way to set a logger.
-func (cfg *ConnectConfig) WithLog15(logger log15.Logger) *ConnectConfig {
+func (cfg ConnectConfig) WithLog15(logger log15.Logger) ConnectConfig {
 	cfg.Logger = logger
 	return cfg
 }
@@ -184,27 +184,27 @@ func (cfg *ConnectConfig) WithLog15(logger log15.Logger) *ConnectConfig {
 // `pgxadapter`.
 // If the provided `Logger` also implements the `log15.Logger` interface, it
 // will be used directly.
-func (cfg *ConnectConfig) WithLogger(logger Logger) *ConnectConfig {
+func (cfg ConnectConfig) WithLogger(logger Logger) ConnectConfig {
 	cfg.Logger = toLog15(logger)
 	return cfg
 }
 
-func (cfg *ConnectConfig) WithLocalCallbacks(callbacks LocalCallbacks) *ConnectConfig {
+func (cfg ConnectConfig) WithLocalCallbacks(callbacks LocalCallbacks) ConnectConfig {
 	cfg.LocalCallbacks = callbacks
 	return cfg
 }
 
-func (cfg *ConnectConfig) WithRemoteCallbacks(callbacks RemoteCallbacks) *ConnectConfig {
+func (cfg ConnectConfig) WithRemoteCallbacks(callbacks RemoteCallbacks) ConnectConfig {
 	cfg.RemoteCallbacks = callbacks
 	return cfg
 }
 
-func (cfg *ConnectConfig) WithCallbackErrors(errs CallbackErrors) *ConnectConfig {
+func (cfg ConnectConfig) WithCallbackErrors(errs CallbackErrors) ConnectConfig {
 	cfg.CallbackErrors = errs
 	return cfg
 }
 
-func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
+func Connect(ctx context.Context, cfg ConnectConfig) (Session, error) {
 	if cfg.Logger == nil {
 		cfg.Logger = log15.New()
 		cfg.Logger.SetHandler(log15.DiscardHandler())

@@ -19,12 +19,8 @@ import (
 	"golang.org/x/net/websocket"
 )
 
-func setupSession(ctx context.Context, t *testing.T, opts *ConnectConfig) Session {
-	if opts == nil {
-		opts = ConnectOptions()
-	}
-	opts.WithAuthToken(os.Getenv("NGROK_TOKEN"))
-	sess, err := Connect(ctx, opts)
+func setupSession(ctx context.Context, t *testing.T, opts ConnectConfig) Session {
+	sess, err := Connect(ctx, opts.WithAuthToken(os.Getenv("NGROK_TOKEN")))
 	require.NoError(t, err, "Session Connect")
 	return sess
 }
@@ -39,7 +35,7 @@ var helloHandler = http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request
 	_, _ = fmt.Fprintln(rw, "Hello, world!")
 })
 
-func serveHTTP(ctx context.Context, t *testing.T, connectOpts *ConnectConfig, opts TunnelConfig, handler http.Handler) (Tunnel, <-chan error) {
+func serveHTTP(ctx context.Context, t *testing.T, connectOpts ConnectConfig, opts TunnelConfig, handler http.Handler) (Tunnel, <-chan error) {
 	sess := setupSession(ctx, t, connectOpts)
 
 	tun := startTunnel(ctx, t, sess, opts)
@@ -55,7 +51,7 @@ func serveHTTP(ctx context.Context, t *testing.T, connectOpts *ConnectConfig, op
 
 func TestTunnel(t *testing.T) {
 	ctx := context.Background()
-	sess := setupSession(ctx, t, nil)
+	sess := setupSession(ctx, t, ConnectOptions())
 
 	tun := startTunnel(ctx, t, sess, HTTPOptions().
 		WithMetadata("Hello, world!").
@@ -68,7 +64,7 @@ func TestTunnel(t *testing.T) {
 
 func TestHTTPS(t *testing.T) {
 	ctx := context.Background()
-	tun, exited := serveHTTP(ctx, t, nil,
+	tun, exited := serveHTTP(ctx, t, ConnectOptions(),
 		HTTPOptions(),
 		helloHandler,
 	)
@@ -92,7 +88,7 @@ func TestHTTPS(t *testing.T) {
 
 func TestHTTP(t *testing.T) {
 	ctx := context.Background()
-	tun, exited := serveHTTP(ctx, t, nil,
+	tun, exited := serveHTTP(ctx, t, ConnectOptions(),
 		HTTPOptions().
 			WithScheme(SchemeHTTP),
 		helloHandler,
@@ -118,7 +114,7 @@ func TestHTTP(t *testing.T) {
 func TestHTTPCompression(t *testing.T) {
 	ctx := context.Background()
 	opts := HTTPOptions().WithCompression()
-	tun, exited := serveHTTP(ctx, t, nil, opts, helloHandler)
+	tun, exited := serveHTTP(ctx, t, ConnectOptions(), opts, helloHandler)
 
 	req, err := http.NewRequest(http.MethodGet, tun.URL(), nil)
 	require.NoError(t, err, "Create request")
@@ -166,7 +162,7 @@ func TestHTTPHeaders(t *testing.T) {
 			Add("spam", "eggs").
 			Remove("python"))
 
-	tun, exited := serveHTTP(ctx, t, nil, opts, http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+	tun, exited := serveHTTP(ctx, t, ConnectOptions(), opts, http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		defer func() { _ = recover() }()
 		t := failPanic{t}
 
@@ -205,7 +201,7 @@ func TestBasicAuth(t *testing.T) {
 
 	opts := HTTPOptions().WithBasicAuth("user", "foobarbaz")
 
-	tun, exited := serveHTTP(ctx, t, nil, opts, helloHandler)
+	tun, exited := serveHTTP(ctx, t, ConnectOptions(), opts, helloHandler)
 
 	req, err := http.NewRequest(http.MethodGet, tun.URL(), nil)
 	require.NoError(t, err, "Create request")
@@ -242,7 +238,7 @@ func TestCircuitBreaker(t *testing.T) {
 	opts := HTTPOptions().WithCircuitBreaker(0.1)
 
 	n := 0
-	tun, exited := serveHTTP(ctx, t, nil, opts, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	tun, exited := serveHTTP(ctx, t, ConnectOptions(), opts, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		n = n + 1
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}))
@@ -271,11 +267,11 @@ type TestConfig interface {
 	WithProxyProtoI(version ProxyProtoVersion) TunnelConfig
 }
 
-func (http *HTTPConfig) WithProxyProtoI(version ProxyProtoVersion) TunnelConfig {
+func (http HTTPConfig) WithProxyProtoI(version ProxyProtoVersion) TunnelConfig {
 	return http.WithProxyProto(version)
 }
 
-func (tcp *TCPConfig) WithProxyProtoI(version ProxyProtoVersion) TunnelConfig {
+func (tcp TCPConfig) WithProxyProtoI(version ProxyProtoVersion) TunnelConfig {
 	return tcp.WithProxyProto(version)
 }
 
@@ -332,7 +328,7 @@ func TestProxyProto(t *testing.T) {
 
 	for _, tcase := range cases {
 		t.Run(tcase.name, func(t *testing.T) {
-			sess := setupSession(ctx, t, nil)
+			sess := setupSession(ctx, t, ConnectOptions())
 			tun := startTunnel(ctx, t, sess, tcase.optsFunc().
 				WithProxyProtoI(tcase.version),
 			).AsListener()
@@ -356,7 +352,7 @@ func TestProxyProto(t *testing.T) {
 func TestHostname(t *testing.T) {
 	ctx := context.Background()
 
-	tun, exited := serveHTTP(ctx, t, nil,
+	tun, exited := serveHTTP(ctx, t, ConnectOptions(),
 		HTTPOptions().WithDomain("foo.robsonchase.com"),
 		helloHandler,
 	)
@@ -381,7 +377,7 @@ func TestSubdomain(t *testing.T) {
 
 	subdomain := hex.EncodeToString(buf)
 
-	tun, exited := serveHTTP(ctx, t, nil,
+	tun, exited := serveHTTP(ctx, t, ConnectOptions(),
 		HTTPOptions().WithDomain(subdomain+".ngrok.io"),
 		helloHandler,
 	)
@@ -404,7 +400,7 @@ func TestOAuth(t *testing.T) {
 
 	opts := HTTPOptions().WithOAuth(OAuthProvider("google"))
 
-	tun, exited := serveHTTP(ctx, t, nil, opts, helloHandler)
+	tun, exited := serveHTTP(ctx, t, ConnectOptions(), opts, helloHandler)
 
 	resp, err := http.Get(tun.URL())
 	require.NoError(t, err, "GET tunnel url")
@@ -429,7 +425,7 @@ func TestHTTPIPRestriction(t *testing.T) {
 			Deny(cidr),
 	)
 
-	tun, exited := serveHTTP(ctx, t, nil, opts, helloHandler)
+	tun, exited := serveHTTP(ctx, t, ConnectOptions(), opts, helloHandler)
 
 	resp, err := http.Get(tun.URL())
 	require.NoError(t, err, "GET tunnel url")
@@ -446,7 +442,7 @@ func TestTCP(t *testing.T) {
 	opts := TCPOptions()
 
 	// Easier to test by pretending it's HTTP on this end.
-	tun, exited := serveHTTP(ctx, t, nil, opts, helloHandler)
+	tun, exited := serveHTTP(ctx, t, ConnectOptions(), opts, helloHandler)
 
 	url, err := url.Parse(tun.URL())
 	require.NoError(t, err)
@@ -476,7 +472,7 @@ func TestTCPIPRestriction(t *testing.T) {
 	)
 
 	// Easier to test by pretending it's HTTP on this end.
-	tun, exited := serveHTTP(ctx, t, nil, opts, helloHandler)
+	tun, exited := serveHTTP(ctx, t, ConnectOptions(), opts, helloHandler)
 
 	url, err := url.Parse(tun.URL())
 	require.NoError(t, err)
@@ -492,7 +488,7 @@ func TestTCPIPRestriction(t *testing.T) {
 
 func TestLabeled(t *testing.T) {
 	ctx := context.Background()
-	tun, exited := serveHTTP(ctx, t, nil,
+	tun, exited := serveHTTP(ctx, t, ConnectOptions(),
 		LabeledOptions().
 			WithLabel("edge", "edghts_2CtuOWQFCrvggKT34fRCFXs0AiK").
 			WithMetadata("Hello, world!"),
@@ -524,7 +520,7 @@ func TestLabeled(t *testing.T) {
 
 func TestWebsocketConversion(t *testing.T) {
 	ctx := context.Background()
-	sess := setupSession(ctx, t, nil)
+	sess := setupSession(ctx, t, ConnectOptions())
 	tun := startTunnel(ctx, t, sess,
 		HTTPOptions().
 			WithWebsocketTCPConversion(),
@@ -667,13 +663,13 @@ func TestErrors(t *testing.T) {
 	var startErr ErrStartTunnel
 	require.ErrorIs(t, err, startErr)
 	require.ErrorAs(t, err, &startErr)
-	require.IsType(t, &TCPConfig{}, startErr.Context.Config)
+	require.IsType(t, TCPConfig{}, startErr.Context.Config)
 }
 
 func TestNonExported(t *testing.T) {
 	ctx := context.Background()
 
-	sess := setupSession(ctx, t, nil)
+	sess := setupSession(ctx, t, ConnectOptions())
 
 	require.NotEmpty(t, sess.(interface{ Region() string }).Region())
 }

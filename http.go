@@ -18,18 +18,22 @@ type Headers struct {
 	Removed []string
 }
 
-func (h *Headers) Add(name, value string) *Headers {
+func (h Headers) Add(name, value string) Headers {
+	if h.Added == nil {
+		h.Added = map[string]string{}
+	}
+
 	h.Added[name] = value
 	return h
 }
 
-func (h *Headers) Remove(name string) *Headers {
+func (h Headers) Remove(name string) Headers {
 	h.Removed = append(h.Removed, name)
 	return h
 }
 
-func (h *Headers) toProtoConfig() *pb_agent.MiddlewareConfiguration_Headers {
-	if h == nil {
+func (h Headers) toProtoConfig() *pb_agent.MiddlewareConfiguration_Headers {
+	if len(h.Added) == 0 && len(h.Removed) == 0 {
 		return nil
 	}
 
@@ -44,63 +48,63 @@ func (h *Headers) toProtoConfig() *pb_agent.MiddlewareConfiguration_Headers {
 	return headers
 }
 
-func HTTPHeaders() *Headers {
-	return &Headers{
+func HTTPHeaders() Headers {
+	return Headers{
 		Added:   map[string]string{},
 		Removed: []string{},
 	}
 }
 
 type HTTPConfig struct {
-	CommonConfig *CommonConfig
-	TLSCommon    *TLSCommon
+	CommonConfig CommonConfig
+	TLSCommon    TLSCommon
+
+	Domain string
 
 	Scheme                 Scheme
 	Compression            bool
 	WebsocketTCPConversion bool
 	CircuitBreaker         float64
 
-	RequestHeaders  *Headers
-	ResponseHeaders *Headers
+	RequestHeaders  Headers
+	ResponseHeaders Headers
 
 	BasicAuth           []BasicAuth
-	OAuth               *OAuth
-	WebhookVerification *WebhookVerification
+	OAuth               OAuth
+	WebhookVerification WebhookVerification
 }
 
-func HTTPOptions() *HTTPConfig {
-	opts := &HTTPConfig{}
-	opts.TLSCommon = &TLSCommon{}
-	opts.CommonConfig = &CommonConfig{}
+func HTTPOptions() HTTPConfig {
+	opts := HTTPConfig{}
 	return opts
 }
 
-func (cfg *HTTPConfig) WithScheme(scheme Scheme) *HTTPConfig {
+func (cfg HTTPConfig) WithScheme(scheme Scheme) HTTPConfig {
 	cfg.Scheme = scheme
 	return cfg
 }
 
-func (cfg *HTTPConfig) WithWebsocketTCPConversion() *HTTPConfig {
+func (cfg HTTPConfig) WithWebsocketTCPConversion() HTTPConfig {
 	cfg.WebsocketTCPConversion = true
 	return cfg
 }
 
-func (cfg *HTTPConfig) WithCompression() *HTTPConfig {
+func (cfg HTTPConfig) WithCompression() HTTPConfig {
 	cfg.Compression = true
 	return cfg
 }
 
-func (cfg *HTTPConfig) WithCircuitBreaker(ratio float64) *HTTPConfig {
+func (cfg HTTPConfig) WithCircuitBreaker(ratio float64) HTTPConfig {
 	cfg.CircuitBreaker = ratio
 	return cfg
 }
 
-func (cfg *HTTPConfig) WithRequestHeaders(headers *Headers) *HTTPConfig {
+func (cfg HTTPConfig) WithRequestHeaders(headers Headers) HTTPConfig {
 	cfg.RequestHeaders = headers
 	return cfg
 }
 
-func (cfg *HTTPConfig) WithResponseHeaders(headers *Headers) *HTTPConfig {
+func (cfg HTTPConfig) WithResponseHeaders(headers Headers) HTTPConfig {
 	cfg.ResponseHeaders = headers
 	return cfg
 }
@@ -119,29 +123,32 @@ type OAuth struct {
 	Scopes       []string
 }
 
-func OAuthProvider(name string) *OAuth {
-	return &OAuth{
+func OAuthProvider(name string) OAuth {
+	return OAuth{
 		Provider: name,
 	}
 }
 
-func (oauth *OAuth) AllowEmail(addr ...string) *OAuth {
+func (oauth OAuth) AllowEmail(addr ...string) OAuth {
 	oauth.AllowEmails = append(oauth.AllowEmails, addr...)
 	return oauth
 }
 
-func (oauth *OAuth) AllowDomain(domain ...string) *OAuth {
+func (oauth OAuth) AllowDomain(domain ...string) OAuth {
 	oauth.AllowDomains = append(oauth.AllowDomains, domain...)
 	return oauth
 }
 
-func (oauth *OAuth) WithScope(scope ...string) *OAuth {
+func (oauth OAuth) WithScope(scope ...string) OAuth {
 	oauth.Scopes = append(oauth.Scopes, scope...)
 	return oauth
 }
 
-func (oauth *OAuth) toProtoConfig() *pb_agent.MiddlewareConfiguration_OAuth {
-	if oauth == nil {
+func (oauth OAuth) toProtoConfig() *pb_agent.MiddlewareConfiguration_OAuth {
+	if oauth.Provider == "" &&
+		len(oauth.AllowEmails) == 0 &&
+		len(oauth.AllowDomains) == 0 &&
+		len(oauth.Scopes) == 0 {
 		return nil
 	}
 
@@ -153,7 +160,7 @@ func (oauth *OAuth) toProtoConfig() *pb_agent.MiddlewareConfiguration_OAuth {
 	}
 }
 
-func (cfg *HTTPConfig) WithOAuth(oauth *OAuth) *HTTPConfig {
+func (cfg HTTPConfig) WithOAuth(oauth OAuth) HTTPConfig {
 	cfg.OAuth = oauth
 	return cfg
 }
@@ -162,11 +169,11 @@ type BasicAuth struct {
 	Username, Password string
 }
 
-func (cfg *HTTPConfig) WithBasicAuth(username, password string) *HTTPConfig {
+func (cfg HTTPConfig) WithBasicAuth(username, password string) HTTPConfig {
 	return cfg.WithBasicAuthCreds(BasicAuth{username, password})
 }
 
-func (cfg *HTTPConfig) WithBasicAuthCreds(credential ...BasicAuth) *HTTPConfig {
+func (cfg HTTPConfig) WithBasicAuthCreds(credential ...BasicAuth) HTTPConfig {
 	cfg.BasicAuth = append(cfg.BasicAuth, credential...)
 	return cfg
 }
@@ -176,16 +183,16 @@ type WebhookVerification struct {
 	Secret   string
 }
 
-func (cfg *HTTPConfig) WithWebhookVerification(provider string, secret string) *HTTPConfig {
-	cfg.WebhookVerification = &WebhookVerification{
+func (cfg HTTPConfig) WithWebhookVerification(provider string, secret string) HTTPConfig {
+	cfg.WebhookVerification = WebhookVerification{
 		Provider: provider,
 		Secret:   secret,
 	}
 	return cfg
 }
 
-func (wv *WebhookVerification) toProtoConfig() *pb_agent.MiddlewareConfiguration_WebhookVerification {
-	if wv == nil {
+func (wv WebhookVerification) toProtoConfig() *pb_agent.MiddlewareConfiguration_WebhookVerification {
+	if wv.Provider == "" && wv.Secret == "" {
 		return nil
 	}
 	return &pb_agent.MiddlewareConfiguration_WebhookVerification{
@@ -194,39 +201,39 @@ func (wv *WebhookVerification) toProtoConfig() *pb_agent.MiddlewareConfiguration
 	}
 }
 
-func (cfg *HTTPConfig) WithDomain(name string) *HTTPConfig {
-	cfg.TLSCommon = cfg.TLSCommon.WithDomain(name)
+func (cfg HTTPConfig) WithDomain(name string) HTTPConfig {
+	cfg.Domain = name
 	return cfg
 }
 
-func (cfg *HTTPConfig) WithMutualTLSCA(certs ...*x509.Certificate) *HTTPConfig {
+func (cfg HTTPConfig) WithMutualTLSCA(certs ...*x509.Certificate) HTTPConfig {
 	cfg.TLSCommon = cfg.TLSCommon.WithMutualTLSCA(certs...)
 	return cfg
 }
 
-func (cfg *HTTPConfig) WithProxyProto(version ProxyProtoVersion) *HTTPConfig {
+func (cfg HTTPConfig) WithProxyProto(version ProxyProtoVersion) HTTPConfig {
 	cfg.CommonConfig = cfg.CommonConfig.WithProxyProto(version)
 	return cfg
 }
 
-func (cfg *HTTPConfig) WithMetadata(meta string) *HTTPConfig {
+func (cfg HTTPConfig) WithMetadata(meta string) HTTPConfig {
 	cfg.CommonConfig = cfg.CommonConfig.WithMetadata(meta)
 	return cfg
 }
 
-func (cfg *HTTPConfig) WithForwardsTo(address string) *HTTPConfig {
+func (cfg HTTPConfig) WithForwardsTo(address string) HTTPConfig {
 	cfg.CommonConfig = cfg.CommonConfig.WithForwardsTo(address)
 	return cfg
 }
 
-func (cfg *HTTPConfig) WithCIDRRestriction(set ...*CIDRRestriction) *HTTPConfig {
+func (cfg HTTPConfig) WithCIDRRestriction(set ...CIDRRestriction) HTTPConfig {
 	cfg.CommonConfig = cfg.CommonConfig.WithCIDRRestriction(set...)
 	return cfg
 }
 
-func (cfg *HTTPConfig) toProtoConfig() *proto.HTTPOptions {
+func (cfg HTTPConfig) toProtoConfig() *proto.HTTPOptions {
 	opts := &proto.HTTPOptions{
-		Hostname: cfg.TLSCommon.Domain,
+		Hostname: cfg.Domain,
 	}
 
 	if cfg.Compression {
@@ -262,7 +269,7 @@ func (cfg *HTTPConfig) toProtoConfig() *proto.HTTPOptions {
 	return opts
 }
 
-func (cfg *HTTPConfig) tunnelConfig() tunnelConfig {
+func (cfg HTTPConfig) tunnelConfig() tunnelConfig {
 	if cfg.Scheme == "" {
 		cfg.Scheme = SchemeHTTPS
 	}

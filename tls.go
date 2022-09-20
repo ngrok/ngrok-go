@@ -9,22 +9,16 @@ import (
 )
 
 type TLSCommon struct {
-	Domain      string
 	MutualTLSCA []*x509.Certificate
 }
 
-func (cfg *TLSCommon) WithDomain(name string) *TLSCommon {
-	cfg.Domain = name
-	return cfg
-}
-
-func (cfg *TLSCommon) WithMutualTLSCA(certs ...*x509.Certificate) *TLSCommon {
+func (cfg TLSCommon) WithMutualTLSCA(certs ...*x509.Certificate) TLSCommon {
 	cfg.MutualTLSCA = append(cfg.MutualTLSCA, certs...)
 	return cfg
 }
 
-func (cfg *TLSCommon) toProtoConfig() *pb_agent.MiddlewareConfiguration_MutualTLS {
-	if cfg == nil || cfg.MutualTLSCA == nil {
+func (cfg TLSCommon) toProtoConfig() *pb_agent.MiddlewareConfiguration_MutualTLS {
+	if cfg.MutualTLSCA == nil {
 		return nil
 	}
 	opts := &pb_agent.MiddlewareConfiguration_MutualTLS{}
@@ -35,59 +29,59 @@ func (cfg *TLSCommon) toProtoConfig() *pb_agent.MiddlewareConfiguration_MutualTL
 }
 
 type TLSConfig struct {
-	TLSCommon    *TLSCommon
-	CommonConfig *CommonConfig
+	TLSCommon    TLSCommon
+	CommonConfig CommonConfig
+
+	Domain string
 
 	KeyPEM  []byte
 	CertPEM []byte
 }
 
-func (cfg *TLSConfig) WithTermination(certPEM, keyPEM []byte) *TLSConfig {
+func (cfg TLSConfig) WithTermination(certPEM, keyPEM []byte) TLSConfig {
 	cfg.CertPEM = certPEM
 	cfg.KeyPEM = keyPEM
 	return cfg
 }
 
-func TLSOptions() *TLSConfig {
-	opts := &TLSConfig{}
-	opts.TLSCommon = &TLSCommon{}
-	opts.CommonConfig = &CommonConfig{}
+func TLSOptions() TLSConfig {
+	opts := TLSConfig{}
 	return opts
 }
 
-func (cfg *TLSConfig) WithDomain(name string) *TLSConfig {
-	cfg.TLSCommon = cfg.TLSCommon.WithDomain(name)
+func (cfg TLSConfig) WithDomain(name string) TLSConfig {
+	cfg.Domain = name
 	return cfg
 }
 
-func (cfg *TLSConfig) WithMutualTLSCA(certs ...*x509.Certificate) *TLSConfig {
+func (cfg TLSConfig) WithMutualTLSCA(certs ...*x509.Certificate) TLSConfig {
 	cfg.TLSCommon = cfg.TLSCommon.WithMutualTLSCA(certs...)
 	return cfg
 }
 
-func (cfg *TLSConfig) WithProxyProto(version ProxyProtoVersion) *TLSConfig {
+func (cfg TLSConfig) WithProxyProto(version ProxyProtoVersion) TLSConfig {
 	cfg.CommonConfig = cfg.CommonConfig.WithProxyProto(version)
 	return cfg
 }
 
-func (cfg *TLSConfig) WithMetadata(meta string) *TLSConfig {
+func (cfg TLSConfig) WithMetadata(meta string) TLSConfig {
 	cfg.CommonConfig = cfg.CommonConfig.WithMetadata(meta)
 	return cfg
 }
 
-func (cfg *TLSConfig) WithForwardsTo(address string) *TLSConfig {
+func (cfg TLSConfig) WithForwardsTo(address string) TLSConfig {
 	cfg.CommonConfig = cfg.CommonConfig.WithForwardsTo(address)
 	return cfg
 }
 
-func (cfg *TLSConfig) WithCIDRRestriction(set ...*CIDRRestriction) *TLSConfig {
+func (cfg TLSConfig) WithCIDRRestriction(set ...CIDRRestriction) TLSConfig {
 	cfg.CommonConfig = cfg.CommonConfig.WithCIDRRestriction(set...)
 	return cfg
 }
 
-func (cfg *TLSConfig) toProtoConfig() *proto.TLSOptions {
+func (cfg TLSConfig) toProtoConfig() *proto.TLSOptions {
 	opts := &proto.TLSOptions{
-		Hostname:   cfg.TLSCommon.Domain,
+		Hostname:   cfg.Domain,
 		ProxyProto: proto.ProxyProto(cfg.CommonConfig.ProxyProto),
 	}
 
@@ -103,7 +97,7 @@ func (cfg *TLSConfig) toProtoConfig() *proto.TLSOptions {
 	return opts
 }
 
-func (cfg *TLSConfig) tunnelConfig() tunnelConfig {
+func (cfg TLSConfig) tunnelConfig() tunnelConfig {
 	return tunnelConfig{
 		forwardsTo: cfg.CommonConfig.ForwardsTo,
 		proto:      "tls",
