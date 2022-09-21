@@ -3,14 +3,14 @@ package libngrok
 import "github.com/ngrok/libngrok-go/internal/tunnel/proto"
 
 type tunnelConfig struct {
-	// Note: Only one set of options should be set at a time - either proto,
-	// opts, and extra, or labels and metadata.
+	// Note: Only one set of options should be set at a time - either proto and
+	// opts or only labels
 	forwardsTo string
+	extra      proto.BindExtra
 
 	// HTTP(s), TCP, and TLS tunnels
 	proto string
 	opts  any
-	extra proto.BindExtra
 
 	// Labeled tunnels
 	labels map[string]string

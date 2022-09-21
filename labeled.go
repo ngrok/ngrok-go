@@ -3,39 +3,40 @@ package libngrok
 import "github.com/ngrok/libngrok-go/internal/tunnel/proto"
 
 type LabeledConfig struct {
-	Labels     map[string]string
-	Metadata   string
-	ForwardsTo string
+	CommonConfig *CommonConfig
+
+	Labels map[string]string
 }
 
 func LabeledOptions() *LabeledConfig {
 	opts := &LabeledConfig{
-		Labels: map[string]string{},
+		Labels:       map[string]string{},
+		CommonConfig: &CommonConfig{},
 	}
 	return opts
 }
 
-func (lo *LabeledConfig) WithLabel(key, value string) *LabeledConfig {
-	lo.Labels[key] = value
-	return lo
+func (cfg *LabeledConfig) WithLabel(key, value string) *LabeledConfig {
+	cfg.Labels[key] = value
+	return cfg
 }
 
-func (lo *LabeledConfig) WithForwardsTo(addr string) *LabeledConfig {
-	lo.ForwardsTo = addr
-	return lo
+func (cfg *LabeledConfig) WithForwardsTo(addr string) *LabeledConfig {
+	cfg.CommonConfig = cfg.CommonConfig.WithForwardsTo(addr)
+	return cfg
 }
 
-func (lo *LabeledConfig) WithMetadata(meta string) *LabeledConfig {
-	lo.Metadata = meta
-	return lo
+func (cfg *LabeledConfig) WithMetadata(meta string) *LabeledConfig {
+	cfg.CommonConfig = cfg.CommonConfig.WithMetadata(meta)
+	return cfg
 }
 
-func (lo *LabeledConfig) tunnelConfig() tunnelConfig {
+func (cfg *LabeledConfig) tunnelConfig() tunnelConfig {
 	return tunnelConfig{
-		forwardsTo: lo.ForwardsTo,
-		labels:     lo.Labels,
+		forwardsTo: cfg.CommonConfig.ForwardsTo,
+		labels:     cfg.Labels,
 		extra: proto.BindExtra{
-			Metadata: lo.Metadata,
+			Metadata: cfg.CommonConfig.Metadata,
 		},
 	}
 }

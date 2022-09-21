@@ -6,9 +6,7 @@ import (
 	"github.com/ngrok/libngrok-go/internal/pb_agent"
 )
 
-type CommonConfig[T any] struct {
-	parent *T
-
+type CommonConfig struct {
 	CIDRRestrictions *CIDRRestriction
 	ProxyProto       ProxyProtoVersion
 	Metadata         string
@@ -22,19 +20,19 @@ const (
 	ProxyProtoV2 = ProxyProtoVersion(2)
 )
 
-func (cfg *CommonConfig[T]) WithProxyProto(version ProxyProtoVersion) *T {
+func (cfg *CommonConfig) WithProxyProto(version ProxyProtoVersion) *CommonConfig {
 	cfg.ProxyProto = version
-	return cfg.parent
+	return cfg
 }
 
-func (cfg *CommonConfig[T]) WithMetadata(meta string) *T {
+func (cfg *CommonConfig) WithMetadata(meta string) *CommonConfig {
 	cfg.Metadata = meta
-	return cfg.parent
+	return cfg
 }
 
-func (cfg *CommonConfig[T]) WithForwardsTo(address string) *T {
+func (cfg *CommonConfig) WithForwardsTo(address string) *CommonConfig {
 	cfg.ForwardsTo = address
-	return cfg.parent
+	return cfg
 }
 
 type CIDRRestriction struct {
@@ -81,7 +79,7 @@ func (ir *CIDRRestriction) toProtoConfig() *pb_agent.MiddlewareConfiguration_IPR
 	}
 }
 
-func (cfg *CommonConfig[T]) WithCIDRRestriction(set ...*CIDRRestriction) *T {
+func (cfg *CommonConfig) WithCIDRRestriction(set ...*CIDRRestriction) *CommonConfig {
 	if cfg.CIDRRestrictions == nil {
 		cfg.CIDRRestrictions = CIDRSet()
 	}
@@ -92,5 +90,5 @@ func (cfg *CommonConfig[T]) WithCIDRRestriction(set ...*CIDRRestriction) *T {
 			cfg.CIDRRestrictions.DenyString(s.Denied...)
 		}
 	}
-	return cfg.parent
+	return cfg
 }
