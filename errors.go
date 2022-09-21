@@ -3,7 +3,6 @@ package libngrok
 import (
 	"fmt"
 	"net/url"
-	"reflect"
 )
 
 type ErrAuthFailed struct {
@@ -27,7 +26,8 @@ func (e ErrAuthFailed) Unwrap() error {
 }
 
 func (e ErrAuthFailed) Is(target error) bool {
-	return reflect.TypeOf(e) == reflect.TypeOf(target)
+	_, ok := target.(ErrAuthFailed)
+	return ok
 }
 
 type ErrAcceptFailed struct {
@@ -43,7 +43,8 @@ func (e ErrAcceptFailed) Unwrap() error {
 }
 
 func (e ErrAcceptFailed) Is(target error) bool {
-	return reflect.TypeOf(e) == reflect.TypeOf(target)
+	_, ok := target.(ErrAcceptFailed)
+	return ok
 }
 
 type ErrStartTunnel struct {
@@ -60,7 +61,8 @@ func (e ErrStartTunnel) Unwrap() error {
 }
 
 func (e ErrStartTunnel) Is(target error) bool {
-	return reflect.TypeOf(e) == reflect.TypeOf(target)
+	_, ok := target.(ErrStartTunnel)
+	return ok
 }
 
 type ErrProxyInit struct {
@@ -77,7 +79,8 @@ func (e ErrProxyInit) Unwrap() error {
 }
 
 func (e ErrProxyInit) Is(target error) bool {
-	return reflect.TypeOf(e) == reflect.TypeOf(target)
+	_, ok := target.(ErrProxyInit)
+	return ok
 }
 
 type ErrSessionDial struct {
@@ -94,5 +97,6 @@ func (e ErrSessionDial) Unwrap() error {
 }
 
 func (e ErrSessionDial) Is(target error) bool {
-	return reflect.TypeOf(e) == reflect.TypeOf(target)
+	_, ok := target.(ErrSessionDial)
+	return ok
 }
