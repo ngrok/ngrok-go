@@ -6,74 +6,93 @@ import (
 	"reflect"
 )
 
-type ErrContext interface {
-	message() string
-}
-type Error[C ErrContext] struct {
-	Inner   error
-	Context C
+type ErrAuthFailed struct {
+	Remote bool
+	Inner  error
 }
 
-func (e Error[C]) Unwrap() error {
+func (e ErrAuthFailed) Error() string {
+	var msg string
+	if e.Remote {
+		msg = "authentication failed"
+	} else {
+		msg = "failed to send authentication request"
+	}
+
+	return fmt.Sprintf("%s: %v", msg, e.Inner)
+}
+
+func (e ErrAuthFailed) Unwrap() error {
 	return e.Inner
 }
 
-func (e Error[C]) Error() string {
-	msg := e.Context.message()
-	if e.Inner != nil {
-		return fmt.Sprintf("%s: %v", msg, e.Inner.Error())
-	} else {
-		return msg
-	}
+func (e ErrAuthFailed) Is(target error) bool {
+	return reflect.TypeOf(e) == reflect.TypeOf(target)
 }
 
-func (e Error[C]) Is(other error) bool {
-	return reflect.TypeOf(e) == reflect.TypeOf(other)
+type ErrAcceptFailed struct {
+	Inner error
 }
 
-type ErrAuthFailed = Error[AuthFailedContext]
-type AuthFailedContext struct {
-	Remote bool
+func (e ErrAcceptFailed) Error() string {
+	return fmt.Sprintf("failed to accept connection: %v", e.Inner)
 }
 
-func (c AuthFailedContext) message() string {
-	if c.Remote {
-		return "authentication failed"
-	} else {
-		return "failed to send authentication request"
-	}
+func (e ErrAcceptFailed) Unwrap() error {
+	return e.Inner
 }
 
-type ErrAcceptFailed = Error[AcceptContext]
-type AcceptContext struct{}
-
-func (c AcceptContext) message() string {
-	return "failed to accept connection"
+func (e ErrAcceptFailed) Is(target error) bool {
+	return reflect.TypeOf(e) == reflect.TypeOf(target)
 }
 
-type ErrStartTunnel = Error[StartContext]
-type StartContext struct {
+type ErrStartTunnel struct {
 	Config TunnelConfig
+	Inner  error
 }
 
-func (c StartContext) message() string {
-	return "failed to start tunnel"
+func (e ErrStartTunnel) Error() string {
+	return fmt.Sprintf("failed to start tunnel: %v", e.Inner)
 }
 
-type ErrProxyInit = Error[ProxyInitContext]
-type ProxyInitContext struct {
-	URL *url.URL
+func (e ErrStartTunnel) Unwrap() error {
+	return e.Inner
 }
 
-func (c ProxyInitContext) message() string {
-	return fmt.Sprintf("failed to construct proxy dialer from \"%s\"", c.URL.String())
+func (e ErrStartTunnel) Is(target error) bool {
+	return reflect.TypeOf(e) == reflect.TypeOf(target)
 }
 
-type ErrSessionDial = Error[DialContext]
-type DialContext struct {
-	Addr string
+type ErrProxyInit struct {
+	URL   *url.URL
+	Inner error
 }
 
-func (c DialContext) message() string {
-	return fmt.Sprintf("failed to dial ngrok server with address \"%s\"", c.Addr)
+func (e ErrProxyInit) Error() string {
+	return fmt.Sprintf("failed to construct proxy dialer from \"%s\": %v", e.URL.String(), e.Inner)
+}
+
+func (e ErrProxyInit) Unwrap() error {
+	return e.Inner
+}
+
+func (e ErrProxyInit) Is(target error) bool {
+	return reflect.TypeOf(e) == reflect.TypeOf(target)
+}
+
+type ErrSessionDial struct {
+	Addr  string
+	Inner error
+}
+
+func (e ErrSessionDial) Error() string {
+	return fmt.Sprintf("failed to dial ngrok server with address \"%s\": %v", e.Addr, e.Inner)
+}
+
+func (e ErrSessionDial) Unwrap() error {
+	return e.Inner
+}
+
+func (e ErrSessionDial) Is(target error) bool {
+	return reflect.TypeOf(e) == reflect.TypeOf(target)
 }
