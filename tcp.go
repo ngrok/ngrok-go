@@ -46,13 +46,9 @@ func (cfg *TCPConfig) toProtoConfig() *proto.TCPOptions {
 	}
 }
 
-func (tcp *TCPConfig) tunnelConfig() tunnelConfig {
-	return tunnelConfig{
-		forwardsTo: tcp.CommonConfig.ForwardsTo,
-		proto:      "tcp",
-		opts:       tcp.toProtoConfig(),
-		extra: proto.BindExtra{
-			Metadata: tcp.CommonConfig.Metadata,
-		},
-	}
+func (cfg *TCPConfig) applyTunnelConfig(tcfg *tunnelConfig) {
+	cfg.CommonConfig.applyTunnelConfig(tcfg)
+
+	tcfg.proto = "tcp"
+	tcfg.opts = cfg.toProtoConfig()
 }

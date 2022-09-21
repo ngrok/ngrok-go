@@ -1,7 +1,10 @@
 package libngrok
 
 import (
+	"fmt"
 	"net"
+	"os"
+	"path/filepath"
 
 	"github.com/ngrok/libngrok-go/internal/pb_agent"
 )
@@ -91,4 +94,31 @@ func (cfg *CommonConfig) WithCIDRRestriction(set ...*CIDRRestriction) *CommonCon
 		}
 	}
 	return cfg
+}
+
+func defaultForwardsTo() string {
+	hostname, err := os.Hostname()
+	if err != nil {
+		hostname = "<unknown>"
+	}
+
+	exe, err := os.Executable()
+	if err != nil {
+		exe = "<unknown>"
+	} else {
+		exe = filepath.ToSlash(exe)
+	}
+
+	pid := os.Getpid()
+
+	return fmt.Sprintf("app://%s/%s?pid=%d", hostname, exe, pid)
+}
+
+func (cfg CommonConfig) applyTunnelConfig(tcfg *tunnelConfig) {
+	if cfg.ForwardsTo == "" {
+		tcfg.forwardsTo = defaultForwardsTo()
+	} else {
+		tcfg.forwardsTo = cfg.ForwardsTo
+	}
+	tcfg.extra.Metadata = cfg.Metadata
 }

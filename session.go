@@ -437,7 +437,8 @@ func (s *sessionImpl) StartTunnel(ctx context.Context, cfg TunnelConfig) (Tunnel
 		err    error
 	)
 
-	tunnelCfg := cfg.tunnelConfig()
+	tunnelCfg := &tunnelConfig{}
+	cfg.applyTunnelConfig(tunnelCfg)
 
 	if tunnelCfg.proto != "" {
 		tunnel, err = s.inner().Listen(tunnelCfg.proto, tunnelCfg.opts, tunnelCfg.extra, tunnelCfg.forwardsTo)
