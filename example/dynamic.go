@@ -49,7 +49,7 @@ func main() {
 					return nil
 				},
 			}).
-			WithAuthToken(os.Getenv("NGROK_TOKEN")),
+			WithAuthtoken(os.Getenv("NGROK_TOKEN")),
 		))
 
 		tun := unwrap(sess.StartTunnel(ctx, libngrok.HTTPOptions().
