@@ -578,8 +578,10 @@ func TestConnectcionCallbacks(t *testing.T) {
 	disconnectErrs := 0
 	disconnectNils := 0
 	sess := setupSession(ctx, t, ConnectOptions().WithLocalCallbacks(LocalCallbacks{
-		OnConnect: func(ctx context.Context, sess Session) {
+		OnConnect: func(ctx context.Context, connect ConnectFunction) error {
+			_, err := connect(ctx)
 			connects += 1
+			return err
 		},
 		OnDisconnect: func(ctx context.Context, sess Session, err error) {
 			if err == nil {

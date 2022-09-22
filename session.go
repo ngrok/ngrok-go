@@ -50,9 +50,11 @@ type Dialer interface {
 	DialContext(ctx context.Context, network, address string) (net.Conn, error)
 }
 
+type ConnectFunction func(context.Context) (Session, error)
+
 type LocalCallbackHandler interface {
 	// Called any time a session (re)connects.
-	HandleConnect(ctx context.Context, sess Session)
+	HandleConnect(ctx context.Context, connect ConnectFunction) error
 	// Called any time a session disconnects.
 	// If the session has been closed locally, `OnDisconnect` will be called a
 	// final time with a `nil` `err`.
@@ -66,7 +68,7 @@ type LocalCallbackHandler interface {
 // Callbacks in response to local(ish) network events.
 type LocalCallbacks struct {
 	// Called any time a session (re)connects.
-	OnConnect func(ctx context.Context, sess Session)
+	OnConnect func(ctx context.Context, connect ConnectFunction) error
 	// Called any time a session disconnects.
 	// If the session has been closed locally, `OnDisconnect` will be called a
 	// final time with a `nil` `err`.
@@ -77,16 +79,21 @@ type LocalCallbacks struct {
 	OnHeartbeat func(ctx context.Context, sess Session, latency time.Duration)
 }
 
-func (cb LocalCallbacks) HandleConnect(ctx context.Context, sess Session) {
+func (cb LocalCallbacks) HandleConnect(ctx context.Context, connect ConnectFunction) error {
 	if cb.OnConnect != nil {
-		cb.OnConnect(ctx, sess)
+		return cb.OnConnect(ctx, connect)
 	}
+
+	_, err := connect(ctx)
+	return err
 }
+
 func (cb LocalCallbacks) HandleDisconnect(ctx context.Context, sess Session, err error) {
 	if cb.OnDisconnect != nil {
 		cb.OnDisconnect(ctx, sess, err)
 	}
 }
+
 func (cb LocalCallbacks) HandleHeartbeat(ctx context.Context, sess Session, latency time.Duration) {
 	if cb.OnHeartbeat != nil {
 		cb.OnHeartbeat(ctx, sess, latency)
@@ -349,45 +356,50 @@ func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
 	}
 
 	reconnect := func(sess tunnel_client.Session) error {
-		resp, err := sess.Auth(auth)
-		if err != nil {
-			remote := false
-			if resp.Error != "" {
-				err = errors.New(resp.Error)
-				remote = true
+		err := localCallbackHandler.HandleConnect(ctx, func(ctx context.Context) (Session, error) {
+			resp, err := sess.Auth(auth)
+			if err != nil {
+				remote := false
+				if resp.Error != "" {
+					err = errors.New(resp.Error)
+					remote = true
+				}
+				return nil, ErrAuthFailed{remote, err}
 			}
-			return ErrAuthFailed{remote, err}
-		}
 
-		session.setInner(&sessionInner{
-			Session:         sess,
-			Region:          resp.Extra.Region,
-			ProtoVersion:    resp.Version,
-			ServerVersion:   resp.Extra.Version,
-			ClientID:        resp.Extra.Region,
-			AccountName:     resp.Extra.AccountName,
-			PlanName:        resp.Extra.PlanName,
-			Banner:          resp.Extra.Banner,
-			SessionDuration: resp.Extra.SessionDuration,
+			session.setInner(&sessionInner{
+				Session:         sess,
+				Region:          resp.Extra.Region,
+				ProtoVersion:    resp.Version,
+				ServerVersion:   resp.Extra.Version,
+				ClientID:        resp.Extra.Region,
+				AccountName:     resp.Extra.AccountName,
+				PlanName:        resp.Extra.PlanName,
+				Banner:          resp.Extra.Banner,
+				SessionDuration: resp.Extra.SessionDuration,
+			})
+
+			go func() {
+				beats := session.Latency()
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case latency, ok := <-beats:
+						if !ok {
+							return
+						}
+						localCallbackHandler.HandleHeartbeat(ctx, session, latency)
+					}
+				}
+			}()
+
+			auth.Cookie = resp.Extra.Cookie
+
+			return session, nil
 		})
 
-		go func() {
-			beats := session.Latency()
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case latency, ok := <-beats:
-					if !ok {
-						return
-					}
-					localCallbackHandler.HandleHeartbeat(ctx, session, latency)
-				}
-			}
-		}()
-
-		auth.Cookie = resp.Extra.Cookie
-		return nil
+		return err
 	}
 
 	sess := tunnel_client.NewReconnectingSession(cfg.Logger, rawDialer, stateChanges, reconnect)
@@ -402,8 +414,6 @@ func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
 		}
 	}
 
-	localCallbackHandler.HandleConnect(ctx, session)
-
 	go func() {
 		for {
 			select {
@@ -413,10 +423,7 @@ func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
 				if !ok {
 					localCallbackHandler.HandleDisconnect(ctx, session, nil)
 					return
-				}
-				if err == nil {
-					localCallbackHandler.HandleConnect(ctx, session)
-				} else {
+				} else if err != nil {
 					localCallbackHandler.HandleDisconnect(ctx, session, err)
 				}
 			}
