@@ -9,10 +9,10 @@ import (
 
 var testError = errors.New("testing, 1 2 3!")
 
-// Sanity check for my appraoch to error construction/wrapping
-func TestErrorStrategy(t *testing.T) {
+// Sanity check for the appraoch to error construction/wrapping
+func TestErrorWrapping(t *testing.T) {
 	var accept error = ErrAcceptFailed{Inner: testError}
-	var auth error = ErrAuthFailed{accept, AuthFailedContext{Remote: true}}
+	var auth error = ErrAuthFailed{true, accept}
 
 	require.True(t, errors.Is(accept, ErrAcceptFailed{}))
 	require.True(t, errors.Is(auth, ErrAuthFailed{}))
@@ -26,5 +26,5 @@ func TestErrorStrategy(t *testing.T) {
 
 	require.True(t, errors.As(accept, &downcastAccept))
 
-	require.True(t, downcastAuth.Context.Remote)
+	require.True(t, downcastAuth.Remote)
 }

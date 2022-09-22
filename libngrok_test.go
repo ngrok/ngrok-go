@@ -659,7 +659,7 @@ func TestErrors(t *testing.T) {
 	var authErr ErrAuthFailed
 	require.ErrorIs(t, err, authErr)
 	require.ErrorAs(t, err, &authErr)
-	require.True(t, authErr.Context.Remote)
+	require.True(t, authErr.Remote)
 
 	sess, err := Connect(ctx, ConnectOptions())
 	require.NoError(t, err)
@@ -667,7 +667,7 @@ func TestErrors(t *testing.T) {
 	var startErr ErrStartTunnel
 	require.ErrorIs(t, err, startErr)
 	require.ErrorAs(t, err, &startErr)
-	require.IsType(t, &TCPConfig{}, startErr.Context.Config)
+	require.IsType(t, &TCPConfig{}, startErr.Config)
 }
 
 func TestNonExported(t *testing.T) {
