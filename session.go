@@ -50,6 +50,19 @@ type Dialer interface {
 	DialContext(ctx context.Context, network, address string) (net.Conn, error)
 }
 
+type LocalCallbackHandler interface {
+	// Called any time a session (re)connects.
+	HandleConnect(ctx context.Context, sess Session)
+	// Called any time a session disconnects.
+	// If the session has been closed locally, `OnDisconnect` will be called a
+	// final time with a `nil` `err`.
+	HandleDisconnect(ctx context.Context, sess Session, err error)
+	// Called any time an automatic heartbeat response is received.
+	// This does not include on-demand heartbeating via the `Session.Heartbeat`
+	// method.
+	HandleHeartbeat(ctx context.Context, sess Session, latency time.Duration)
+}
+
 // Callbacks in response to local(ish) network events.
 type LocalCallbacks struct {
 	// Called any time a session (re)connects.
@@ -62,6 +75,22 @@ type LocalCallbacks struct {
 	// This does not include on-demand heartbeating via the `Session.Heartbeat`
 	// method.
 	OnHeartbeat func(ctx context.Context, sess Session, latency time.Duration)
+}
+
+func (cb LocalCallbacks) HandleConnect(ctx context.Context, sess Session) {
+	if cb.OnConnect != nil {
+		cb.OnConnect(ctx, sess)
+	}
+}
+func (cb LocalCallbacks) HandleDisconnect(ctx context.Context, sess Session, err error) {
+	if cb.OnDisconnect != nil {
+		cb.OnDisconnect(ctx, sess, err)
+	}
+}
+func (cb LocalCallbacks) HandleHeartbeat(ctx context.Context, sess Session, latency time.Duration) {
+	if cb.OnHeartbeat != nil {
+		cb.OnHeartbeat(ctx, sess, latency)
+	}
 }
 
 // Callbacks in response to remote requests
@@ -100,7 +129,7 @@ type ConnectConfig struct {
 
 	HeartbeatConfig *muxado.HeartbeatConfig
 
-	LocalCallbacks  LocalCallbacks
+	LocalCallbacks  LocalCallbackHandler
 	RemoteCallbacks RemoteCallbacks
 
 	CallbackErrors CallbackErrors
@@ -189,7 +218,7 @@ func (cfg *ConnectConfig) WithLogger(logger Logger) *ConnectConfig {
 	return cfg
 }
 
-func (cfg *ConnectConfig) WithLocalCallbacks(callbacks LocalCallbacks) *ConnectConfig {
+func (cfg *ConnectConfig) WithLocalCallbacks(callbacks LocalCallbackHandler) *ConnectConfig {
 	cfg.LocalCallbacks = callbacks
 	return cfg
 }
@@ -312,6 +341,13 @@ func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
 		// TODO: More fields here?
 	}
 
+	var localCallbackHandler LocalCallbackHandler
+	if cfg.LocalCallbacks != nil {
+		localCallbackHandler = cfg.LocalCallbacks
+	} else {
+		localCallbackHandler = LocalCallbacks{}
+	}
+
 	reconnect := func(sess tunnel_client.Session) error {
 		resp, err := sess.Auth(auth)
 		if err != nil {
@@ -335,22 +371,20 @@ func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
 			SessionDuration: resp.Extra.SessionDuration,
 		})
 
-		if cfg.LocalCallbacks.OnHeartbeat != nil {
-			go func() {
-				beats := session.Latency()
-				for {
-					select {
-					case <-ctx.Done():
+		go func() {
+			beats := session.Latency()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case latency, ok := <-beats:
+					if !ok {
 						return
-					case latency, ok := <-beats:
-						if !ok {
-							return
-						}
-						cfg.LocalCallbacks.OnHeartbeat(ctx, session, latency)
 					}
+					localCallbackHandler.HandleHeartbeat(ctx, session, latency)
 				}
-			}()
-		}
+			}
+		}()
 
 		auth.Cookie = resp.Extra.Cookie
 		return nil
@@ -368,9 +402,7 @@ func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
 		}
 	}
 
-	if cfg.LocalCallbacks.OnConnect != nil {
-		cfg.LocalCallbacks.OnConnect(ctx, session)
-	}
+	localCallbackHandler.HandleConnect(ctx, session)
 
 	go func() {
 		for {
@@ -379,17 +411,13 @@ func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
 				return
 			case err, ok := <-stateChanges:
 				if !ok {
-					if cfg.LocalCallbacks.OnDisconnect != nil {
-						cfg.Logger.Info("no more state changes")
-						cfg.LocalCallbacks.OnDisconnect(ctx, session, nil)
-					}
+					localCallbackHandler.HandleDisconnect(ctx, session, nil)
 					return
 				}
-				if err == nil && cfg.LocalCallbacks.OnConnect != nil {
-					cfg.LocalCallbacks.OnConnect(ctx, session)
-				}
-				if err != nil && cfg.LocalCallbacks.OnDisconnect != nil {
-					cfg.LocalCallbacks.OnDisconnect(ctx, session, err)
+				if err == nil {
+					localCallbackHandler.HandleConnect(ctx, session)
+				} else {
+					localCallbackHandler.HandleDisconnect(ctx, session, err)
 				}
 			}
 		}
