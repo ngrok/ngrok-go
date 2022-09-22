@@ -74,10 +74,42 @@ type RemoteCallbacks struct {
 	// It is the implementer's responsibility to ensure that the application
 	// recreates the session.
 	OnRestart func(ctx context.Context, sess Session) error
+}
+
+func (cb RemoteCallbacks) HandleStop(ctx context.Context, sess Session) error {
+	if cb.OnStop != nil {
+		return cb.OnStop(ctx, sess)
+	}
+
+	return errors.New("stop callback not set")
+}
+
+func (cb RemoteCallbacks) HandleRestart(ctx context.Context, sess Session) error {
+	if cb.OnRestart != nil {
+		return cb.OnRestart(ctx, sess)
+	}
+
+	return errors.New("restart callback not set")
+}
+
+type RemoteCallbackHandler interface {
+	// Called when a stop is requested via the dashboard or API.
+	// If it returns nil, success will be reported and the session closed.
+	HandleStop(ctx context.Context, sess Session) error
+	// Called when a restart is requested via the dashboard or API.
+	// If it returns nil, success will be reported and the session closed.
+	// It is the implementer's responsibility to ensure that the application
+	// recreates the session.
+	HandleRestart(ctx context.Context, sess Session) error
+}
+
+type updateHandler interface {
 	// Called when an update is requested via the dashboard or API.
 	// If it returns nil, success will be reported. Any other semantics are left
 	// up to the application, as automatic library updates aren't possible.
-	OnUpdate func(ctx context.Context, sess Session) error
+	// This is intentionally hidden from the public API, since it's primarily
+	// intended to support official automatic agent updates.
+	HandleUpdate(ctx context.Context, sess Session) error
 }
 
 type CallbackErrors struct {
@@ -101,7 +133,7 @@ type ConnectConfig struct {
 	HeartbeatConfig *muxado.HeartbeatConfig
 
 	LocalCallbacks  LocalCallbacks
-	RemoteCallbacks RemoteCallbacks
+	RemoteCallbacks RemoteCallbackHandler
 
 	CallbackErrors CallbackErrors
 
@@ -194,7 +226,7 @@ func (cfg *ConnectConfig) WithLocalCallbacks(callbacks LocalCallbacks) *ConnectC
 	return cfg
 }
 
-func (cfg *ConnectConfig) WithRemoteCallbacks(callbacks RemoteCallbacks) *ConnectConfig {
+func (cfg *ConnectConfig) WithRemoteCallbacks(callbacks RemoteCallbackHandler) *ConnectConfig {
 	cfg.RemoteCallbacks = callbacks
 	return cfg
 }
@@ -286,14 +318,12 @@ func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
 		remoteRestartErr = &cfg.CallbackErrors.RestartUnsupported
 	}
 
-	if cfg.RemoteCallbacks.OnStop != nil {
+	if cfg.RemoteCallbacks != nil {
 		remoteStopErr = &empty
-	}
-	if cfg.RemoteCallbacks.OnRestart != nil {
 		remoteRestartErr = &empty
-	}
-	if cfg.RemoteCallbacks.OnUpdate != nil {
-		remoteUpdateErr = &empty
+		if _, ok := cfg.RemoteCallbacks.(updateHandler); ok {
+			remoteUpdateErr = &empty
+		}
 	}
 
 	auth := proto.AuthExtra{
@@ -492,14 +522,14 @@ func (s *sessionImpl) Latency() <-chan time.Duration {
 type remoteCallbackHandler struct {
 	log15.Logger
 	sess Session
-	cb   RemoteCallbacks
+	cb   RemoteCallbackHandler
 }
 
 func (rc remoteCallbackHandler) OnStop(_ *proto.Stop, respond tunnel_client.HandlerRespFunc) {
-	if rc.cb.OnStop != nil {
+	if rc.cb != nil {
 		resp := new(proto.StopResp)
 		close := true
-		if err := rc.cb.OnStop(context.TODO(), rc.sess); err != nil {
+		if err := rc.cb.HandleStop(context.TODO(), rc.sess); err != nil {
 			close = false
 			resp.Error = err.Error()
 		}
@@ -513,10 +543,10 @@ func (rc remoteCallbackHandler) OnStop(_ *proto.Stop, respond tunnel_client.Hand
 }
 
 func (rc remoteCallbackHandler) OnRestart(_ *proto.Restart, respond tunnel_client.HandlerRespFunc) {
-	if rc.cb.OnRestart != nil {
+	if rc.cb != nil {
 		resp := new(proto.RestartResp)
 		close := true
-		if err := rc.cb.OnRestart(context.TODO(), rc.sess); err != nil {
+		if err := rc.cb.HandleRestart(context.TODO(), rc.sess); err != nil {
 			close = false
 			resp.Error = err.Error()
 		}
@@ -530,9 +560,9 @@ func (rc remoteCallbackHandler) OnRestart(_ *proto.Restart, respond tunnel_clien
 }
 
 func (rc remoteCallbackHandler) OnUpdate(_ *proto.Update, respond tunnel_client.HandlerRespFunc) {
-	if rc.cb.OnUpdate != nil {
+	if h, ok := rc.cb.(updateHandler); ok {
 		resp := new(proto.UpdateResp)
-		if err := rc.cb.OnUpdate(context.TODO(), rc.sess); err != nil {
+		if err := h.HandleUpdate(context.TODO(), rc.sess); err != nil {
 			resp.Error = err.Error()
 		}
 		if err := respond(resp); err != nil {
