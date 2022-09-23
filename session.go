@@ -22,21 +22,33 @@ import (
 	"golang.org/x/net/proxy"
 )
 
+// The ngrok library version.
 const VERSION = "4.0.0-library"
 
+// The interface implemented by an ngrok session object.
 type Session interface {
+	// Close the ngrok session.
+	// This also closes all existing tunnels tied to the session.
 	Close() error
 
+	// Start a new tunnel over the ngrok session.
 	StartTunnel(ctx context.Context, cfg TunnelConfig) (Tunnel, error)
 }
 
 const (
+	// The US ngrok region.
 	RegionUS = "us"
+	// The Europe ngrok region.
 	RegionEU = "eu"
+	// The South America ngrok region.
 	RegionSA = "sa"
+	// The Asia-Pacific ngrok region.
 	RegionAP = "ap"
+	// The Australia ngrok region.
 	RegionAU = "au"
+	// The Japan ngrok region.
 	RegionJP = "jp"
+	// The India ngrok region.
 	RegionIN = "in"
 )
 
@@ -45,8 +57,14 @@ var defaultCACert []byte
 
 const defaultServer = "tunnel.ngrok.com:443"
 
+// Interface implemented by supported dialers for establishing a connection to
+// the ngrok server.
 type Dialer interface {
+	// Connect to an address on the named network.
+	// See the documentation for [net.Dial].
 	Dial(network, address string) (net.Conn, error)
+	// Connect to an address on the named network with the provided
+	// [context.Context].
 	DialContext(ctx context.Context, network, address string) (net.Conn, error)
 }
 
@@ -80,63 +98,105 @@ type RemoteCallbacks struct {
 	OnUpdate func(ctx context.Context, sess Session) error
 }
 
+// Errors that should be displayed in the ngrok dashboard if handlers are not
+// provided.
 type CallbackErrors struct {
-	UpdateUnsupported  string
+	// The error to display if an Update handler is not provided.
+	UpdateUnsupported string
+	// The error to display if a Restart handler is not provided.
 	RestartUnsupported string
-	StopUnsupported    string
+	// The error to display if a Stop handler is not provided.
+	StopUnsupported string
 }
 
+// Options to use when establishing an ngrok session.
 type ConnectConfig struct {
-	Authtoken  string
+	// Your ngrok Authtoken.
+	Authtoken string
+	// The address of the ngrok server to connect to.
+	// Defaults to `tunnel.ngrok.com:443`
 	ServerAddr string
-	CAPool     *x509.CertPool
+	// The [x509.CertPool] used to authenticate the ngrok server certificate.
+	CAPool *x509.CertPool
 
+	// The [Dialer] used to establish the initial TCP connection to the ngrok
+	// server.
+	// If set, takes precedence over Resolver and ProxyURL settings.
+	// If not set, defaults to a [net.Dialer].
 	Dialer Dialer
 
+	// The DNS resolver configuration to use with the default [Dialer].
 	Resolver *net.Resolver
+	// The URL of a proxy to use when making the TCP connection to the ngrok
+	// server.
+	// Any proxy supported by [golang.org/x/net/proxy] may be used.
 	ProxyURL *url.URL
 
+	// Opaque metadata string to be associated with the session.
+	// Viewable from the ngrok dashboard or API.
 	Metadata string
 
+	// Configuration for the session's heartbeat.
+	// TODO(josh): don't expose muxado in the public API
 	HeartbeatConfig *muxado.HeartbeatConfig
 
-	LocalCallbacks  LocalCallbacks
+	// Callbacks for local network events.
+	LocalCallbacks LocalCallbacks
+	// Callbacks for remote requests.
 	RemoteCallbacks RemoteCallbacks
 
+	// Errors to display for unsupported callbacks.
 	CallbackErrors CallbackErrors
 
+	// The logger for the session to use.
 	Logger log15.Logger
 }
 
+// Construct a new set of Connect options.
 func ConnectOptions() *ConnectConfig {
 	return &ConnectConfig{}
 }
 
+// Use the provided opaque metadata string for this session.
+// Sets the [ConnectConfig].Metadata field.
 func (cfg *ConnectConfig) WithMetadata(meta string) *ConnectConfig {
 	cfg.Metadata = meta
 	return cfg
 }
 
+// Use the provided dialer for establishing a TCP connection to the ngrok
+// server.
+// Sets the [ConnectConfig].Dialer field and takes precedence over ProxyURL and
+// Resolver settings.
 func (cfg *ConnectConfig) WithDialer(dialer Dialer) *ConnectConfig {
 	cfg.Dialer = dialer
 	return cfg
 }
 
+// Proxy requests through the server identified by the provided URL when using
+// the default Dialer.
+// Sets the [ConnectConfig].ProxyURL field. Ignored if a custom Dialer is in use.
 func (cfg *ConnectConfig) WithProxyURL(url *url.URL) *ConnectConfig {
 	cfg.ProxyURL = url
 	return cfg
 }
 
+// Use the provided [net.Resolver] settings when using the default Dialer.
+// Sets the [ConnectConfig].Resolver field. Ignored if a custom Dialer is in use.
 func (cfg *ConnectConfig) WithResolver(resolver *net.Resolver) *ConnectConfig {
 	cfg.Resolver = resolver
 	return cfg
 }
 
+// Use the provided Authtoken to authenticate this session.
+// Sets the [ConnectConfig].Authtoken field.
 func (cfg *ConnectConfig) WithAuthtoken(token string) *ConnectConfig {
 	cfg.Authtoken = token
 	return cfg
 }
 
+// Connect to the ngrok server in a specific region.
+// Overwrites the [ConnectConfig].ServerAddr field.
 func (cfg *ConnectConfig) WithRegion(region string) *ConnectConfig {
 	if region != "" {
 		cfg.ServerAddr = fmt.Sprintf("tunnel.%s.ngrok.com:443", region)
@@ -144,16 +204,24 @@ func (cfg *ConnectConfig) WithRegion(region string) *ConnectConfig {
 	return cfg
 }
 
+// Connect to the provided ngrok server.
+// Sets the [ConnectConfig].Server field.
 func (cfg *ConnectConfig) WithServer(addr string) *ConnectConfig {
 	cfg.ServerAddr = addr
 	return cfg
 }
 
+// Use the provided [x509.CertPool] to authenticate the ngrok server
+// certificate.
+// Sets the [ConnectConfig].CAPool field.
 func (cfg *ConnectConfig) WithCA(pool *x509.CertPool) *ConnectConfig {
 	cfg.CAPool = pool
 	return cfg
 }
 
+// Set the heartbeat tolerance for the session.
+// If the session's heartbeats are outside of their interval by this duration,
+// the server will assume the session is dead and close it.
 func (cfg *ConnectConfig) WithHeartbeatTolerance(tolerance time.Duration) *ConnectConfig {
 	if cfg.HeartbeatConfig == nil {
 		cfg.HeartbeatConfig = muxado.NewHeartbeatConfig()
@@ -162,6 +230,9 @@ func (cfg *ConnectConfig) WithHeartbeatTolerance(tolerance time.Duration) *Conne
 	return cfg
 }
 
+// Set the heartbeat interval for the session.
+// If the session's heartbeats are outside of this interval by the heartbeat
+// tolerance, the server will assume the session is dead and close it.
 func (cfg *ConnectConfig) WithHeartbeatInterval(interval time.Duration) *ConnectConfig {
 	if cfg.HeartbeatConfig == nil {
 		cfg.HeartbeatConfig = muxado.NewHeartbeatConfig()
@@ -189,21 +260,25 @@ func (cfg *ConnectConfig) WithLogger(logger Logger) *ConnectConfig {
 	return cfg
 }
 
+// Set the callbacks for local network events.
 func (cfg *ConnectConfig) WithLocalCallbacks(callbacks LocalCallbacks) *ConnectConfig {
 	cfg.LocalCallbacks = callbacks
 	return cfg
 }
 
+// Set the callbacks for requests from the ngrok dashboard.
 func (cfg *ConnectConfig) WithRemoteCallbacks(callbacks RemoteCallbacks) *ConnectConfig {
 	cfg.RemoteCallbacks = callbacks
 	return cfg
 }
 
+// Set the errors to display for unsupported callbacks.
 func (cfg *ConnectConfig) WithCallbackErrors(errs CallbackErrors) *ConnectConfig {
 	cfg.CallbackErrors = errs
 	return cfg
 }
 
+// Connect to the ngrok server and start a new session.
 func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
 	if cfg.Logger == nil {
 		cfg.Logger = log15.New()

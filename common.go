@@ -10,48 +10,72 @@ import (
 )
 
 type CommonConfig struct {
+	// Restrictions placed on the origin of incoming connections to the edge.
 	CIDRRestrictions *CIDRRestriction
-	ProxyProto       ProxyProtoVersion
-	Metadata         string
-	ForwardsTo       string
+	// The version of PROXY protocol to use with this tunnel, zero if not
+	// using.
+	ProxyProto ProxyProtoVersion
+	// Tunnel-specific opaque metadata. Viewable via the API.
+	Metadata string
+	// Tunnel backend metadata. Viewable via the dashboard and API, but has no
+	// bearing on tunnel behavior.
+	// If not set, defaults to a URI in the format `app://hostname/path/to/executable?pid=12345`
+	ForwardsTo string
 }
 
+// A valid PROXY protocol version
 type ProxyProtoVersion int32
 
 const (
+	// PROXY protocol disabled
+	ProxyProtoNone = ProxyProtoVersion(0)
+	// PROXY protocol v1
 	ProxyProtoV1 = ProxyProtoVersion(1)
+	// PROXY protocol v2
 	ProxyProtoV2 = ProxyProtoVersion(2)
 )
 
+// Use the provided PROXY protocol version for connections over this tunnel.
+// Sets the [CommonConfig].ProxyProto field.
 func (cfg *CommonConfig) WithProxyProto(version ProxyProtoVersion) *CommonConfig {
 	cfg.ProxyProto = version
 	return cfg
 }
 
+// Use the provided opaque metadata string for this tunnel.
+// Sets the [CommonConfig].Metadata field.
 func (cfg *CommonConfig) WithMetadata(meta string) *CommonConfig {
 	cfg.Metadata = meta
 	return cfg
 }
 
-func (cfg *CommonConfig) WithForwardsTo(address string) *CommonConfig {
-	cfg.ForwardsTo = address
+// Use the provided backend as the tunnel's ForwardsTo string.
+// Sets the [CommonConfig].ForwardsTo field.
+func (cfg *CommonConfig) WithForwardsTo(backend string) *CommonConfig {
+	cfg.ForwardsTo = backend
 	return cfg
 }
 
+// Restrictions placed on the origin of incoming connections to the edge.
 type CIDRRestriction struct {
+	// Rejects connections that do not match the given CIDRs
 	Allowed []string
-	Denied  []string
+	// Rejects connections that match the given CIDRs and allows all other CIDRs.
+	Denied []string
 }
 
+// Construct a new set of [CIDRRestriction]
 func CIDRSet() *CIDRRestriction {
 	return &CIDRRestriction{}
 }
 
+// Add the provided CIDRS to the [CIDRRestriction].Allowed list.
 func (cr *CIDRRestriction) AllowString(cidr ...string) *CIDRRestriction {
 	cr.Allowed = append(cr.Allowed, cidr...)
 	return cr
 }
 
+// Add the provided [net.IPNet] to the [CIDRRestriction].Allowed list.
 func (cr *CIDRRestriction) Allow(net ...*net.IPNet) *CIDRRestriction {
 	for _, n := range net {
 		cr.AllowString(n.String())
@@ -59,11 +83,13 @@ func (cr *CIDRRestriction) Allow(net ...*net.IPNet) *CIDRRestriction {
 	return cr
 }
 
+// Add the provided CIDRS to the [CIDRRestriction].Denied list.
 func (cr *CIDRRestriction) DenyString(cidr ...string) *CIDRRestriction {
 	cr.Denied = append(cr.Denied, cidr...)
 	return cr
 }
 
+// Add the provided [net.IPNet] to the [CIDRRestriction].Denied list.
 func (cr *CIDRRestriction) Deny(net ...*net.IPNet) *CIDRRestriction {
 	for _, n := range net {
 		cr.DenyString(n.String())
@@ -82,6 +108,8 @@ func (ir *CIDRRestriction) toProtoConfig() *pb_agent.MiddlewareConfiguration_IPR
 	}
 }
 
+// Add the provided [CIDRRestriction] to the tunnel.
+// Concatenates all provided Allowed and Denied lists with the existing ones.
 func (cfg *CommonConfig) WithCIDRRestriction(set ...*CIDRRestriction) *CommonConfig {
 	if cfg.CIDRRestrictions == nil {
 		cfg.CIDRRestrictions = CIDRSet()
