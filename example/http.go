@@ -34,7 +34,7 @@ func main() {
 
 	for {
 		opts := libngrok.ConnectOptions().
-			WithAuthToken(os.Getenv("NGROK_TOKEN")).
+			WithAuthtoken(os.Getenv("NGROK_TOKEN")).
 			WithServer(os.Getenv("NGROK_SERVER")).
 			WithRegion(os.Getenv("NGROK_REGION")).
 			WithLogger(log15adapter.NewLogger(logger)).

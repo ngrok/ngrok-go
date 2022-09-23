@@ -23,7 +23,7 @@ func setupSession(ctx context.Context, t *testing.T, opts *ConnectConfig) Sessio
 	if opts == nil {
 		opts = ConnectOptions()
 	}
-	opts.WithAuthToken(os.Getenv("NGROK_TOKEN"))
+	opts.WithAuthtoken(os.Getenv("NGROK_TOKEN"))
 	sess, err := Connect(ctx, opts)
 	require.NoError(t, err, "Session Connect")
 	return sess
@@ -655,7 +655,7 @@ func TestErrors(t *testing.T) {
 	require.ErrorIs(t, err, dialErr)
 	require.ErrorAs(t, err, &dialErr)
 
-	_, err = Connect(ctx, ConnectOptions().WithAuthToken("lolnope"))
+	_, err = Connect(ctx, ConnectOptions().WithAuthtoken("lolnope"))
 	var authErr ErrAuthFailed
 	require.ErrorIs(t, err, authErr)
 	require.ErrorAs(t, err, &authErr)

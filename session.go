@@ -87,7 +87,7 @@ type CallbackErrors struct {
 }
 
 type ConnectConfig struct {
-	AuthToken  string
+	Authtoken  string
 	ServerAddr string
 	CAPool     *x509.CertPool
 
@@ -132,8 +132,8 @@ func (cfg *ConnectConfig) WithResolver(resolver *net.Resolver) *ConnectConfig {
 	return cfg
 }
 
-func (cfg *ConnectConfig) WithAuthToken(token string) *ConnectConfig {
-	cfg.AuthToken = token
+func (cfg *ConnectConfig) WithAuthtoken(token string) *ConnectConfig {
+	cfg.Authtoken = token
 	return cfg
 }
 
@@ -298,7 +298,7 @@ func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
 
 	auth := proto.AuthExtra{
 		Version:            VERSION,
-		Authtoken:          cfg.AuthToken,
+		Authtoken:          cfg.Authtoken,
 		Metadata:           cfg.Metadata,
 		OS:                 runtime.GOOS,
 		Arch:               runtime.GOARCH,
