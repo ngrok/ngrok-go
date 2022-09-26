@@ -42,15 +42,7 @@ func main() {
 
 		sess := common.Unwrap(ngrok.Connect(ctx, opts))
 
-<<<<<<< HEAD
-		tun := common.Unwrap(sess.StartTunnel(ctx, ngrok.
-			HTTPOptions().
-			WithMetadata(`{"foo":"bar"}`).
-			WithForwardsTo("foobarbaz"),
-		))
-=======
-		tun := common.Unwrap(sess.StartTunnel(ctx, libngrok.HTTPOptions()))
->>>>>>> 065091f6d (examples/http: remove more extraneous options)
+		tun := common.Unwrap(sess.StartTunnel(ctx, ngrok.HTTPOptions()))
 
 		l := tun.AsHTTP()
 		log15.Info("started tunnel", "url", l.URL())
