@@ -1,7 +1,5 @@
 package libngrok
 
-import "github.com/ngrok/libngrok-go/internal/tunnel/proto"
-
 type LabeledConfig struct {
 	CommonConfig *CommonConfig
 
@@ -31,12 +29,8 @@ func (cfg *LabeledConfig) WithMetadata(meta string) *LabeledConfig {
 	return cfg
 }
 
-func (cfg *LabeledConfig) tunnelConfig() tunnelConfig {
-	return tunnelConfig{
-		forwardsTo: cfg.CommonConfig.ForwardsTo,
-		labels:     cfg.Labels,
-		extra: proto.BindExtra{
-			Metadata: cfg.CommonConfig.Metadata,
-		},
-	}
+func (cfg *LabeledConfig) applyTunnelConfig(tcfg *tunnelConfig) {
+	cfg.CommonConfig.applyTunnelConfig(tcfg)
+
+	tcfg.labels = cfg.Labels
 }

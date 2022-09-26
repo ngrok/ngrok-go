@@ -103,13 +103,9 @@ func (cfg *TLSConfig) toProtoConfig() *proto.TLSOptions {
 	return opts
 }
 
-func (cfg *TLSConfig) tunnelConfig() tunnelConfig {
-	return tunnelConfig{
-		forwardsTo: cfg.CommonConfig.ForwardsTo,
-		proto:      "tls",
-		opts:       cfg.toProtoConfig(),
-		extra: proto.BindExtra{
-			Metadata: cfg.CommonConfig.Metadata,
-		},
-	}
+func (cfg *TLSConfig) applyTunnelConfig(tcfg *tunnelConfig) {
+	cfg.CommonConfig.applyTunnelConfig(tcfg)
+
+	tcfg.proto = "tls"
+	tcfg.opts = cfg.toProtoConfig()
 }

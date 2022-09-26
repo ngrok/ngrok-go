@@ -68,8 +68,7 @@ func main() {
 		tun, err := sess.StartTunnel(ctx, libngrok.
 			HTTPOptions().
 			WithDomain(hostname).
-			WithMetadata(`{"foo":"bar"}`).
-			WithForwardsTo("foobarbaz"),
+			WithMetadata(`{"foo":"bar"}`),
 		)
 		exitErr(err)
 

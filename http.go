@@ -262,16 +262,13 @@ func (cfg *HTTPConfig) toProtoConfig() *proto.HTTPOptions {
 	return opts
 }
 
-func (cfg *HTTPConfig) tunnelConfig() tunnelConfig {
+func (cfg *HTTPConfig) applyTunnelConfig(tcfg *tunnelConfig) {
 	if cfg.Scheme == "" {
 		cfg.Scheme = SchemeHTTPS
 	}
-	return tunnelConfig{
-		forwardsTo: cfg.CommonConfig.ForwardsTo,
-		proto:      string(cfg.Scheme),
-		opts:       cfg.toProtoConfig(),
-		extra: proto.BindExtra{
-			Metadata: cfg.CommonConfig.Metadata,
-		},
-	}
+
+	cfg.CommonConfig.applyTunnelConfig(tcfg)
+
+	tcfg.proto = string(cfg.Scheme)
+	tcfg.opts = cfg.toProtoConfig()
 }

@@ -17,5 +17,5 @@ type tunnelConfig struct {
 }
 
 type TunnelConfig interface {
-	tunnelConfig() tunnelConfig
+	applyTunnelConfig(cfg *tunnelConfig)
 }
