@@ -26,8 +26,6 @@ func main() {
 	for {
 		opts := ngrok.ConnectOptions().
 			WithAuthtoken(os.Getenv("NGROK_TOKEN")).
-			WithServer(os.Getenv("NGROK_SERVER")).
-			WithRegion(os.Getenv("NGROK_REGION")).
 			WithLogger(log15adapter.NewLogger(logger)).
 			WithMetadata("Hello, world!").
 			WithRemoteCallbacks(ngrok.RemoteCallbacks{
@@ -44,11 +42,15 @@ func main() {
 
 		sess := common.Unwrap(ngrok.Connect(ctx, opts))
 
+<<<<<<< HEAD
 		tun := common.Unwrap(sess.StartTunnel(ctx, ngrok.
 			HTTPOptions().
 			WithMetadata(`{"foo":"bar"}`).
 			WithForwardsTo("foobarbaz"),
 		))
+=======
+		tun := common.Unwrap(sess.StartTunnel(ctx, libngrok.HTTPOptions()))
+>>>>>>> 065091f6d (examples/http: remove more extraneous options)
 
 		l := tun.AsHTTP()
 		log15.Info("started tunnel", "url", l.URL())

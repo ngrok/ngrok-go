@@ -6,13 +6,13 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/gorilla/mux"
-
 	"github.com/davecgh/go-spew/spew"
+	"github.com/gorilla/mux"
 	"github.com/inconshreveable/log15"
-	libngrok "github.com/ngrok/libngrok-go"
-	"github.com/ngrok/libngrok-go/log/log15adapter"
+
+	"github.com/ngrok/ngrok-go"
 	"github.com/ngrok/ngrok-go/examples/common"
+	"github.com/ngrok/ngrok-go/log/log15adapter"
 )
 
 func main() {
@@ -27,13 +27,13 @@ func main() {
 	r.HandleFunc("/", helloHandler)
 	r.HandleFunc("/dump", dumpHandler)
 
-	opts := libngrok.ConnectOptions().
-		WithAuthToken(os.Getenv("NGROK_TOKEN")).
+	opts := ngrok.ConnectOptions().
+		WithAuthtoken(os.Getenv("NGROK_TOKEN")).
 		WithLogger(log15adapter.NewLogger(logger))
 
-	sess := common.Unwrap(libngrok.Connect(ctx, opts))
+	sess := common.Unwrap(ngrok.Connect(ctx, opts))
 
-	tun := common.Unwrap(sess.StartTunnel(ctx, libngrok.HTTPOptions()))
+	tun := common.Unwrap(sess.StartTunnel(ctx, ngrok.HTTPOptions()))
 
 	l := tun.AsHTTP()
 	log15.Info("started tunnel", "url", l.URL())
