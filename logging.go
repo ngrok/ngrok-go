@@ -19,9 +19,13 @@ const (
 )
 
 // Logger defines a logging interface. It is identical to the log.Logger
-// interface in [github.com/ngrok/ngrok-go/log.Logger]. It is duplicated here to avoid having to
-// unconditionally import that submodule. Documentation lives in the
-// [github.com/ngrok/ngrok-go/log.Logger] submodule, as well as adapters for other logging libraries.
+// interface in [github.com/ngrok/ngrok-go/log.Logger]. It is duplicated here to
+// avoid having to unconditionally import that submodule. Documentation lives in
+// the [github.com/ngrok/ngrok-go/log.Logger] submodule, as well as adapters for
+// other logging libraries.
+// If you are implementing a logger, you should use the `log` submodule instead,
+// as it also includes things like level formatting functions and doesn't
+// require importing the full `ngrok` module.
 type Logger interface {
 	// Log a message at the given level with data key/value pairs. data may be nil.
 	Log(context context.Context, level LogLevel, msg string, data map[string]interface{})

@@ -23,7 +23,7 @@ func setupSession(ctx context.Context, t *testing.T, opts *ConnectConfig) Sessio
 	if opts == nil {
 		opts = ConnectOptions()
 	}
-	opts.WithAuthtoken(os.Getenv("NGROK_TOKEN"))
+	opts.WithAuthtoken(os.Getenv("NGROK_AUTHTOKEN"))
 	sess, err := Connect(ctx, opts)
 	require.NoError(t, err, "Session Connect")
 	return sess
@@ -56,7 +56,7 @@ func serveHTTP(ctx context.Context, t *testing.T, connectOpts *ConnectConfig, op
 func TestConnectAndStartTunnel(t *testing.T) {
 	_, _, err := ConnectAndStartTunnel(context.Background(),
 		ConnectOptions().
-			WithAuthtoken(os.Getenv("NGROK_TOKEN")),
+			WithAuthtoken(os.Getenv("NGROK_AUTHTOKEN")),
 		HTTPOptions(),
 	)
 	require.NoError(t, err, "Session Connect")

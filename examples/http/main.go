@@ -1,62 +1,36 @@
+// A simple HTTP service.
+
 package main
 
 import (
 	"context"
+	"fmt"
+	"log"
 	"net/http"
 	"os"
 
-	"github.com/davecgh/go-spew/spew"
-	"github.com/inconshreveable/log15"
-
-	ngrok "github.com/ngrok/ngrok-go"
-	"github.com/ngrok/ngrok-go/examples/common"
-	"github.com/ngrok/ngrok-go/log/log15adapter"
+	"github.com/ngrok/ngrok-go"
 )
 
 func main() {
-	log15.Root().SetHandler(log15.LvlFilterHandler(log15.LvlInfo, log15.StdoutHandler))
-
-	ctx := context.Background()
-
-	stopRequested := false
-
-	logger := log15.New()
-	logger.SetHandler(log15.LvlFilterHandler(log15.LvlInfo, log15.StderrHandler))
-
-	for {
-		opts := ngrok.ConnectOptions().
-			WithAuthtoken(os.Getenv("NGROK_TOKEN")).
-			WithLogger(log15adapter.NewLogger(logger)).
-			WithMetadata("Hello, world!").
-			WithRemoteCallbacks(ngrok.RemoteCallbacks{
-				OnStop: func(_ context.Context, sess ngrok.Session) error {
-					log15.Info("got remote stop")
-					stopRequested = true
-					return nil
-				},
-				OnRestart: func(_ context.Context, sess ngrok.Session) error {
-					log15.Info("got remote restart")
-					return nil
-				},
-			})
-
-		sess := common.Unwrap(ngrok.Connect(ctx, opts))
-
-		tun := common.Unwrap(sess.StartTunnel(ctx, ngrok.HTTPOptions()))
-
-		l := tun.AsHTTP()
-		log15.Info("started tunnel", "url", l.URL())
-
-		err := l.Serve(ctx, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			spew.Fdump(w, r)
-		}))
-		if err != nil {
-			log15.Info("http server exited", "error", err)
-		}
-
-		if stopRequested {
-			log15.Info("exiting")
-			os.Exit(0)
-		}
+	if err := run(context.Background()); err != nil {
+		log.Fatal(err)
 	}
+}
+
+func run(ctx context.Context) error {
+	_, tun, err := ngrok.ConnectAndStartTunnel(ctx,
+		ngrok.ConnectOptions().
+			WithAuthtoken(os.Getenv("NGROK_AUTHTOKEN")),
+		ngrok.HTTPOptions().
+			WithDomain("golang-demo.ngrok.io"),
+	)
+	if err != nil {
+		return err
+	}
+	return tun.AsHTTP().Serve(ctx, http.HandlerFunc(handler))
+}
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintln(w, "Hello from ngrok-go!")
 }
