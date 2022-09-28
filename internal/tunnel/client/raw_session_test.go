@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/inconshreveable/log15"
-	"github.com/ngrok/libngrok-go/internal/muxado"
+	"github.com/ngrok/ngrok-go/internal/muxado"
 )
 
 type dummyStream struct{}

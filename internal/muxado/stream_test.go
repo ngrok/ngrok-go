@@ -5,7 +5,7 @@ import (
 	"io/ioutil"
 	"testing"
 
-	"github.com/ngrok/libngrok-go/internal/muxado/frame"
+	"github.com/ngrok/ngrok-go/internal/muxado/frame"
 )
 
 func TestCloseWrite(t *testing.T) {

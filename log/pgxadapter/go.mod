@@ -1,10 +1,10 @@
-module github.com/ngrok/libngrok-go/log/pgxadapter
+module github.com/ngrok/ngrok-go/log/pgxadapter
 
 go 1.18
 
 require (
 	github.com/jackc/pgx/v4 v4.17.0
-	github.com/ngrok/libngrok-go/log v0.0.0
+	github.com/ngrok/ngrok-go/log v0.0.0
 )
 
 require (
@@ -19,4 +19,4 @@ require (
 	golang.org/x/text v0.3.7 // indirect
 )
 
-replace github.com/ngrok/libngrok-go/log => ../
+replace github.com/ngrok/ngrok-go/log => ../

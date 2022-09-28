@@ -11,7 +11,7 @@ import (
 	"sync"
 
 	"github.com/inconshreveable/log15"
-	"github.com/ngrok/libngrok-go"
+	"github.com/ngrok/ngrok-go"
 )
 
 func unwrap[T any](out T, err error) T {
@@ -36,15 +36,15 @@ func main() {
 	ctx := context.Background()
 
 	for restart {
-		sess := unwrap(libngrok.Connect(ctx, libngrok.ConnectOptions().
+		sess := unwrap(ngrok.Connect(ctx, ngrok.ConnectOptions().
 			WithLog15(log15.Root()).
-			WithRemoteCallbacks(libngrok.RemoteCallbacks{
-				OnStop: func(ctx context.Context, sess libngrok.Session) error {
+			WithRemoteCallbacks(ngrok.RemoteCallbacks{
+				OnStop: func(ctx context.Context, sess ngrok.Session) error {
 					restart = false
 					log15.Info("exiting due to remote request")
 					return nil
 				},
-				OnRestart: func(ctx context.Context, sess libngrok.Session) error {
+				OnRestart: func(ctx context.Context, sess ngrok.Session) error {
 					log15.Info("restarting due to remote request")
 					return nil
 				},
@@ -52,7 +52,7 @@ func main() {
 			WithAuthtoken(os.Getenv("NGROK_TOKEN")),
 		))
 
-		tun := unwrap(sess.StartTunnel(ctx, libngrok.HTTPOptions().
+		tun := unwrap(sess.StartTunnel(ctx, ngrok.HTTPOptions().
 			WithForwardsTo("tunnel management"),
 		))
 
@@ -62,7 +62,7 @@ func main() {
 	}
 }
 
-func manageTunnels(ctx context.Context, sess libngrok.Session) http.Handler {
+func manageTunnels(ctx context.Context, sess ngrok.Session) http.Handler {
 	tunnels := sync.Map{}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -77,9 +77,9 @@ func manageTunnels(ctx context.Context, sess libngrok.Session) http.Handler {
 				return
 			}
 
-			tun, err := sess.StartTunnel(ctx, libngrok.HTTPOptions().
+			tun, err := sess.StartTunnel(ctx, ngrok.HTTPOptions().
 				WithForwardsTo("dump requests").
-				WithOAuth(libngrok.OAuthProvider(provider).
+				WithOAuth(ngrok.OAuthProvider(provider).
 					AllowEmail(allowed)))
 			if err != nil {
 				httpResp(w, http.StatusInternalServerError, "error starting tunnel: %v\n", err)
@@ -99,7 +99,7 @@ func manageTunnels(ctx context.Context, sess libngrok.Session) http.Handler {
 		if r.Method == http.MethodDelete {
 			tun, ok := tunnels.LoadAndDelete(strings.TrimPrefix(r.URL.Path, "/"))
 			if ok {
-				tun := tun.(libngrok.Tunnel)
+				tun := tun.(ngrok.Tunnel)
 				log15.Info("closing tunnel", "url", tun.URL())
 				tun.Close()
 				httpResp(w, http.StatusOK, "tunnel closed\n")

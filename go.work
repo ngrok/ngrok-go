@@ -15,8 +15,8 @@ use (
 )
 
 replace (
-	github.com/ngrok/libngrok-go v0.0.0 => ./
-	github.com/ngrok/libngrok-go/log v0.0.0 => ./log
-	github.com/ngrok/libngrok-go/log/log15adapter v0.0.0 => ./log/log15adapter
-	github.com/ngrok/libngrok-go/log/pgxadapter v0.0.0 => ./log/pgxadapter
+	github.com/ngrok/ngrok-go v0.0.0 => ./
+	github.com/ngrok/ngrok-go/log v0.0.0 => ./log
+	github.com/ngrok/ngrok-go/log/log15adapter v0.0.0 => ./log/log15adapter
+	github.com/ngrok/ngrok-go/log/pgxadapter v0.0.0 => ./log/pgxadapter
 )

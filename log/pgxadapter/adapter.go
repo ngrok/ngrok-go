@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/jackc/pgx/v4"
-	"github.com/ngrok/libngrok-go/log"
+	"github.com/ngrok/ngrok-go/log"
 )
 
 // Adapter for the pgx logging interface.

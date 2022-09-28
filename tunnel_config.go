@@ -1,6 +1,6 @@
-package libngrok
+package ngrok
 
-import "github.com/ngrok/libngrok-go/internal/tunnel/proto"
+import "github.com/ngrok/ngrok-go/internal/tunnel/proto"
 
 type tunnelConfig struct {
 	// Note: Only one set of options should be set at a time - either proto and

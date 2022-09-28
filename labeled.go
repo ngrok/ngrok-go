@@ -1,4 +1,4 @@
-package libngrok
+package ngrok
 
 type LabeledConfig struct {
 	CommonConfig *CommonConfig

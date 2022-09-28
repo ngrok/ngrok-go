@@ -1,4 +1,4 @@
-package libngrok
+package ngrok
 
 import (
 	"context"
@@ -16,9 +16,9 @@ import (
 	"unsafe"
 
 	"github.com/inconshreveable/log15"
-	"github.com/ngrok/libngrok-go/internal/muxado"
-	tunnel_client "github.com/ngrok/libngrok-go/internal/tunnel/client"
-	"github.com/ngrok/libngrok-go/internal/tunnel/proto"
+	"github.com/ngrok/ngrok-go/internal/muxado"
+	tunnel_client "github.com/ngrok/ngrok-go/internal/tunnel/client"
+	"github.com/ngrok/ngrok-go/internal/tunnel/proto"
 	"golang.org/x/net/proxy"
 )
 

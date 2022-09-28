@@ -1,4 +1,4 @@
-package libngrok
+package ngrok
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/ngrok/libngrok-go/internal/pb_agent"
+	"github.com/ngrok/ngrok-go/internal/pb_agent"
 )
 
 type CommonConfig struct {

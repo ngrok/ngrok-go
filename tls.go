@@ -1,11 +1,11 @@
-package libngrok
+package ngrok
 
 import (
 	"crypto/x509"
 	"encoding/pem"
 
-	"github.com/ngrok/libngrok-go/internal/pb_agent"
-	"github.com/ngrok/libngrok-go/internal/tunnel/proto"
+	"github.com/ngrok/ngrok-go/internal/pb_agent"
+	"github.com/ngrok/ngrok-go/internal/tunnel/proto"
 )
 
 type TLSCommon struct {
