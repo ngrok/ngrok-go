@@ -1,4 +1,4 @@
-// Naiive ngrok agent implementation.
+// Naïve ngrok agent implementation.
 // Sets up a single tunnel and forwards it to another service.
 
 package main
