@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ngrok/libngrok-go/internal/muxado/frame"
+	"github.com/ngrok/ngrok-go/internal/muxado/frame"
 )
 
 var (

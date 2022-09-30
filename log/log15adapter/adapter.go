@@ -4,10 +4,10 @@ import (
 	"context"
 
 	"github.com/inconshreveable/log15"
-	"github.com/ngrok/libngrok-go/log"
+	"github.com/ngrok/ngrok-go/log"
 )
 
-// Wrapper for a log15.Logger to add the libngrok logging interface.
+// Wrapper for a log15.Logger to add the ngrok logging interface.
 // Also exposes the log15.Logger interface directly so that it can be downcast
 // to the log15.Logger.
 type Logger struct {

@@ -1,6 +1,6 @@
-package libngrok
+package ngrok
 
-import "github.com/ngrok/libngrok-go/internal/tunnel/proto"
+import "github.com/ngrok/ngrok-go/internal/tunnel/proto"
 
 type TCPConfig struct {
 	CommonConfig *CommonConfig

@@ -1,3 +1,3 @@
-module github.com/ngrok/libngrok-go/log
+module github.com/ngrok/ngrok-go/log
 
 go 1.18

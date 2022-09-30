@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"sync/atomic"
 
-	"github.com/ngrok/libngrok-go/internal/tunnel/proto"
+	"github.com/ngrok/ngrok-go/internal/tunnel/proto"
 )
 
 type Tunnel interface {

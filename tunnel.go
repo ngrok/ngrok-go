@@ -1,4 +1,4 @@
-package libngrok
+package ngrok
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	tunnel_client "github.com/ngrok/libngrok-go/internal/tunnel/client"
+	tunnel_client "github.com/ngrok/ngrok-go/internal/tunnel/client"
 )
 
 type Tunnel interface {

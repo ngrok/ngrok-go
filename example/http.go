@@ -12,8 +12,8 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/inconshreveable/log15"
-	libngrok "github.com/ngrok/libngrok-go"
-	"github.com/ngrok/libngrok-go/log/log15adapter"
+	ngrok "github.com/ngrok/ngrok-go"
+	"github.com/ngrok/ngrok-go/log/log15adapter"
 )
 
 func exitErr(err error) {
@@ -33,19 +33,19 @@ func main() {
 	logger.SetHandler(log15.LvlFilterHandler(log15.LvlInfo, log15.StderrHandler))
 
 	for {
-		opts := libngrok.ConnectOptions().
+		opts := ngrok.ConnectOptions().
 			WithAuthtoken(os.Getenv("NGROK_TOKEN")).
 			WithServer(os.Getenv("NGROK_SERVER")).
 			WithRegion(os.Getenv("NGROK_REGION")).
 			WithLogger(log15adapter.NewLogger(logger)).
 			WithMetadata("Hello, world!").
-			WithRemoteCallbacks(libngrok.RemoteCallbacks{
-				OnStop: func(_ context.Context, sess libngrok.Session) error {
+			WithRemoteCallbacks(ngrok.RemoteCallbacks{
+				OnStop: func(_ context.Context, sess ngrok.Session) error {
 					fmt.Println("got remote stop")
 					stopRequested = true
 					return nil
 				},
-				OnRestart: func(_ context.Context, sess libngrok.Session) error {
+				OnRestart: func(_ context.Context, sess ngrok.Session) error {
 					fmt.Println("got remote restart")
 					return nil
 				},
@@ -62,10 +62,10 @@ func main() {
 			opts.WithCA(pool)
 		}
 
-		sess, err := libngrok.Connect(ctx, opts)
+		sess, err := ngrok.Connect(ctx, opts)
 		exitErr(err)
 
-		tun, err := sess.StartTunnel(ctx, libngrok.
+		tun, err := sess.StartTunnel(ctx, ngrok.
 			HTTPOptions().
 			WithDomain(hostname).
 			WithMetadata(`{"foo":"bar"}`),
