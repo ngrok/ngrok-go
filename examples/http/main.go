@@ -22,12 +22,14 @@ func run(ctx context.Context) error {
 	_, tun, err := ngrok.ConnectAndStartTunnel(ctx,
 		ngrok.ConnectOptions().
 			WithAuthtoken(os.Getenv("NGROK_AUTHTOKEN")),
-		ngrok.HTTPOptions().
-			WithDomain("golang-demo.ngrok.io"),
+		ngrok.HTTPOptions(),
 	)
 	if err != nil {
 		return err
 	}
+	
+	log.Println("tunnel created:", tun.URL())
+	
 	return tun.AsHTTP().Serve(ctx, http.HandlerFunc(handler))
 }
 
