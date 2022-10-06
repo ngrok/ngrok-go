@@ -69,19 +69,9 @@ type Dialer interface {
 	DialContext(ctx context.Context, network, address string) (net.Conn, error)
 }
 
-// Callbacks in response to local(ish) network events.
-type LocalCallbacks struct {
-	// Called any time a session (re)connects.
-	OnConnect func(ctx context.Context, sess Session)
-	// Called any time a session disconnects.
-	// If the session has been closed locally, `OnDisconnect` will be called a
-	// final time with a `nil` `err`.
-	OnDisconnect func(ctx context.Context, sess Session, err error)
-	// Called any time an automatic heartbeat response is received.
-	// This does not include on-demand heartbeating via the `Session.Heartbeat`
-	// method.
-	OnHeartbeat func(ctx context.Context, sess Session, latency time.Duration)
-}
+type SessionConnectHandler func(ctx context.Context, sess Session)
+type SessionDisconnectHandler func(ctx context.Context, sess Session, err error)
+type SessionHeartbeatHandler func(ctx context.Context, sess Session, latency time.Duration)
 
 type ServerCommandHandler func(ctx context.Context, sess Session) error
 
@@ -116,8 +106,9 @@ type ConnectConfig struct {
 	// TODO(josh): don't expose muxado in the public API
 	HeartbeatConfig *muxado.HeartbeatConfig
 
-	// Callbacks for local network events.
-	LocalCallbacks LocalCallbacks
+	ConnectHandler    SessionConnectHandler
+	DisconnectHandler SessionDisconnectHandler
+	HeartbeatHandler  SessionHeartbeatHandler
 
 	StopHandler    ServerCommandHandler
 	RestartHandler ServerCommandHandler
@@ -227,13 +218,21 @@ func (cfg *ConnectConfig) WithLogger(logger Logger) *ConnectConfig {
 	return cfg
 }
 
-// Set the callbacks for local network events.
-func (cfg *ConnectConfig) WithLocalCallbacks(callbacks LocalCallbacks) *ConnectConfig {
-	cfg.LocalCallbacks = callbacks
+func (cfg *ConnectConfig) WithConnectHandler(handler SessionConnectHandler) *ConnectConfig {
+	cfg.ConnectHandler = handler
+	return cfg
+}
+func (cfg *ConnectConfig) WithDisconnectHandler(handler SessionDisconnectHandler) *ConnectConfig {
+	cfg.DisconnectHandler = handler
+	return cfg
+}
+func (cfg *ConnectConfig) WithHeartbeatHandler(handler SessionHeartbeatHandler) *ConnectConfig {
+	cfg.HeartbeatHandler = handler
 	return cfg
 }
 
-func (cfg *ConnectConfig) WithStopHandler() *ConnectConfig {
+func (cfg *ConnectConfig) WithStopHandler(handler ServerCommandHandler) *ConnectConfig {
+	cfg.StopHandler = handler
 	return cfg
 }
 
@@ -363,7 +362,7 @@ func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
 			SessionDuration: resp.Extra.SessionDuration,
 		})
 
-		if cfg.LocalCallbacks.OnHeartbeat != nil {
+		if cfg.HeartbeatHandler != nil {
 			go func() {
 				beats := session.Latency()
 				for {
@@ -374,7 +373,7 @@ func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
 						if !ok {
 							return
 						}
-						cfg.LocalCallbacks.OnHeartbeat(ctx, session, latency)
+						cfg.HeartbeatHandler(ctx, session, latency)
 					}
 				}
 			}()
@@ -396,8 +395,8 @@ func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
 		}
 	}
 
-	if cfg.LocalCallbacks.OnConnect != nil {
-		cfg.LocalCallbacks.OnConnect(ctx, session)
+	if cfg.ConnectHandler != nil {
+		cfg.ConnectHandler(ctx, session)
 	}
 
 	go func() {
@@ -407,17 +406,17 @@ func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
 				return
 			case err, ok := <-stateChanges:
 				if !ok {
-					if cfg.LocalCallbacks.OnDisconnect != nil {
+					if cfg.DisconnectHandler != nil {
 						logger.Info("no more state changes")
-						cfg.LocalCallbacks.OnDisconnect(ctx, session, nil)
+						cfg.DisconnectHandler(ctx, session, nil)
 					}
 					return
 				}
-				if err == nil && cfg.LocalCallbacks.OnConnect != nil {
-					cfg.LocalCallbacks.OnConnect(ctx, session)
+				if err == nil && cfg.ConnectHandler != nil {
+					cfg.ConnectHandler(ctx, session)
 				}
-				if err != nil && cfg.LocalCallbacks.OnDisconnect != nil {
-					cfg.LocalCallbacks.OnDisconnect(ctx, session, err)
+				if err != nil && cfg.DisconnectHandler != nil {
+					cfg.DisconnectHandler(ctx, session, err)
 				}
 			}
 		}
