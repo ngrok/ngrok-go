@@ -98,17 +98,6 @@ type RemoteCallbacks struct {
 	OnUpdate func(ctx context.Context, sess Session) error
 }
 
-// Errors that should be displayed in the ngrok dashboard if handlers are not
-// provided.
-type CallbackErrors struct {
-	// The error to display if an Update handler is not provided.
-	UpdateUnsupported string
-	// The error to display if a Restart handler is not provided.
-	RestartUnsupported string
-	// The error to display if a Stop handler is not provided.
-	StopUnsupported string
-}
-
 // Options to use when establishing an ngrok session.
 type ConnectConfig struct {
 	// Your ngrok Authtoken.
@@ -144,9 +133,6 @@ type ConnectConfig struct {
 	LocalCallbacks LocalCallbacks
 	// Callbacks for remote requests.
 	RemoteCallbacks RemoteCallbacks
-
-	// Errors to display for unsupported callbacks.
-	CallbackErrors CallbackErrors
 
 	// The logger for the session to use.
 	Logger log15.Logger
@@ -272,12 +258,6 @@ func (cfg *ConnectConfig) WithRemoteCallbacks(callbacks RemoteCallbacks) *Connec
 	return cfg
 }
 
-// Set the errors to display for unsupported callbacks.
-func (cfg *ConnectConfig) WithCallbackErrors(errs CallbackErrors) *ConnectConfig {
-	cfg.CallbackErrors = errs
-	return cfg
-}
-
 // Connect to the ngrok server and start a new session.
 func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
 	if cfg.Logger == nil {
@@ -347,19 +327,9 @@ func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
 	}
 
 	empty := ""
-	notImplemented := "not implemented"
+	notImplemented := "the agent has not defined a callback for this operation"
 
 	var remoteStopErr, remoteRestartErr, remoteUpdateErr = &notImplemented, &notImplemented, &notImplemented
-
-	if cfg.CallbackErrors.StopUnsupported != "" {
-		remoteStopErr = &cfg.CallbackErrors.StopUnsupported
-	}
-	if cfg.CallbackErrors.UpdateUnsupported != "" {
-		remoteUpdateErr = &cfg.CallbackErrors.UpdateUnsupported
-	}
-	if cfg.CallbackErrors.RestartUnsupported != "" {
-		remoteRestartErr = &cfg.CallbackErrors.RestartUnsupported
-	}
 
 	if cfg.RemoteCallbacks.OnStop != nil {
 		remoteStopErr = &empty
