@@ -83,21 +83,7 @@ type LocalCallbacks struct {
 	OnHeartbeat func(ctx context.Context, sess Session, latency time.Duration)
 }
 
-// Callbacks in response to remote requests
-type RemoteCallbacks struct {
-	// Called when a stop is requested via the dashboard or API.
-	// If it returns nil, success will be reported and the session closed.
-	OnStop func(ctx context.Context, sess Session) error
-	// Called when a restart is requested via the dashboard or API.
-	// If it returns nil, success will be reported and the session closed.
-	// It is the implementer's responsibility to ensure that the application
-	// recreates the session.
-	OnRestart func(ctx context.Context, sess Session) error
-	// Called when an update is requested via the dashboard or API.
-	// If it returns nil, success will be reported. Any other semantics are left
-	// up to the application, as automatic library updates aren't possible.
-	OnUpdate func(ctx context.Context, sess Session) error
-}
+type ServerCommandHandler func(ctx context.Context, sess Session) error
 
 // Options to use when establishing an ngrok session.
 type ConnectConfig struct {
@@ -132,8 +118,10 @@ type ConnectConfig struct {
 
 	// Callbacks for local network events.
 	LocalCallbacks LocalCallbacks
-	// Callbacks for remote requests.
-	RemoteCallbacks RemoteCallbacks
+
+	StopHandler    ServerCommandHandler
+	RestartHandler ServerCommandHandler
+	UpdateHandler  ServerCommandHandler
 
 	// The logger for the session to use.
 	Logger Logger
@@ -245,9 +233,7 @@ func (cfg *ConnectConfig) WithLocalCallbacks(callbacks LocalCallbacks) *ConnectC
 	return cfg
 }
 
-// Set the callbacks for requests from the ngrok dashboard.
-func (cfg *ConnectConfig) WithRemoteCallbacks(callbacks RemoteCallbacks) *ConnectConfig {
-	cfg.RemoteCallbacks = callbacks
+func (cfg *ConnectConfig) WithStopHandler() *ConnectConfig {
 	return cfg
 }
 
@@ -304,9 +290,11 @@ func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
 	stateChanges := make(chan error, 32)
 
 	callbackHandler := remoteCallbackHandler{
-		Logger: logger,
-		sess:   session,
-		cb:     cfg.RemoteCallbacks,
+		Logger:         logger,
+		sess:           session,
+		stopHandler:    cfg.StopHandler,
+		restartHandler: cfg.RestartHandler,
+		updateHandler:  cfg.UpdateHandler,
 	}
 
 	rawDialer := func() (tunnel_client.RawSession, error) {
@@ -326,13 +314,13 @@ func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
 
 	var remoteStopErr, remoteRestartErr, remoteUpdateErr = &notImplemented, &notImplemented, &notImplemented
 
-	if cfg.RemoteCallbacks.OnStop != nil {
+	if cfg.StopHandler != nil {
 		remoteStopErr = &empty
 	}
-	if cfg.RemoteCallbacks.OnRestart != nil {
+	if cfg.RestartHandler != nil {
 		remoteRestartErr = &empty
 	}
-	if cfg.RemoteCallbacks.OnUpdate != nil {
+	if cfg.UpdateHandler != nil {
 		remoteUpdateErr = &empty
 	}
 
@@ -536,15 +524,17 @@ func (s *sessionImpl) Latency() <-chan time.Duration {
 
 type remoteCallbackHandler struct {
 	log15.Logger
-	sess Session
-	cb   RemoteCallbacks
+	sess           Session
+	stopHandler    ServerCommandHandler
+	restartHandler ServerCommandHandler
+	updateHandler  ServerCommandHandler
 }
 
 func (rc remoteCallbackHandler) OnStop(_ *proto.Stop, respond tunnel_client.HandlerRespFunc) {
-	if rc.cb.OnStop != nil {
+	if rc.stopHandler != nil {
 		resp := new(proto.StopResp)
 		close := true
-		if err := rc.cb.OnStop(context.TODO(), rc.sess); err != nil {
+		if err := rc.stopHandler(context.TODO(), rc.sess); err != nil {
 			close = false
 			resp.Error = err.Error()
 		}
@@ -558,10 +548,10 @@ func (rc remoteCallbackHandler) OnStop(_ *proto.Stop, respond tunnel_client.Hand
 }
 
 func (rc remoteCallbackHandler) OnRestart(_ *proto.Restart, respond tunnel_client.HandlerRespFunc) {
-	if rc.cb.OnRestart != nil {
+	if rc.restartHandler != nil {
 		resp := new(proto.RestartResp)
 		close := true
-		if err := rc.cb.OnRestart(context.TODO(), rc.sess); err != nil {
+		if err := rc.restartHandler(context.TODO(), rc.sess); err != nil {
 			close = false
 			resp.Error = err.Error()
 		}
@@ -575,9 +565,9 @@ func (rc remoteCallbackHandler) OnRestart(_ *proto.Restart, respond tunnel_clien
 }
 
 func (rc remoteCallbackHandler) OnUpdate(_ *proto.Update, respond tunnel_client.HandlerRespFunc) {
-	if rc.cb.OnUpdate != nil {
+	if rc.updateHandler != nil {
 		resp := new(proto.UpdateResp)
-		if err := rc.cb.OnUpdate(context.TODO(), rc.sess); err != nil {
+		if err := rc.updateHandler(context.TODO(), rc.sess); err != nil {
 			resp.Error = err.Error()
 		}
 		if err := respond(resp); err != nil {
