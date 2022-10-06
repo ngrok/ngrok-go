@@ -16,6 +16,7 @@ type tunnelConfig struct {
 	labels map[string]string
 }
 
+// Interface implemented by types that can be used to start a tunnel.
 type TunnelConfig interface {
 	applyTunnelConfig(cfg *tunnelConfig)
 }

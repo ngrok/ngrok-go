@@ -2,6 +2,10 @@ package ngrok
 
 import "context"
 
+// Create a new ngrok session and start a tunnel.
+// Shorthand for a [Connect] followed by a [Session].StartTunnel.
+// If an error is encoutered when starting the tunnel, but after a session has
+// been established, both the [Session] and error return values will be non-nil.
 func ConnectAndStartTunnel(ctx context.Context, connectOpts *ConnectConfig, tunnelOpts TunnelConfig) (Session, Tunnel, error) {
 	sess, err := Connect(ctx, connectOpts)
 	if err != nil {

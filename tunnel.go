@@ -9,6 +9,7 @@ import (
 	tunnel_client "github.com/ngrok/ngrok-go/internal/tunnel/client"
 )
 
+// An ngrok tunnel.
 type Tunnel interface {
 	// Closing a tunnel is an operation that involves sending a "close" message
 	// over the existing session. Since this is subject to network latency,
@@ -19,26 +20,40 @@ type Tunnel interface {
 	// of 5 seconds.
 	Close() error
 
+	// Returns the ForwardsTo string for this tunnel.
 	ForwardsTo() string
+	// Returns the Metadata string for this tunnel.
 	Metadata() string
+	// Returns this tunnel's ID.
 	ID() string
 
+	// Returns this tunnel's protocol.
+	// Will be empty for labeled tunnels.
 	Proto() string
+	// Returns the URL for this tunnel.
+	// Will be empty for labeled tunnels.
 	URL() string
 
+	// Returns the labels for this tunnel.
+	// Will be empty for non-labeled tunnels.
 	Labels() map[string]string
 
+	// Convert this tunnel to a [net.Listener].
 	AsListener() ListenerTunnel
+	// Use this tunnel to serve HTTP requests.
 	AsHTTP() HTTPTunnel
 }
 
+// A tunnel that also implements [net.Listener].
 type ListenerTunnel interface {
 	Tunnel
 	net.Listener
 }
 
+// A tunnel that may be used to serve HTTP.
 type HTTPTunnel interface {
 	Tunnel
+	// Serve HTTP requests over this tunnel using the provided [http.Handler].
 	Serve(context.Context, http.Handler) error
 }
 
@@ -111,13 +126,22 @@ func (t *tunnelImpl) Serve(ctx context.Context, h http.Handler) error {
 	return srv.Serve(t)
 }
 
+// An ngrok tunnel connection.
+// For the time being, just a [net.Conn].
+// May have additional methods added in the future.
+// Must be type-asserted with the [net.Conn] returned from
+// [ListenerTunnel].Accept.
 type Conn interface {
 	net.Conn
-
-	// other methods?
 }
 
 type connImpl struct {
 	net.Conn
 	Proxy *tunnel_client.ProxyConn
+}
+
+var _ Conn = (*connImpl)(nil)
+
+func (c *connImpl) ProxyConn() *tunnel_client.ProxyConn {
+	return c.Proxy
 }
