@@ -1,0 +1,125 @@
+package modules
+
+import (
+	"crypto/x509"
+
+	"github.com/ngrok/ngrok-go/internal/pb_agent"
+	"github.com/ngrok/ngrok-go/internal/tunnel/proto"
+)
+
+type HTTPOption interface {
+	ApplyHTTP(cfg *httpOptions)
+}
+
+type httpOptionFunc func(cfg *httpOptions)
+
+func (of httpOptionFunc) ApplyHTTP(cfg *httpOptions) {
+	of(cfg)
+}
+
+// Construct a new set of HTTP tunnel options.
+func HTTPOptions(opts ...HTTPOption) TunnelOptions {
+	cfg := httpOptions{}
+	for _, opt := range opts {
+		opt.ApplyHTTP(&cfg)
+	}
+	return cfg
+}
+
+type httpOptions struct {
+	// Common tunnel configuration options.
+	commonOpts
+
+	// The scheme that this edge should use.
+	// Defaults to [SchemeHTTPS].
+	Scheme Scheme
+
+	// The domain to request for this edge
+	Domain string
+
+	// Certificates to use for client authentication at the ngrok edge.
+	MutualTLSCA []*x509.Certificate
+	// Enable gzip compression for HTTP responses.
+	Compression bool
+	// Convert incoming websocket connections to TCP-like streams.
+	WebsocketTCPConversion bool
+	// Reject requests when 5XX responses exceed this ratio.
+	// Disabled when 0.
+	CircuitBreaker float64
+
+	// Headers to be added to or removed from all requests at the ngrok edge.
+	RequestHeaders *headers
+	// Headers to be added to or removed from all responses at the ngrok edge.
+	ResponseHeaders *headers
+
+	// Credentials for basic authentication.
+	// If empty, basic authentication is disabled.
+	BasicAuth []basicAuth
+	// OAuth configuration.
+	// If nil, OAuth is disabled.
+	OAuth *oauthOptions
+	// WebhookVerification configuration.
+	// If nil, WebhookVerification is disabled.
+	WebhookVerification *webhookVerification
+}
+
+func (cfg *httpOptions) toProtoConfig() *proto.HTTPOptions {
+	opts := &proto.HTTPOptions{
+		Hostname: cfg.Domain,
+	}
+
+	if cfg.Compression {
+		opts.Compression = &pb_agent.MiddlewareConfiguration_Compression{}
+	}
+
+	if cfg.WebsocketTCPConversion {
+		opts.WebsocketTCPConverter = &pb_agent.MiddlewareConfiguration_WebsocketTCPConverter{}
+	}
+
+	if cfg.CircuitBreaker != 0 {
+		opts.CircuitBreaker = &pb_agent.MiddlewareConfiguration_CircuitBreaker{
+			ErrorThreshold: cfg.CircuitBreaker,
+		}
+	}
+
+	opts.MutualTLSCA = mutualTLSOption(cfg.MutualTLSCA).toProtoConfig()
+
+	opts.ProxyProto = proto.ProxyProto(cfg.commonOpts.ProxyProto)
+
+	opts.RequestHeaders = cfg.RequestHeaders.toProtoConfig()
+	opts.ResponseHeaders = cfg.ResponseHeaders.toProtoConfig()
+	if len(cfg.BasicAuth) > 0 {
+		opts.BasicAuth = &pb_agent.MiddlewareConfiguration_BasicAuth{}
+		for _, c := range cfg.BasicAuth {
+			opts.BasicAuth.Credentials = append(opts.BasicAuth.Credentials, c.toProtoConfig())
+		}
+	}
+	opts.OAuth = cfg.OAuth.toProtoConfig()
+	opts.WebhookVerification = cfg.WebhookVerification.toProtoConfig()
+	opts.IPRestriction = cfg.commonOpts.CIDRRestrictions.toProtoConfig()
+
+	return opts
+}
+
+func (cfg httpOptions) tunnelOptions() {}
+
+func (cfg httpOptions) ForwardsTo() string {
+	return cfg.commonOpts.getForwardsTo()
+}
+func (cfg httpOptions) Extra() proto.BindExtra {
+	return proto.BindExtra{
+		Metadata: cfg.Metadata,
+	}
+}
+func (cfg httpOptions) Proto() string {
+	if cfg.Scheme == "" {
+		return string(SchemeHTTPS)
+	}
+	return string(cfg.Scheme)
+}
+func (cfg httpOptions) Opts() any {
+	return cfg.toProtoConfig()
+}
+func (cfg httpOptions) Labels() map[string]string {
+	return nil
+}

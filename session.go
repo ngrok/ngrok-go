@@ -19,6 +19,7 @@ import (
 	"github.com/ngrok/ngrok-go/internal/muxado"
 	tunnel_client "github.com/ngrok/ngrok-go/internal/tunnel/client"
 	"github.com/ngrok/ngrok-go/internal/tunnel/proto"
+	"github.com/ngrok/ngrok-go/modules"
 	"golang.org/x/net/proxy"
 )
 
@@ -32,7 +33,7 @@ type Session interface {
 	Close() error
 
 	// Start a new tunnel over the ngrok session.
-	StartTunnel(ctx context.Context, cfg TunnelConfig) (Tunnel, error)
+	StartTunnel(ctx context.Context, cfg modules.TunnelOptions) (Tunnel, error)
 }
 
 const (
@@ -476,23 +477,27 @@ func (s *sessionImpl) Close() error {
 	return s.inner().Close()
 }
 
-func (s *sessionImpl) StartTunnel(ctx context.Context, cfg TunnelConfig) (Tunnel, error) {
+func (s *sessionImpl) StartTunnel(ctx context.Context, cfg modules.TunnelOptions) (Tunnel, error) {
 	var (
 		tunnel tunnel_client.Tunnel
 		err    error
 	)
 
-	tunnelCfg := &tunnelConfig{}
-	cfg.applyTunnelConfig(tunnelCfg)
+	tunnelCfg, ok := cfg.(tunnelConfigPrivate)
+	if !ok {
+		return nil, errors.New("invalid tunnel config")
+	}
 
-	if tunnelCfg.proto != "" {
-		tunnel, err = s.inner().Listen(tunnelCfg.proto, tunnelCfg.opts, tunnelCfg.extra, tunnelCfg.forwardsTo)
+	extra := tunnelCfg.Extra()
+
+	if tunnelCfg.Proto() != "" {
+		tunnel, err = s.inner().Listen(tunnelCfg.Proto(), tunnelCfg.Opts(), extra, tunnelCfg.ForwardsTo())
 	} else {
-		tunnel, err = s.inner().ListenLabel(tunnelCfg.labels, tunnelCfg.extra.Metadata, tunnelCfg.forwardsTo)
+		tunnel, err = s.inner().ListenLabel(tunnelCfg.Labels(), extra.Metadata, tunnelCfg.ForwardsTo())
 	}
 
 	if err != nil {
-		return nil, ErrStartTunnel{cfg, err}
+		return nil, ErrStartTunnel{err}
 	}
 
 	return &tunnelImpl{

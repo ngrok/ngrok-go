@@ -1,0 +1,31 @@
+package modules
+
+import "github.com/ngrok/ngrok-go/internal/pb_agent"
+
+// BasicAuth is a set of credentials for basic authentication.
+type basicAuth struct {
+	// The username for basic authentication.
+	Username string
+	// The password for basic authentication.
+	// Must be at least eight characters.
+	Password string
+}
+
+func (ba basicAuth) toProtoConfig() *pb_agent.MiddlewareConfiguration_BasicAuthCredential {
+	return &pb_agent.MiddlewareConfiguration_BasicAuthCredential{
+		CleartextPassword: ba.Password,
+		Username:          ba.Username,
+	}
+}
+
+// WithBasicAuth adds the provided credentials to the list of basic
+// authentication credentials.
+func WithBasicAuth(username, password string) HTTPOption {
+	return httpOptionFunc(func(cfg *httpOptions) {
+		cfg.BasicAuth = append(cfg.BasicAuth,
+			basicAuth{
+				Username: username,
+				Password: password,
+			})
+	})
+}
