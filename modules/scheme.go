@@ -10,8 +10,7 @@ const (
 	SchemeHTTPS = Scheme("https")
 )
 
-// Use the provided scheme for this edge.
-// Sets the [httpOptions].Scheme field.
+// WithScheme sets the scheme for this edge.
 func WithScheme(scheme Scheme) HTTPOption {
 	return httpOptionFunc(func(cfg *httpOptions) {
 		cfg.Scheme = scheme
