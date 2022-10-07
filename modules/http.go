@@ -57,7 +57,7 @@ type httpOptions struct {
 	BasicAuth []basicAuth
 	// OAuth configuration.
 	// If nil, OAuth is disabled.
-	OAuth *OAuth
+	OAuth *oauthOptions
 	// WebhookVerification configuration.
 	// If nil, WebhookVerification is disabled.
 	WebhookVerification *webhookVerification
