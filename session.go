@@ -482,6 +482,7 @@ func (s *sessionImpl) StartTunnel(ctx context.Context, cfg modules.TunnelOptions
 	}
 
 	return &tunnelImpl{
+		Sess:   s,
 		Tunnel: tunnel,
 	}, nil
 }
