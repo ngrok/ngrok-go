@@ -48,9 +48,9 @@ type httpOptions struct {
 	CircuitBreaker float64
 
 	// Headers to be added to or removed from all requests at the ngrok edge.
-	RequestHeaders *Headers
+	RequestHeaders *headers
 	// Headers to be added to or removed from all responses at the ngrok edge.
-	ResponseHeaders *Headers
+	ResponseHeaders *headers
 
 	// Credentials for basic authentication.
 	// If empty, basic authentication is disabled.

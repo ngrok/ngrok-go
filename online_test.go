@@ -169,12 +169,10 @@ func (f failPanic) FailNow() {
 func TestHTTPHeaders(t *testing.T) {
 	ctx := context.Background()
 	opts := modules.HTTPOptions(
-		modules.WithRequestHeaders(modules.HTTPHeaders().
-			Add("foo", "bar").
-			Remove("baz")),
-		modules.WithResponseHeaders(modules.HTTPHeaders().
-			Add("spam", "eggs").
-			Remove("python")))
+		modules.WithRequestHeader("foo", "bar"),
+		modules.WithRemoveRequestHeader("baz"),
+		modules.WithResponseHeader("spam", "eggs"),
+		modules.WithRemoveResponseHeader("python"))
 
 	tun, exited := serveHTTP(ctx, t, nil, opts, http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		defer func() { _ = recover() }()
