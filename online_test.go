@@ -421,8 +421,8 @@ func TestHTTPIPRestriction(t *testing.T) {
 	require.NoError(t, err)
 
 	opts := modules.HTTPOptions(
-		modules.AllowCIDRString("127.0.0.1/32"),
-		modules.DenyCIDR(cidr))
+		modules.WithAllowCIDRString("127.0.0.1/32"),
+		modules.WithDenyCIDR(cidr))
 
 	tun, exited := serveHTTP(ctx, t, nil, opts, helloHandler)
 
@@ -465,8 +465,8 @@ func TestTCPIPRestriction(t *testing.T) {
 	require.NoError(t, err)
 
 	opts := modules.TCPOptions(
-		modules.AllowCIDR(cidr),
-		modules.DenyCIDRString("0.0.0.0/0"))
+		modules.WithAllowCIDR(cidr),
+		modules.WithDenyCIDRString("0.0.0.0/0"))
 
 	// Easier to test by pretending it's HTTP on this end.
 	tun, exited := serveHTTP(ctx, t, nil, opts, helloHandler)
