@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ngrok/ngrok-go/modules"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/websocket"
 )
@@ -29,7 +30,7 @@ func setupSession(ctx context.Context, t *testing.T, opts *ConnectConfig) Sessio
 	return sess
 }
 
-func startTunnel(ctx context.Context, t *testing.T, sess Session, opts TunnelConfig) Tunnel {
+func startTunnel(ctx context.Context, t *testing.T, sess Session, opts modules.TunnelOptions) Tunnel {
 	tun, err := sess.StartTunnel(ctx, opts)
 	require.NoError(t, err, "StartTunnel")
 	return tun
@@ -39,7 +40,7 @@ var helloHandler = http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request
 	_, _ = fmt.Fprintln(rw, "Hello, world!")
 })
 
-func serveHTTP(ctx context.Context, t *testing.T, connectOpts *ConnectConfig, opts TunnelConfig, handler http.Handler) (Tunnel, <-chan error) {
+func serveHTTP(ctx context.Context, t *testing.T, connectOpts *ConnectConfig, opts modules.TunnelOptions, handler http.Handler) (Tunnel, <-chan error) {
 	sess := setupSession(ctx, t, connectOpts)
 
 	tun := startTunnel(ctx, t, sess, opts)
@@ -57,7 +58,7 @@ func TestConnectAndStartTunnel(t *testing.T) {
 	_, _, err := ConnectAndStartTunnel(context.Background(),
 		ConnectOptions().
 			WithAuthtoken(os.Getenv("NGROK_AUTHTOKEN")),
-		HTTPOptions(),
+		modules.HTTPOptions(),
 	)
 	require.NoError(t, err, "Session Connect")
 }
@@ -66,9 +67,9 @@ func TestTunnel(t *testing.T) {
 	ctx := context.Background()
 	sess := setupSession(ctx, t, nil)
 
-	tun := startTunnel(ctx, t, sess, HTTPOptions().
-		WithMetadata("Hello, world!").
-		WithForwardsTo("some application"))
+	tun := startTunnel(ctx, t, sess, modules.HTTPOptions(
+		modules.WithMetadata("Hello, world!"),
+		modules.WithForwardsTo("some application")))
 
 	require.NotEmpty(t, tun.URL(), "Tunnel URL")
 	require.Equal(t, "Hello, world!", tun.Metadata())
@@ -78,7 +79,7 @@ func TestTunnel(t *testing.T) {
 func TestHTTPS(t *testing.T) {
 	ctx := context.Background()
 	tun, exited := serveHTTP(ctx, t, nil,
-		HTTPOptions(),
+		modules.HTTPOptions(),
 		helloHandler,
 	)
 
@@ -102,8 +103,8 @@ func TestHTTPS(t *testing.T) {
 func TestHTTP(t *testing.T) {
 	ctx := context.Background()
 	tun, exited := serveHTTP(ctx, t, nil,
-		HTTPOptions().
-			WithScheme(SchemeHTTP),
+		modules.HTTPOptions(
+			modules.WithScheme(modules.SchemeHTTP)),
 		helloHandler,
 	)
 
@@ -126,7 +127,7 @@ func TestHTTP(t *testing.T) {
 
 func TestHTTPCompression(t *testing.T) {
 	ctx := context.Background()
-	opts := HTTPOptions().WithCompression()
+	opts := modules.HTTPOptions(modules.WithCompression())
 	tun, exited := serveHTTP(ctx, t, nil, opts, helloHandler)
 
 	req, err := http.NewRequest(http.MethodGet, tun.URL(), nil)
@@ -167,13 +168,13 @@ func (f failPanic) FailNow() {
 
 func TestHTTPHeaders(t *testing.T) {
 	ctx := context.Background()
-	opts := HTTPOptions().
-		WithRequestHeaders(HTTPHeaders().
+	opts := modules.HTTPOptions(
+		modules.WithRequestHeaders(modules.HTTPHeaders().
 			Add("foo", "bar").
-			Remove("baz")).
-		WithResponseHeaders(HTTPHeaders().
+			Remove("baz")),
+		modules.WithResponseHeaders(modules.HTTPHeaders().
 			Add("spam", "eggs").
-			Remove("python"))
+			Remove("python")))
 
 	tun, exited := serveHTTP(ctx, t, nil, opts, http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		defer func() { _ = recover() }()
@@ -212,7 +213,7 @@ func TestHTTPHeaders(t *testing.T) {
 func TestBasicAuth(t *testing.T) {
 	ctx := context.Background()
 
-	opts := HTTPOptions().WithBasicAuth("user", "foobarbaz")
+	opts := modules.HTTPOptions(modules.WithBasicAuth("user", "foobarbaz"))
 
 	tun, exited := serveHTTP(ctx, t, nil, opts, helloHandler)
 
@@ -248,7 +249,7 @@ func TestCircuitBreaker(t *testing.T) {
 	}
 	ctx := context.Background()
 
-	opts := HTTPOptions().WithCircuitBreaker(0.1)
+	opts := modules.HTTPOptions(modules.WithCircuitBreaker(0.1))
 
 	n := 0
 	tun, exited := serveHTTP(ctx, t, nil, opts, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -275,37 +276,24 @@ func TestCircuitBreaker(t *testing.T) {
 	require.Error(t, <-exited)
 }
 
-type TestConfig interface {
-	TunnelConfig
-	WithProxyProtoI(version ProxyProtoVersion) TunnelConfig
-}
-
-func (http *HTTPConfig) WithProxyProtoI(version ProxyProtoVersion) TunnelConfig {
-	return http.WithProxyProto(version)
-}
-
-func (tcp *TCPConfig) WithProxyProtoI(version ProxyProtoVersion) TunnelConfig {
-	return tcp.WithProxyProto(version)
-}
-
 func TestProxyProto(t *testing.T) {
 	ctx := context.Background()
 
 	type testCase struct {
 		name          string
-		optsFunc      func() TestConfig
+		optsFunc      func(modules.ProxyProtoVersion) modules.TunnelOptions
 		reqFunc       func(*testing.T, string)
-		version       ProxyProtoVersion
+		version       modules.ProxyProtoVersion
 		shouldContain string
 	}
 
 	base := []testCase{
 		{
-			version:       ProxyProtoV1,
+			version:       modules.ProxyProtoV1,
 			shouldContain: "PROXY TCP4",
 		},
 		{
-			version:       ProxyProtoV2,
+			version:       modules.ProxyProtoV2,
 			shouldContain: "\x0D\x0A\x0D\x0A\x00\x0D\x0A\x51\x55\x49\x54\x0A",
 		},
 	}
@@ -315,8 +303,10 @@ func TestProxyProto(t *testing.T) {
 	for _, c := range base {
 		cases = append(cases,
 			testCase{
-				name:     fmt.Sprintf("HTTP/Version%d", c.version),
-				optsFunc: func() TestConfig { return HTTPOptions() },
+				name: fmt.Sprintf("HTTP/Version%d", c.version),
+				optsFunc: func(v modules.ProxyProtoVersion) modules.TunnelOptions {
+					return modules.HTTPOptions(modules.WithProxyProto(v))
+				},
 				reqFunc: func(t *testing.T, url string) {
 					_, _ = http.Get(url)
 				},
@@ -324,8 +314,10 @@ func TestProxyProto(t *testing.T) {
 				shouldContain: c.shouldContain,
 			},
 			testCase{
-				name:     fmt.Sprintf("TCP/Version%d", c.version),
-				optsFunc: func() TestConfig { return TCPOptions() },
+				name: fmt.Sprintf("TCP/Version%d", c.version),
+				optsFunc: func(v modules.ProxyProtoVersion) modules.TunnelOptions {
+					return modules.TCPOptions(modules.WithProxyProto(v))
+				},
 				reqFunc: func(t *testing.T, u string) {
 					url, err := url.Parse(u)
 					require.NoError(t, err)
@@ -342,9 +334,7 @@ func TestProxyProto(t *testing.T) {
 	for _, tcase := range cases {
 		t.Run(tcase.name, func(t *testing.T) {
 			sess := setupSession(ctx, t, nil)
-			tun := startTunnel(ctx, t, sess, tcase.optsFunc().
-				WithProxyProtoI(tcase.version),
-			).AsListener()
+			tun := startTunnel(ctx, t, sess, tcase.optsFunc(tcase.version)).AsListener()
 
 			go tcase.reqFunc(t, tun.URL())
 
@@ -366,7 +356,7 @@ func TestHostname(t *testing.T) {
 	ctx := context.Background()
 
 	tun, exited := serveHTTP(ctx, t, nil,
-		HTTPOptions().WithDomain("foo.robsonchase.com"),
+		modules.HTTPOptions(modules.WithDomain("foo.robsonchase.com")),
 		helloHandler,
 	)
 	require.Equal(t, "https://foo.robsonchase.com", tun.URL())
@@ -391,7 +381,7 @@ func TestSubdomain(t *testing.T) {
 	subdomain := hex.EncodeToString(buf)
 
 	tun, exited := serveHTTP(ctx, t, nil,
-		HTTPOptions().WithDomain(subdomain+".ngrok.io"),
+		modules.HTTPOptions(modules.WithDomain(subdomain+".ngrok.io")),
 		helloHandler,
 	)
 
@@ -411,7 +401,7 @@ func TestSubdomain(t *testing.T) {
 func TestOAuth(t *testing.T) {
 	ctx := context.Background()
 
-	opts := HTTPOptions().WithOAuth(OAuthProvider("google"))
+	opts := modules.HTTPOptions(modules.WithOAuth(modules.OAuthProvider("google")))
 
 	tun, exited := serveHTTP(ctx, t, nil, opts, helloHandler)
 
@@ -432,11 +422,9 @@ func TestHTTPIPRestriction(t *testing.T) {
 	_, cidr, err := net.ParseCIDR("0.0.0.0/0")
 	require.NoError(t, err)
 
-	opts := HTTPOptions().WithCIDRRestriction(
-		CIDRSet().
-			AllowString("127.0.0.1/32").
-			Deny(cidr),
-	)
+	opts := modules.HTTPOptions(
+		modules.AllowCIDRString("127.0.0.1/32"),
+		modules.DenyCIDR(cidr))
 
 	tun, exited := serveHTTP(ctx, t, nil, opts, helloHandler)
 
@@ -452,7 +440,7 @@ func TestHTTPIPRestriction(t *testing.T) {
 func TestTCP(t *testing.T) {
 	ctx := context.Background()
 
-	opts := TCPOptions()
+	opts := modules.TCPOptions()
 
 	// Easier to test by pretending it's HTTP on this end.
 	tun, exited := serveHTTP(ctx, t, nil, opts, helloHandler)
@@ -478,11 +466,9 @@ func TestTCPIPRestriction(t *testing.T) {
 	_, cidr, err := net.ParseCIDR("127.0.0.1/32")
 	require.NoError(t, err)
 
-	opts := TCPOptions().WithCIDRRestriction(
-		CIDRSet().
-			Allow(cidr).
-			DenyString("0.0.0.0/0"),
-	)
+	opts := modules.TCPOptions(
+		modules.AllowCIDR(cidr),
+		modules.DenyCIDRString("0.0.0.0/0"))
 
 	// Easier to test by pretending it's HTTP on this end.
 	tun, exited := serveHTTP(ctx, t, nil, opts, helloHandler)
@@ -502,9 +488,10 @@ func TestTCPIPRestriction(t *testing.T) {
 func TestLabeled(t *testing.T) {
 	ctx := context.Background()
 	tun, exited := serveHTTP(ctx, t, nil,
-		LabeledOptions().
-			WithLabel("edge", "edghts_2CtuOWQFCrvggKT34fRCFXs0AiK").
-			WithMetadata("Hello, world!"),
+		modules.LabeledOptions(
+			modules.WithLabel("edge", "edghts_2CtuOWQFCrvggKT34fRCFXs0AiK"),
+			modules.WithMetadata("Hello, world!"),
+		),
 		helloHandler,
 	)
 
@@ -535,8 +522,8 @@ func TestWebsocketConversion(t *testing.T) {
 	ctx := context.Background()
 	sess := setupSession(ctx, t, nil)
 	tun := startTunnel(ctx, t, sess,
-		HTTPOptions().
-			WithWebsocketTCPConversion(),
+		modules.HTTPOptions(
+			modules.WithWebsocketTCPConversion()),
 	)
 
 	// HTTP over websockets? suuuure lol
@@ -672,11 +659,10 @@ func TestErrors(t *testing.T) {
 
 	sess, err := Connect(ctx, ConnectOptions())
 	require.NoError(t, err)
-	_, err = sess.StartTunnel(ctx, TCPOptions())
+	_, err = sess.StartTunnel(ctx, modules.TCPOptions())
 	var startErr ErrStartTunnel
 	require.ErrorIs(t, err, startErr)
 	require.ErrorAs(t, err, &startErr)
-	require.IsType(t, &TCPConfig{}, startErr.Config)
 }
 
 func TestNonExported(t *testing.T) {

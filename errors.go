@@ -55,8 +55,6 @@ func (e ErrAcceptFailed) Is(target error) bool {
 
 // Errors arising from a failure to start a tunnel.
 type ErrStartTunnel struct {
-	// The configuration used to start the tunnel.
-	Config TunnelConfig
 	// The underlying error.
 	Inner error
 }

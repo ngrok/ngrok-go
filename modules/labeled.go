@@ -1,0 +1,62 @@
+package modules
+
+import "github.com/ngrok/ngrok-go/internal/tunnel/proto"
+
+type LabeledOption interface {
+	ApplyLabeled(cfg *labeledOptions)
+}
+
+type labeledOptionFunc func(cfg *labeledOptions)
+
+func (of labeledOptionFunc) ApplyLabeled(cfg *labeledOptions) {
+	of(cfg)
+}
+
+// Construct a new set of Labeled tunnel options.
+func LabeledOptions(opts ...LabeledOption) TunnelOptions {
+	cfg := labeledOptions{}
+	for _, opt := range opts {
+		opt.ApplyLabeled(&cfg)
+	}
+	return cfg
+}
+
+// Options for labeled tunnels.
+type labeledOptions struct {
+	// Common tunnel configuration options.
+	commonOpts
+
+	// A map of label, value pairs for this tunnel.
+	labels map[string]string
+}
+
+// WithLabel adds a label to this tunnel's set of label, value pairs.
+func WithLabel(label, value string) LabeledOption {
+	return labeledOptionFunc(func(cfg *labeledOptions) {
+		if cfg.labels == nil {
+			cfg.labels = map[string]string{}
+		}
+
+		cfg.labels[label] = value
+	})
+}
+
+func (cfg labeledOptions) tunnelOptions() {}
+
+func (cfg labeledOptions) ForwardsTo() string {
+	return cfg.commonOpts.getForwardsTo()
+}
+func (cfg labeledOptions) Extra() proto.BindExtra {
+	return proto.BindExtra{
+		Metadata: cfg.Metadata,
+	}
+}
+func (cfg labeledOptions) Proto() string {
+	return ""
+}
+func (cfg labeledOptions) Opts() any {
+	return nil
+}
+func (cfg labeledOptions) Labels() map[string]string {
+	return cfg.labels
+}

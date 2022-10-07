@@ -11,6 +11,7 @@ import (
 	"os"
 
 	"github.com/ngrok/ngrok-go"
+	"github.com/ngrok/ngrok-go/modules"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -31,7 +32,7 @@ func run(ctx context.Context, dest string) error {
 	_, tun, err := ngrok.ConnectAndStartTunnel(ctx,
 		ngrok.ConnectOptions().
 			WithAuthtoken(os.Getenv("NGROK_AUTHTOKEN")),
-		ngrok.HTTPOptions(),
+		modules.HTTPOptions(),
 	)
 	if err != nil {
 		return err
