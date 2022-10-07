@@ -15,7 +15,7 @@ type cidrRestrictions struct {
 }
 
 // Add the provided CIDRS to the [CIDRRestriction].Allowed list.
-func AllowCIDRString(cidr ...string) interface {
+func WithAllowCIDRString(cidr ...string) interface {
 	HTTPOption
 	TCPOption
 	TLSOption
@@ -24,7 +24,7 @@ func AllowCIDRString(cidr ...string) interface {
 }
 
 // Add the provided [net.IPNet] to the [CIDRRestriction].Allowed list.
-func AllowCIDR(net ...*net.IPNet) interface {
+func WithAllowCIDR(net ...*net.IPNet) interface {
 	HTTPOption
 	TCPOption
 	TLSOption
@@ -37,7 +37,7 @@ func AllowCIDR(net ...*net.IPNet) interface {
 }
 
 // Add the provided CIDRS to the [CIDRRestriction].Denied list.
-func DenyCIDRString(cidr ...string) interface {
+func WithDenyCIDRString(cidr ...string) interface {
 	HTTPOption
 	TCPOption
 	TLSOption
@@ -46,7 +46,7 @@ func DenyCIDRString(cidr ...string) interface {
 }
 
 // Add the provided [net.IPNet] to the [CIDRRestriction].Denied list.
-func DenyCIDR(net ...*net.IPNet) interface {
+func WithDenyCIDR(net ...*net.IPNet) interface {
 	HTTPOption
 	TCPOption
 	TLSOption
