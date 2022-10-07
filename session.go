@@ -136,7 +136,7 @@ type ConnectConfig struct {
 	RemoteCallbacks RemoteCallbacks
 
 	// The logger for the session to use.
-	Logger log15.Logger
+	Logger Logger
 }
 
 // Construct a new set of Connect options.
@@ -228,14 +228,6 @@ func (cfg *ConnectConfig) WithHeartbeatInterval(interval time.Duration) *Connect
 	return cfg
 }
 
-// Log to a log15.Logger.
-// This is the logging interface that the internals use, so this is the most
-// direct way to set a logger.
-func (cfg *ConnectConfig) WithLog15(logger log15.Logger) *ConnectConfig {
-	cfg.Logger = logger
-	return cfg
-}
-
 // Log to a simplified logging interface.
 // This is a "lowest common denominator" interface that should be simple to
 // adapt other loggers to. Examples are provided in `log15adapter` and
@@ -243,7 +235,7 @@ func (cfg *ConnectConfig) WithLog15(logger log15.Logger) *ConnectConfig {
 // If the provided `Logger` also implements the `log15.Logger` interface, it
 // will be used directly.
 func (cfg *ConnectConfig) WithLogger(logger Logger) *ConnectConfig {
-	cfg.Logger = toLog15(logger)
+	cfg.Logger = logger
 	return cfg
 }
 
@@ -261,9 +253,11 @@ func (cfg *ConnectConfig) WithRemoteCallbacks(callbacks RemoteCallbacks) *Connec
 
 // Connect to the ngrok server and start a new session.
 func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
-	if cfg.Logger == nil {
-		cfg.Logger = log15.New()
-		cfg.Logger.SetHandler(log15.DiscardHandler())
+	logger := log15.New()
+	logger.SetHandler(log15.DiscardHandler())
+
+	if cfg.Logger != nil {
+		logger = toLog15(cfg.Logger)
 	}
 
 	if cfg.CAPool == nil {
@@ -310,7 +304,7 @@ func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
 	stateChanges := make(chan error, 32)
 
 	callbackHandler := remoteCallbackHandler{
-		Logger: cfg.Logger,
+		Logger: logger,
 		sess:   session,
 		cb:     cfg.RemoteCallbacks,
 	}
@@ -324,7 +318,7 @@ func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
 		conn = tls.Client(conn, tlsConfig)
 
 		sess := muxado.Client(conn, &muxado.Config{})
-		return tunnel_client.NewRawSession(cfg.Logger, sess, cfg.HeartbeatConfig, callbackHandler), nil
+		return tunnel_client.NewRawSession(logger, sess, cfg.HeartbeatConfig, callbackHandler), nil
 	}
 
 	empty := ""
@@ -402,7 +396,7 @@ func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
 		return nil
 	}
 
-	sess := tunnel_client.NewReconnectingSession(cfg.Logger, rawDialer, stateChanges, reconnect)
+	sess := tunnel_client.NewReconnectingSession(logger, rawDialer, stateChanges, reconnect)
 
 	select {
 	case <-ctx.Done():
@@ -426,7 +420,7 @@ func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
 			case err, ok := <-stateChanges:
 				if !ok {
 					if cfg.LocalCallbacks.OnDisconnect != nil {
-						cfg.Logger.Info("no more state changes")
+						logger.Info("no more state changes")
 						cfg.LocalCallbacks.OnDisconnect(ctx, session, nil)
 					}
 					return
