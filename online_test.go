@@ -640,17 +640,17 @@ func TestErrors(t *testing.T) {
 	u, _ := url.Parse("notarealscheme://example.com")
 
 	_, err = Connect(ctx, ConnectOptions().WithProxyURL(u))
-	var proxyErr ErrProxyInit
+	var proxyErr errProxyInit
 	require.ErrorIs(t, err, proxyErr)
 	require.ErrorAs(t, err, &proxyErr)
 
 	_, err = Connect(ctx, ConnectOptions().WithServer("127.0.0.234:123"))
-	var dialErr ErrSessionDial
+	var dialErr errSessionDial
 	require.ErrorIs(t, err, dialErr)
 	require.ErrorAs(t, err, &dialErr)
 
 	_, err = Connect(ctx, ConnectOptions().WithAuthtoken("lolnope"))
-	var authErr ErrAuthFailed
+	var authErr errAuthFailed
 	require.ErrorIs(t, err, authErr)
 	require.ErrorAs(t, err, &authErr)
 	require.True(t, authErr.Remote)
@@ -658,7 +658,7 @@ func TestErrors(t *testing.T) {
 	sess, err := Connect(ctx, ConnectOptions())
 	require.NoError(t, err)
 	_, err = sess.StartTunnel(ctx, modules.TCPOptions())
-	var startErr ErrStartTunnel
+	var startErr errStartTunnel
 	require.ErrorIs(t, err, startErr)
 	require.ErrorAs(t, err, &startErr)
 }
