@@ -87,12 +87,10 @@ type ConnectConfig struct {
 
 	// The [Dialer] used to establish the initial TCP connection to the ngrok
 	// server.
-	// If set, takes precedence over Resolver and ProxyURL settings.
+	// If set, takes precedence over the ProxyURL setting.
 	// If not set, defaults to a [net.Dialer].
 	Dialer Dialer
 
-	// The DNS resolver configuration to use with the default [Dialer].
-	Resolver *net.Resolver
 	// The URL of a proxy to use when making the TCP connection to the ngrok
 	// server.
 	// Any proxy supported by [golang.org/x/net/proxy] may be used.
@@ -132,8 +130,8 @@ func (cfg *ConnectConfig) WithMetadata(meta string) *ConnectConfig {
 
 // Use the provided dialer for establishing a TCP connection to the ngrok
 // server.
-// Sets the [ConnectConfig].Dialer field and takes precedence over ProxyURL and
-// Resolver settings.
+// Sets the [ConnectConfig].Dialer field. Takes precedence over ProxyURL if both
+// are specified.
 func (cfg *ConnectConfig) WithDialer(dialer Dialer) *ConnectConfig {
 	cfg.Dialer = dialer
 	return cfg
@@ -144,13 +142,6 @@ func (cfg *ConnectConfig) WithDialer(dialer Dialer) *ConnectConfig {
 // Sets the [ConnectConfig].ProxyURL field. Ignored if a custom Dialer is in use.
 func (cfg *ConnectConfig) WithProxyURL(url *url.URL) *ConnectConfig {
 	cfg.ProxyURL = url
-	return cfg
-}
-
-// Use the provided [net.Resolver] settings when using the default Dialer.
-// Sets the [ConnectConfig].Resolver field. Ignored if a custom Dialer is in use.
-func (cfg *ConnectConfig) WithResolver(resolver *net.Resolver) *ConnectConfig {
-	cfg.Resolver = resolver
 	return cfg
 }
 
@@ -265,9 +256,7 @@ func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
 	if cfg.Dialer != nil {
 		dialer = cfg.Dialer
 	} else {
-		netDialer := &net.Dialer{
-			Resolver: cfg.Resolver,
-		}
+		netDialer := &net.Dialer{}
 
 		if cfg.ProxyURL != nil {
 			proxied, err := proxy.FromURL(cfg.ProxyURL, netDialer)
