@@ -11,14 +11,9 @@ import (
 
 // An ngrok tunnel.
 type Tunnel interface {
-	// Closing a tunnel is an operation that involves sending a "close" message
-	// over the existing session. Since this is subject to network latency,
-	// packet loss, etc., it is most correct to provide a context. See also
-	// `Close`, which matches the `io.Closer` interface method.
-	CloseWithContext(context.Context) error
-	// Convenience method that calls `CloseWithContext` with a default timeout
-	// of 5 seconds.
-	Close() error
+	// Every Tunnel is a net.Listener. It can be plugged into any existing
+	// code that expects a net.Listener seamlessly without any changes.
+	net.Listener
 
 	// Returns the ForwardsTo string for this tunnel.
 	ForwardsTo() string
@@ -42,16 +37,17 @@ type Tunnel interface {
 	// was started on.
 	Session() Session
 
-	// Convert this tunnel to a [net.Listener].
-	AsListener() ListenerTunnel
 	// Use this tunnel to serve HTTP requests.
 	AsHTTP() HTTPTunnel
-}
 
-// A tunnel that also implements [net.Listener].
-type ListenerTunnel interface {
-	Tunnel
-	net.Listener
+	// Convenience method that calls `CloseWithContext` with a default timeout
+	// of 5 seconds.
+	Close() error
+	// Closing a tunnel is an operation that involves sending a "close" message
+	// over the existing session. Since this is subject to network latency,
+	// packet loss, etc., it is most correct to provide a context. See also
+	// `Close`, which matches the `io.Closer` interface method.
+	CloseWithContext(context.Context) error
 }
 
 // A tunnel that may be used to serve HTTP.
@@ -116,10 +112,6 @@ func (t *tunnelImpl) Labels() map[string]string {
 }
 
 func (t *tunnelImpl) AsHTTP() HTTPTunnel {
-	return t
-}
-
-func (t *tunnelImpl) AsListener() ListenerTunnel {
 	return t
 }
 
