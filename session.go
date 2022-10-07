@@ -69,35 +69,11 @@ type Dialer interface {
 	DialContext(ctx context.Context, network, address string) (net.Conn, error)
 }
 
-// Callbacks in response to local(ish) network events.
-type LocalCallbacks struct {
-	// Called any time a session (re)connects.
-	OnConnect func(ctx context.Context, sess Session)
-	// Called any time a session disconnects.
-	// If the session has been closed locally, `OnDisconnect` will be called a
-	// final time with a `nil` `err`.
-	OnDisconnect func(ctx context.Context, sess Session, err error)
-	// Called any time an automatic heartbeat response is received.
-	// This does not include on-demand heartbeating via the `Session.Heartbeat`
-	// method.
-	OnHeartbeat func(ctx context.Context, sess Session, latency time.Duration)
-}
+type SessionConnectHandler func(ctx context.Context, sess Session)
+type SessionDisconnectHandler func(ctx context.Context, sess Session, err error)
+type SessionHeartbeatHandler func(ctx context.Context, sess Session, latency time.Duration)
 
-// Callbacks in response to remote requests
-type RemoteCallbacks struct {
-	// Called when a stop is requested via the dashboard or API.
-	// If it returns nil, success will be reported and the session closed.
-	OnStop func(ctx context.Context, sess Session) error
-	// Called when a restart is requested via the dashboard or API.
-	// If it returns nil, success will be reported and the session closed.
-	// It is the implementer's responsibility to ensure that the application
-	// recreates the session.
-	OnRestart func(ctx context.Context, sess Session) error
-	// Called when an update is requested via the dashboard or API.
-	// If it returns nil, success will be reported. Any other semantics are left
-	// up to the application, as automatic library updates aren't possible.
-	OnUpdate func(ctx context.Context, sess Session) error
-}
+type ServerCommandHandler func(ctx context.Context, sess Session) error
 
 // Options to use when establishing an ngrok session.
 type ConnectConfig struct {
@@ -130,10 +106,13 @@ type ConnectConfig struct {
 	// TODO(josh): don't expose muxado in the public API
 	HeartbeatConfig *muxado.HeartbeatConfig
 
-	// Callbacks for local network events.
-	LocalCallbacks LocalCallbacks
-	// Callbacks for remote requests.
-	RemoteCallbacks RemoteCallbacks
+	ConnectHandler    SessionConnectHandler
+	DisconnectHandler SessionDisconnectHandler
+	HeartbeatHandler  SessionHeartbeatHandler
+
+	StopHandler    ServerCommandHandler
+	RestartHandler ServerCommandHandler
+	UpdateHandler  ServerCommandHandler
 
 	// The logger for the session to use.
 	Logger Logger
@@ -239,15 +218,21 @@ func (cfg *ConnectConfig) WithLogger(logger Logger) *ConnectConfig {
 	return cfg
 }
 
-// Set the callbacks for local network events.
-func (cfg *ConnectConfig) WithLocalCallbacks(callbacks LocalCallbacks) *ConnectConfig {
-	cfg.LocalCallbacks = callbacks
+func (cfg *ConnectConfig) WithConnectHandler(handler SessionConnectHandler) *ConnectConfig {
+	cfg.ConnectHandler = handler
+	return cfg
+}
+func (cfg *ConnectConfig) WithDisconnectHandler(handler SessionDisconnectHandler) *ConnectConfig {
+	cfg.DisconnectHandler = handler
+	return cfg
+}
+func (cfg *ConnectConfig) WithHeartbeatHandler(handler SessionHeartbeatHandler) *ConnectConfig {
+	cfg.HeartbeatHandler = handler
 	return cfg
 }
 
-// Set the callbacks for requests from the ngrok dashboard.
-func (cfg *ConnectConfig) WithRemoteCallbacks(callbacks RemoteCallbacks) *ConnectConfig {
-	cfg.RemoteCallbacks = callbacks
+func (cfg *ConnectConfig) WithStopHandler(handler ServerCommandHandler) *ConnectConfig {
+	cfg.StopHandler = handler
 	return cfg
 }
 
@@ -304,9 +289,11 @@ func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
 	stateChanges := make(chan error, 32)
 
 	callbackHandler := remoteCallbackHandler{
-		Logger: logger,
-		sess:   session,
-		cb:     cfg.RemoteCallbacks,
+		Logger:         logger,
+		sess:           session,
+		stopHandler:    cfg.StopHandler,
+		restartHandler: cfg.RestartHandler,
+		updateHandler:  cfg.UpdateHandler,
 	}
 
 	rawDialer := func() (tunnel_client.RawSession, error) {
@@ -326,13 +313,13 @@ func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
 
 	var remoteStopErr, remoteRestartErr, remoteUpdateErr = &notImplemented, &notImplemented, &notImplemented
 
-	if cfg.RemoteCallbacks.OnStop != nil {
+	if cfg.StopHandler != nil {
 		remoteStopErr = &empty
 	}
-	if cfg.RemoteCallbacks.OnRestart != nil {
+	if cfg.RestartHandler != nil {
 		remoteRestartErr = &empty
 	}
-	if cfg.RemoteCallbacks.OnUpdate != nil {
+	if cfg.UpdateHandler != nil {
 		remoteUpdateErr = &empty
 	}
 
@@ -375,7 +362,7 @@ func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
 			SessionDuration: resp.Extra.SessionDuration,
 		})
 
-		if cfg.LocalCallbacks.OnHeartbeat != nil {
+		if cfg.HeartbeatHandler != nil {
 			go func() {
 				beats := session.Latency()
 				for {
@@ -386,7 +373,7 @@ func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
 						if !ok {
 							return
 						}
-						cfg.LocalCallbacks.OnHeartbeat(ctx, session, latency)
+						cfg.HeartbeatHandler(ctx, session, latency)
 					}
 				}
 			}()
@@ -408,8 +395,8 @@ func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
 		}
 	}
 
-	if cfg.LocalCallbacks.OnConnect != nil {
-		cfg.LocalCallbacks.OnConnect(ctx, session)
+	if cfg.ConnectHandler != nil {
+		cfg.ConnectHandler(ctx, session)
 	}
 
 	go func() {
@@ -419,17 +406,17 @@ func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
 				return
 			case err, ok := <-stateChanges:
 				if !ok {
-					if cfg.LocalCallbacks.OnDisconnect != nil {
+					if cfg.DisconnectHandler != nil {
 						logger.Info("no more state changes")
-						cfg.LocalCallbacks.OnDisconnect(ctx, session, nil)
+						cfg.DisconnectHandler(ctx, session, nil)
 					}
 					return
 				}
-				if err == nil && cfg.LocalCallbacks.OnConnect != nil {
-					cfg.LocalCallbacks.OnConnect(ctx, session)
+				if err == nil && cfg.ConnectHandler != nil {
+					cfg.ConnectHandler(ctx, session)
 				}
-				if err != nil && cfg.LocalCallbacks.OnDisconnect != nil {
-					cfg.LocalCallbacks.OnDisconnect(ctx, session, err)
+				if err != nil && cfg.DisconnectHandler != nil {
+					cfg.DisconnectHandler(ctx, session, err)
 				}
 			}
 		}
@@ -536,15 +523,17 @@ func (s *sessionImpl) Latency() <-chan time.Duration {
 
 type remoteCallbackHandler struct {
 	log15.Logger
-	sess Session
-	cb   RemoteCallbacks
+	sess           Session
+	stopHandler    ServerCommandHandler
+	restartHandler ServerCommandHandler
+	updateHandler  ServerCommandHandler
 }
 
 func (rc remoteCallbackHandler) OnStop(_ *proto.Stop, respond tunnel_client.HandlerRespFunc) {
-	if rc.cb.OnStop != nil {
+	if rc.stopHandler != nil {
 		resp := new(proto.StopResp)
 		close := true
-		if err := rc.cb.OnStop(context.TODO(), rc.sess); err != nil {
+		if err := rc.stopHandler(context.TODO(), rc.sess); err != nil {
 			close = false
 			resp.Error = err.Error()
 		}
@@ -558,10 +547,10 @@ func (rc remoteCallbackHandler) OnStop(_ *proto.Stop, respond tunnel_client.Hand
 }
 
 func (rc remoteCallbackHandler) OnRestart(_ *proto.Restart, respond tunnel_client.HandlerRespFunc) {
-	if rc.cb.OnRestart != nil {
+	if rc.restartHandler != nil {
 		resp := new(proto.RestartResp)
 		close := true
-		if err := rc.cb.OnRestart(context.TODO(), rc.sess); err != nil {
+		if err := rc.restartHandler(context.TODO(), rc.sess); err != nil {
 			close = false
 			resp.Error = err.Error()
 		}
@@ -575,9 +564,9 @@ func (rc remoteCallbackHandler) OnRestart(_ *proto.Restart, respond tunnel_clien
 }
 
 func (rc remoteCallbackHandler) OnUpdate(_ *proto.Update, respond tunnel_client.HandlerRespFunc) {
-	if rc.cb.OnUpdate != nil {
+	if rc.updateHandler != nil {
 		resp := new(proto.UpdateResp)
-		if err := rc.cb.OnUpdate(context.TODO(), rc.sess); err != nil {
+		if err := rc.updateHandler(context.TODO(), rc.sess); err != nil {
 			resp.Error = err.Error()
 		}
 		if err := respond(resp); err != nil {

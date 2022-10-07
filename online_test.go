@@ -421,8 +421,8 @@ func TestHTTPIPRestriction(t *testing.T) {
 	require.NoError(t, err)
 
 	opts := modules.HTTPOptions(
-		modules.AllowCIDRString("127.0.0.1/32"),
-		modules.DenyCIDR(cidr))
+		modules.WithAllowCIDRString("127.0.0.1/32"),
+		modules.WithDenyCIDR(cidr))
 
 	tun, exited := serveHTTP(ctx, t, nil, opts, helloHandler)
 
@@ -465,8 +465,8 @@ func TestTCPIPRestriction(t *testing.T) {
 	require.NoError(t, err)
 
 	opts := modules.TCPOptions(
-		modules.AllowCIDR(cidr),
-		modules.DenyCIDRString("0.0.0.0/0"))
+		modules.WithAllowCIDR(cidr),
+		modules.WithDenyCIDRString("0.0.0.0/0"))
 
 	// Easier to test by pretending it's HTTP on this end.
 	tun, exited := serveHTTP(ctx, t, nil, opts, helloHandler)
@@ -571,18 +571,18 @@ func TestConnectcionCallbacks(t *testing.T) {
 	connects := 0
 	disconnectErrs := 0
 	disconnectNils := 0
-	sess := setupSession(ctx, t, ConnectOptions().WithLocalCallbacks(LocalCallbacks{
-		OnConnect: func(ctx context.Context, sess Session) {
+	sess := setupSession(ctx, t, ConnectOptions().
+		WithConnectHandler(func(ctx context.Context, sess Session) {
 			connects += 1
-		},
-		OnDisconnect: func(ctx context.Context, sess Session, err error) {
+		}).
+		WithDisconnectHandler(func(ctx context.Context, sess Session, err error) {
 			if err == nil {
 				disconnectNils += 1
 			} else {
 				disconnectErrs += 1
 			}
-		},
-	}).WithDialer(&sketchyDialer{1 * time.Second}))
+		}).
+		WithDialer(&sketchyDialer{1 * time.Second}))
 
 	time.Sleep(2*time.Second + 500*time.Millisecond)
 
@@ -621,11 +621,11 @@ func TestHeartbeatCallback(t *testing.T) {
 
 	ctx := context.Background()
 	heartbeats := 0
-	sess := setupSession(ctx, t, ConnectOptions().WithLocalCallbacks(LocalCallbacks{
-		OnHeartbeat: func(ctx context.Context, sess Session, latency time.Duration) {
+	sess := setupSession(ctx, t, ConnectOptions().
+		WithHeartbeatHandler(func(ctx context.Context, sess Session, latency time.Duration) {
 			heartbeats += 1
-		},
-	}).WithHeartbeatInterval(10*time.Second))
+		}).
+		WithHeartbeatInterval(10*time.Second))
 
 	time.Sleep(20*time.Second + 500*time.Millisecond)
 
