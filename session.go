@@ -102,9 +102,12 @@ type ConnectConfig struct {
 	// Viewable from the ngrok dashboard or API.
 	Metadata string
 
-	// Configuration for the session's heartbeat.
-	// TODO(josh): don't expose muxado in the public API
-	HeartbeatConfig *muxado.HeartbeatConfig
+	// HeartbeatInterval determines how often we send application level
+	// heartbeats to the server go check connection liveness.
+	HeartbeatInterval time.Duration
+	// HeartbeatTolerance is the duration after which an unacknowledged
+	// heartbeat is determined to mean the connection is dead.
+	HeartbeatTolerance time.Duration
 
 	ConnectHandler    SessionConnectHandler
 	DisconnectHandler SessionDisconnectHandler
@@ -189,21 +192,15 @@ func (cfg *ConnectConfig) WithCA(pool *x509.CertPool) *ConnectConfig {
 // If the session's heartbeats are outside of their interval by this duration,
 // the server will assume the session is dead and close it.
 func (cfg *ConnectConfig) WithHeartbeatTolerance(tolerance time.Duration) *ConnectConfig {
-	if cfg.HeartbeatConfig == nil {
-		cfg.HeartbeatConfig = muxado.NewHeartbeatConfig()
-	}
-	cfg.HeartbeatConfig.Tolerance = tolerance
+	cfg.HeartbeatTolerance = tolerance
 	return cfg
 }
 
 // Set the heartbeat interval for the session.
-// If the session's heartbeats are outside of this interval by the heartbeat
-// tolerance, the server will assume the session is dead and close it.
+// This value determines how often we send application level
+// heartbeats to the server go check connection liveness.
 func (cfg *ConnectConfig) WithHeartbeatInterval(interval time.Duration) *ConnectConfig {
-	if cfg.HeartbeatConfig == nil {
-		cfg.HeartbeatConfig = muxado.NewHeartbeatConfig()
-	}
-	cfg.HeartbeatConfig.Interval = interval
+	cfg.HeartbeatInterval = interval
 	return cfg
 }
 
@@ -280,8 +277,12 @@ func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
 		}
 	}
 
-	if cfg.HeartbeatConfig == nil {
-		cfg.HeartbeatConfig = muxado.NewHeartbeatConfig()
+	heartbeatConfig := muxado.NewHeartbeatConfig()
+	if cfg.HeartbeatTolerance != 0 {
+		heartbeatConfig.Tolerance = cfg.HeartbeatTolerance
+	}
+	if cfg.HeartbeatInterval != 0 {
+		heartbeatConfig.Interval = cfg.HeartbeatInterval
 	}
 
 	session := new(sessionImpl)
@@ -305,7 +306,7 @@ func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
 		conn = tls.Client(conn, tlsConfig)
 
 		sess := muxado.Client(conn, &muxado.Config{})
-		return tunnel_client.NewRawSession(logger, sess, cfg.HeartbeatConfig, callbackHandler), nil
+		return tunnel_client.NewRawSession(logger, sess, heartbeatConfig, callbackHandler), nil
 	}
 
 	empty := ""
@@ -329,8 +330,8 @@ func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
 		Metadata:           cfg.Metadata,
 		OS:                 runtime.GOOS,
 		Arch:               runtime.GOARCH,
-		HeartbeatInterval:  int64(cfg.HeartbeatConfig.Interval),
-		HeartbeatTolerance: int64(cfg.HeartbeatConfig.Tolerance),
+		HeartbeatInterval:  int64(heartbeatConfig.Interval),
+		HeartbeatTolerance: int64(heartbeatConfig.Tolerance),
 
 		RestartUnsupportedError: remoteRestartErr,
 		StopUnsupportedError:    remoteStopErr,
