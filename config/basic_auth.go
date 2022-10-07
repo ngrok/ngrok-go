@@ -1,4 +1,4 @@
-package modules
+package config
 
 import "github.com/ngrok/ngrok-go/internal/pb_agent"
 
@@ -20,7 +20,7 @@ func (ba basicAuth) toProtoConfig() *pb_agent.MiddlewareConfiguration_BasicAuthC
 
 // WithBasicAuth adds the provided credentials to the list of basic
 // authentication credentials.
-func WithBasicAuth(username, password string) HTTPOption {
+func WithBasicAuth(username, password string) HTTPEndpointOption {
 	return httpOptionFunc(func(cfg *httpOptions) {
 		cfg.BasicAuth = append(cfg.BasicAuth,
 			basicAuth{

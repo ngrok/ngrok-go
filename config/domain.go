@@ -1,11 +1,11 @@
-package modules
+package config
 
 type domainOption string
 
 // WithDomain sets the domain for this edge.
 func WithDomain(name string) interface {
-	HTTPOption
-	TLSOption
+	HTTPEndpointOption
+	TLSEndpointOption
 } {
 	return domainOption(name)
 }

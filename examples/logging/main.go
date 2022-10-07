@@ -11,8 +11,8 @@ import (
 	"os"
 
 	"github.com/ngrok/ngrok-go"
+	"github.com/ngrok/ngrok-go/config"
 	ngrok_log "github.com/ngrok/ngrok-go/log"
-	"github.com/ngrok/ngrok-go/modules"
 )
 
 func usage(bin string) {
@@ -51,7 +51,7 @@ func run(ctx context.Context, lvlName string) error {
 		ngrok.ConnectOptions().
 			WithLogger(&logger{lvl}).
 			WithAuthtoken(os.Getenv("NGROK_AUTHTOKEN")),
-		modules.HTTPOptions(),
+		config.HTTPEndpoint(),
 	)
 	if err != nil {
 		return err

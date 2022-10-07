@@ -1,4 +1,4 @@
-package modules
+package config
 
 import (
 	"crypto/x509"
@@ -7,7 +7,7 @@ import (
 	"github.com/ngrok/ngrok-go/internal/tunnel/proto"
 )
 
-type HTTPOption interface {
+type HTTPEndpointOption interface {
 	ApplyHTTP(cfg *httpOptions)
 }
 
@@ -18,7 +18,7 @@ func (of httpOptionFunc) ApplyHTTP(cfg *httpOptions) {
 }
 
 // Construct a new set of HTTP tunnel options.
-func HTTPOptions(opts ...HTTPOption) TunnelOptions {
+func HTTPEndpoint(opts ...HTTPEndpointOption) Tunnel {
 	cfg := httpOptions{}
 	for _, opt := range opts {
 		opt.ApplyHTTP(&cfg)
@@ -63,8 +63,8 @@ type httpOptions struct {
 	WebhookVerification *webhookVerification
 }
 
-func (cfg *httpOptions) toProtoConfig() *proto.HTTPOptions {
-	opts := &proto.HTTPOptions{
+func (cfg *httpOptions) toProtoConfig() *proto.HTTPEndpoint {
+	opts := &proto.HTTPEndpoint{
 		Hostname: cfg.Domain,
 	}
 
@@ -82,7 +82,7 @@ func (cfg *httpOptions) toProtoConfig() *proto.HTTPOptions {
 		}
 	}
 
-	opts.MutualTLSCA = mutualTLSOption(cfg.MutualTLSCA).toProtoConfig()
+	opts.MutualTLSCA = mutualTLSEndpointOption(cfg.MutualTLSCA).toProtoConfig()
 
 	opts.ProxyProto = proto.ProxyProto(cfg.commonOpts.ProxyProto)
 

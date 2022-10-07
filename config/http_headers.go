@@ -1,4 +1,4 @@
-package modules
+package config
 
 import (
 	"fmt"
@@ -81,28 +81,28 @@ func (h responseHeaders) ApplyHTTP(cfg *httpOptions) {
 }
 
 // WithRequestHeader adds a header to all requests to this edge.
-func WithRequestHeader(name, value string) HTTPOption {
+func WithRequestHeader(name, value string) HTTPEndpointOption {
 	return requestHeaders(headers{
 		Added: map[string]string{name: value},
 	})
 }
 
 // WithRequestHeader adds a header to all responses coming from this edge.
-func WithResponseHeader(name, value string) HTTPOption {
+func WithResponseHeader(name, value string) HTTPEndpointOption {
 	return responseHeaders(headers{
 		Added: map[string]string{name: value},
 	})
 }
 
 // WithRemoveRequestHeader removes a header from requests to this edge.
-func WithRemoveRequestHeader(name string) HTTPOption {
+func WithRemoveRequestHeader(name string) HTTPEndpointOption {
 	return requestHeaders(headers{
 		Removed: []string{name},
 	})
 }
 
 // WithRemoveResponseHeader removes a header from responses from this edge.
-func WithRemoveResponseHeader(name string) HTTPOption {
+func WithRemoveResponseHeader(name string) HTTPEndpointOption {
 	return responseHeaders(headers{
 		Removed: []string{name},
 	})

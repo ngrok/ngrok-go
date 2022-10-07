@@ -1,4 +1,4 @@
-package modules
+package config
 
 import (
 	"crypto/x509"
@@ -7,28 +7,28 @@ import (
 	"github.com/ngrok/ngrok-go/internal/pb_agent"
 )
 
-type mutualTLSOption []*x509.Certificate
+type mutualTLSEndpointOption []*x509.Certificate
 
 // WithMutualTLSCA adds a list of [x509.Certificate]'s to use for mutual TLS
 // authentication.
 // These will be used to authenticate client certificates for requests at the
 // ngrok edge.
 func WithMutualTLSCA(certs ...*x509.Certificate) interface {
-	HTTPOption
-	TLSOption
+	HTTPEndpointOption
+	TLSEndpointOption
 } {
-	return mutualTLSOption(certs)
+	return mutualTLSEndpointOption(certs)
 }
 
-func (opt mutualTLSOption) ApplyHTTP(opts *httpOptions) {
+func (opt mutualTLSEndpointOption) ApplyHTTP(opts *httpOptions) {
 	opts.MutualTLSCA = append(opts.MutualTLSCA, opt...)
 }
 
-func (opt mutualTLSOption) ApplyTLS(opts *tlsOptions) {
+func (opt mutualTLSEndpointOption) ApplyTLS(opts *tlsOptions) {
 	opts.MutualTLSCA = append(opts.MutualTLSCA, opt...)
 }
 
-func (cfg mutualTLSOption) toProtoConfig() *pb_agent.MiddlewareConfiguration_MutualTLS {
+func (cfg mutualTLSEndpointOption) toProtoConfig() *pb_agent.MiddlewareConfiguration_MutualTLS {
 	if cfg == nil {
 		return nil
 	}

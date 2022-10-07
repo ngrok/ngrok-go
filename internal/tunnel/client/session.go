@@ -48,16 +48,16 @@ type Session interface {
 	// Convenience methods
 
 	// ListenHTTP listens on a new HTTP endpoint
-	ListenHTTP(opts *proto.HTTPOptions, extra proto.BindExtra, forwardsTo string) (Tunnel, error)
+	ListenHTTP(opts *proto.HTTPEndpoint, extra proto.BindExtra, forwardsTo string) (Tunnel, error)
 
 	// ListenHTTP listens on a new HTTPS endpoint
-	ListenHTTPS(opts *proto.HTTPOptions, extra proto.BindExtra, forwardsTo string) (Tunnel, error)
+	ListenHTTPS(opts *proto.HTTPEndpoint, extra proto.BindExtra, forwardsTo string) (Tunnel, error)
 
 	// ListenTCP listens on a remote TCP endpoint
-	ListenTCP(opts *proto.TCPOptions, extra proto.BindExtra, forwardsTo string) (Tunnel, error)
+	ListenTCP(opts *proto.TCPEndpoint, extra proto.BindExtra, forwardsTo string) (Tunnel, error)
 
 	// ListenTLS listens on a remote TLS endpoint
-	ListenTLS(opts *proto.TLSOptions, extra proto.BindExtra, forwardsTo string) (Tunnel, error)
+	ListenTLS(opts *proto.TLSEndpoint, extra proto.BindExtra, forwardsTo string) (Tunnel, error)
 
 	SrvInfo() (proto.SrvInfoResp, error)
 
@@ -152,19 +152,19 @@ func (s *session) ListenLabel(labels map[string]string, metadata string, forward
 	return t, nil
 }
 
-func (s *session) ListenHTTP(opts *proto.HTTPOptions, extra proto.BindExtra, forwardsTo string) (Tunnel, error) {
+func (s *session) ListenHTTP(opts *proto.HTTPEndpoint, extra proto.BindExtra, forwardsTo string) (Tunnel, error) {
 	return s.Listen("http", opts, extra, forwardsTo)
 }
 
-func (s *session) ListenHTTPS(opts *proto.HTTPOptions, extra proto.BindExtra, forwardsTo string) (Tunnel, error) {
+func (s *session) ListenHTTPS(opts *proto.HTTPEndpoint, extra proto.BindExtra, forwardsTo string) (Tunnel, error) {
 	return s.Listen("https", opts, extra, forwardsTo)
 }
 
-func (s *session) ListenTCP(opts *proto.TCPOptions, extra proto.BindExtra, forwardsTo string) (Tunnel, error) {
+func (s *session) ListenTCP(opts *proto.TCPEndpoint, extra proto.BindExtra, forwardsTo string) (Tunnel, error) {
 	return s.Listen("tcp", opts, extra, forwardsTo)
 }
 
-func (s *session) ListenTLS(opts *proto.TLSOptions, extra proto.BindExtra, forwardsTo string) (Tunnel, error) {
+func (s *session) ListenTLS(opts *proto.TLSEndpoint, extra proto.BindExtra, forwardsTo string) (Tunnel, error) {
 	return s.Listen("tls", opts, extra, forwardsTo)
 }
 

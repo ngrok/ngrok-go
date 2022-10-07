@@ -1,4 +1,4 @@
-package modules
+package config
 
 import (
 	"fmt"
@@ -9,9 +9,9 @@ import (
 // WithForwardsTo sets the ForwardsTo string for this tunnel.
 // This can be veiwed via the API or dashboard.
 func WithForwardsTo(meta string) interface {
-	HTTPOption
-	TCPOption
-	TLSOption
+	HTTPEndpointOption
+	TCPEndpointOption
+	TLSEndpointOption
 } {
 	return forwardsToOption(meta)
 }

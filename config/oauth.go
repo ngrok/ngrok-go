@@ -1,4 +1,4 @@
-package modules
+package config
 
 import "github.com/ngrok/ngrok-go/internal/pb_agent"
 
@@ -67,7 +67,7 @@ func (oauth *oauthOptions) toProtoConfig() *pb_agent.MiddlewareConfiguration_OAu
 
 // WithOAuth configures this edge with the the given OAuth provider.
 // Overwrites any previously-set OAuth configuration.
-func WithOAuth(provider string, opts ...OAuthOption) HTTPOption {
+func WithOAuth(provider string, opts ...OAuthOption) HTTPEndpointOption {
 	return httpOptionFunc(func(cfg *httpOptions) {
 		oauth := oauthProvider(provider)
 		for _, opt := range opts {

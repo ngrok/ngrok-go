@@ -1,4 +1,4 @@
-package modules
+package config
 
 type commonOpts struct {
 	// Restrictions placed on the origin of incoming connections to the edge.

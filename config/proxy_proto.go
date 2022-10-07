@@ -1,4 +1,4 @@
-package modules
+package config
 
 // ProxyProtoVersion is a valid PROXY protocol version
 type ProxyProtoVersion int32
@@ -17,9 +17,9 @@ type proxyProtoConfig ProxyProtoVersion
 // WithProxyProto sets the PROXY protocol version for connections over this
 // tunnel.
 func WithProxyProto(version ProxyProtoVersion) interface {
-	HTTPOption
-	TCPOption
-	TLSOption
+	HTTPEndpointOption
+	TCPEndpointOption
+	TLSEndpointOption
 } {
 	return proxyProtoConfig(version)
 }

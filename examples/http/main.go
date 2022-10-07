@@ -10,7 +10,7 @@ import (
 	"os"
 
 	"github.com/ngrok/ngrok-go"
-	"github.com/ngrok/ngrok-go/modules"
+	"github.com/ngrok/ngrok-go/config"
 )
 
 func main() {
@@ -23,7 +23,7 @@ func run(ctx context.Context) error {
 	_, tun, err := ngrok.ConnectAndStartTunnel(ctx,
 		ngrok.ConnectOptions().
 			WithAuthtoken(os.Getenv("NGROK_AUTHTOKEN")),
-		modules.HTTPOptions(),
+		config.HTTPEndpoint(),
 	)
 	if err != nil {
 		return err

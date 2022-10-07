@@ -178,7 +178,7 @@ func ParseProxyProto(proxyProto string) (ProxyProto, bool) {
 	}
 }
 
-type HTTPOptions struct {
+type HTTPEndpoint struct {
 	Hostname          string // public hostname of the bind
 	Auth              string
 	Subdomain         string
@@ -200,7 +200,7 @@ type HTTPOptions struct {
 	WebsocketTCPConverter *pb_agent.MiddlewareConfiguration_WebsocketTCPConverter
 }
 
-type TCPOptions struct {
+type TCPEndpoint struct {
 	Addr string
 	ProxyProto
 
@@ -208,7 +208,7 @@ type TCPOptions struct {
 	IPRestriction *pb_agent.MiddlewareConfiguration_IPRestriction
 }
 
-type TLSOptions struct {
+type TLSEndpoint struct {
 	Hostname  string // public hostname of the bind
 	Subdomain string
 	ProxyProto

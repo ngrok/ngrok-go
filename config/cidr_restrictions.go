@@ -1,4 +1,4 @@
-package modules
+package config
 
 import (
 	"net"
@@ -16,18 +16,18 @@ type cidrRestrictions struct {
 
 // Add the provided CIDRS to the [CIDRRestriction].Allowed list.
 func WithAllowCIDRString(cidr ...string) interface {
-	HTTPOption
-	TCPOption
-	TLSOption
+	HTTPEndpointOption
+	TCPEndpointOption
+	TLSEndpointOption
 } {
 	return &cidrRestrictions{Allowed: cidr}
 }
 
 // Add the provided [net.IPNet] to the [CIDRRestriction].Allowed list.
 func WithAllowCIDR(net ...*net.IPNet) interface {
-	HTTPOption
-	TCPOption
-	TLSOption
+	HTTPEndpointOption
+	TCPEndpointOption
+	TLSEndpointOption
 } {
 	cidrStrings := make([]string, 0, len(net))
 	for _, n := range net {
@@ -38,18 +38,18 @@ func WithAllowCIDR(net ...*net.IPNet) interface {
 
 // Add the provided CIDRS to the [CIDRRestriction].Denied list.
 func WithDenyCIDRString(cidr ...string) interface {
-	HTTPOption
-	TCPOption
-	TLSOption
+	HTTPEndpointOption
+	TCPEndpointOption
+	TLSEndpointOption
 } {
 	return cidrRestrictions{Denied: cidr}
 }
 
 // Add the provided [net.IPNet] to the [CIDRRestriction].Denied list.
 func WithDenyCIDR(net ...*net.IPNet) interface {
-	HTTPOption
-	TCPOption
-	TLSOption
+	HTTPEndpointOption
+	TCPEndpointOption
+	TLSEndpointOption
 } {
 	cidrStrings := make([]string, 0, len(net))
 	for _, n := range net {

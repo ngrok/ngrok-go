@@ -1,4 +1,4 @@
-package modules
+package config
 
 import (
 	"crypto/x509"
@@ -7,7 +7,7 @@ import (
 	"github.com/ngrok/ngrok-go/internal/tunnel/proto"
 )
 
-type TLSOption interface {
+type TLSEndpointOption interface {
 	ApplyTLS(cfg *tlsOptions)
 }
 
@@ -18,7 +18,7 @@ func (of tlsOptionFunc) ApplyTLS(cfg *tlsOptions) {
 }
 
 // Construct a new set of HTTP tunnel options.
-func TLSOptions(opts ...TLSOption) TunnelOptions {
+func TLSEndpoint(opts ...TLSEndpointOption) Tunnel {
 	cfg := tlsOptions{}
 	for _, opt := range opts {
 		opt.ApplyTLS(&cfg)
@@ -44,15 +44,15 @@ type tlsOptions struct {
 	CertPEM []byte
 }
 
-func (cfg *tlsOptions) toProtoConfig() *proto.TLSOptions {
-	opts := &proto.TLSOptions{
+func (cfg *tlsOptions) toProtoConfig() *proto.TLSEndpoint {
+	opts := &proto.TLSEndpoint{
 		Hostname:   cfg.Domain,
 		ProxyProto: proto.ProxyProto(cfg.ProxyProto),
 	}
 
 	opts.IPRestriction = cfg.commonOpts.CIDRRestrictions.toProtoConfig()
 
-	opts.MutualTLSAtEdge = mutualTLSOption(cfg.MutualTLSCA).toProtoConfig()
+	opts.MutualTLSAtEdge = mutualTLSEndpointOption(cfg.MutualTLSCA).toProtoConfig()
 
 	opts.TLSTermination = &pb_agent.MiddlewareConfiguration_TLSTermination{
 		Key:  cfg.KeyPEM,
