@@ -11,15 +11,15 @@ var testError = errors.New("testing, 1 2 3!")
 
 // Sanity check for the appraoch to error construction/wrapping
 func TestErrorWrapping(t *testing.T) {
-	var accept error = ErrAcceptFailed{Inner: testError}
-	var auth error = ErrAuthFailed{true, accept}
+	var accept error = errAcceptFailed{Inner: testError}
+	var auth error = errAuthFailed{true, accept}
 
-	require.True(t, errors.Is(accept, ErrAcceptFailed{}))
-	require.True(t, errors.Is(auth, ErrAuthFailed{}))
-	require.True(t, errors.Is(auth, ErrAcceptFailed{}))
+	require.True(t, errors.Is(accept, errAcceptFailed{}))
+	require.True(t, errors.Is(auth, errAuthFailed{}))
+	require.True(t, errors.Is(auth, errAcceptFailed{}))
 
-	var downcastAuth ErrAuthFailed
-	var downcastAccept ErrAcceptFailed
+	var downcastAuth errAuthFailed
+	var downcastAccept errAcceptFailed
 
 	require.True(t, errors.As(auth, &downcastAuth))
 	require.True(t, errors.As(auth, &downcastAccept))

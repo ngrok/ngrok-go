@@ -272,7 +272,7 @@ func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
 		if cfg.ProxyURL != nil {
 			proxied, err := proxy.FromURL(cfg.ProxyURL, netDialer)
 			if err != nil {
-				return nil, ErrProxyInit{cfg.ProxyURL, err}
+				return nil, errProxyInit{cfg.ProxyURL, err}
 			}
 			dialer = proxied.(Dialer)
 		} else {
@@ -299,7 +299,7 @@ func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
 	rawDialer := func() (tunnel_client.RawSession, error) {
 		conn, err := dialer.DialContext(ctx, "tcp", cfg.ServerAddr)
 		if err != nil {
-			return nil, ErrSessionDial{cfg.ServerAddr, err}
+			return nil, errSessionDial{cfg.ServerAddr, err}
 		}
 
 		conn = tls.Client(conn, tlsConfig)
@@ -347,7 +347,7 @@ func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
 				err = errors.New(resp.Error)
 				remote = true
 			}
-			return ErrAuthFailed{remote, err}
+			return errAuthFailed{remote, err}
 		}
 
 		session.setInner(&sessionInner{
@@ -478,7 +478,7 @@ func (s *sessionImpl) StartTunnel(ctx context.Context, cfg modules.TunnelOptions
 	}
 
 	if err != nil {
-		return nil, ErrStartTunnel{err}
+		return nil, errStartTunnel{err}
 	}
 
 	return &tunnelImpl{

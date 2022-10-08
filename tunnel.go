@@ -64,7 +64,7 @@ type tunnelImpl struct {
 func (t *tunnelImpl) Accept() (net.Conn, error) {
 	conn, err := t.Tunnel.Accept()
 	if err != nil {
-		return nil, ErrAcceptFailed{Inner: err}
+		return nil, errAcceptFailed{Inner: err}
 	}
 	return &connImpl{
 		Conn:  conn.Conn,
