@@ -1,8 +1,8 @@
-package modules
+package config
 
 import "github.com/ngrok/ngrok-go/internal/tunnel/proto"
 
-type LabeledOption interface {
+type LabeledTunnelOption interface {
 	ApplyLabeled(cfg *labeledOptions)
 }
 
@@ -13,7 +13,7 @@ func (of labeledOptionFunc) ApplyLabeled(cfg *labeledOptions) {
 }
 
 // Construct a new set of Labeled tunnel options.
-func LabeledOptions(opts ...LabeledOption) TunnelOptions {
+func LabeledTunnel(opts ...LabeledTunnelOption) Tunnel {
 	cfg := labeledOptions{}
 	for _, opt := range opts {
 		opt.ApplyLabeled(&cfg)
@@ -31,7 +31,7 @@ type labeledOptions struct {
 }
 
 // WithLabel adds a label to this tunnel's set of label, value pairs.
-func WithLabel(label, value string) LabeledOption {
+func WithLabel(label, value string) LabeledTunnelOption {
 	return labeledOptionFunc(func(cfg *labeledOptions) {
 		if cfg.labels == nil {
 			cfg.labels = map[string]string{}

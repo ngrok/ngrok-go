@@ -1,7 +1,7 @@
-package modules
+package config
 
 // WithCompression enables gzip compression.
-func WithCompression() HTTPOption {
+func WithCompression() HTTPEndpointOption {
 	return httpOptionFunc(func(cfg *httpOptions) {
 		cfg.Compression = true
 	})

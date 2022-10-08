@@ -1,7 +1,7 @@
-package modules
+package config
 
 // WithWebsocketTCPConversion enables the websocket-to-tcp converter.
-func WithWebsocketTCPConversion() HTTPOption {
+func WithWebsocketTCPConversion() HTTPEndpointOption {
 	return httpOptionFunc(func(cfg *httpOptions) {
 		cfg.WebsocketTCPConversion = true
 	})

@@ -17,10 +17,10 @@ import (
 	"unsafe"
 
 	"github.com/inconshreveable/log15"
+	"github.com/ngrok/ngrok-go/config"
 	"github.com/ngrok/ngrok-go/internal/muxado"
 	tunnel_client "github.com/ngrok/ngrok-go/internal/tunnel/client"
 	"github.com/ngrok/ngrok-go/internal/tunnel/proto"
-	"github.com/ngrok/ngrok-go/modules"
 	"golang.org/x/net/proxy"
 )
 
@@ -34,7 +34,7 @@ type Session interface {
 	Close() error
 
 	// Start a new tunnel over the ngrok session.
-	StartTunnel(ctx context.Context, cfg modules.TunnelOptions) (Tunnel, error)
+	StartTunnel(ctx context.Context, cfg config.Tunnel) (Tunnel, error)
 }
 
 const (
@@ -456,7 +456,7 @@ func (s *sessionImpl) Close() error {
 	return s.inner().Close()
 }
 
-func (s *sessionImpl) StartTunnel(ctx context.Context, cfg modules.TunnelOptions) (Tunnel, error) {
+func (s *sessionImpl) StartTunnel(ctx context.Context, cfg config.Tunnel) (Tunnel, error) {
 	var (
 		tunnel tunnel_client.Tunnel
 		err    error

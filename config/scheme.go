@@ -1,4 +1,4 @@
-package modules
+package config
 
 // A URL scheme.
 type Scheme string
@@ -11,7 +11,7 @@ const (
 )
 
 // WithScheme sets the scheme for this edge.
-func WithScheme(scheme Scheme) HTTPOption {
+func WithScheme(scheme Scheme) HTTPEndpointOption {
 	return httpOptionFunc(func(cfg *httpOptions) {
 		cfg.Scheme = scheme
 	})

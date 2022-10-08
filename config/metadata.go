@@ -1,11 +1,11 @@
-package modules
+package config
 
 // WithMetadata sets the opaque metadata string for this tunnel.
 func WithMetadata(meta string) interface {
-	HTTPOption
-	TCPOption
-	TLSOption
-	LabeledOption
+	HTTPEndpointOption
+	TCPEndpointOption
+	TLSEndpointOption
+	LabeledTunnelOption
 } {
 	return metadataOption(meta)
 }

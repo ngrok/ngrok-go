@@ -11,7 +11,7 @@ import (
 	"os"
 
 	"github.com/ngrok/ngrok-go"
-	"github.com/ngrok/ngrok-go/modules"
+	"github.com/ngrok/ngrok-go/config"
 )
 
 func main() {
@@ -24,7 +24,7 @@ func run(ctx context.Context) error {
 	_, tun, err := ngrok.ConnectAndStartTunnel(ctx,
 		ngrok.ConnectOptions().
 			WithAuthtoken(os.Getenv("NGROK_AUTHTOKEN")),
-		modules.TCPOptions(),
+		config.TCPEndpoint(),
 	)
 	if err != nil {
 		return err

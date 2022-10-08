@@ -34,13 +34,13 @@ func UnpackProtoOpts(protocol string, opts any, bindMsg any) error {
 
 	switch protocol {
 	case "http":
-		unpackedOpts = &HTTPOptions{}
+		unpackedOpts = &HTTPEndpoint{}
 	case "https":
-		unpackedOpts = &HTTPOptions{}
+		unpackedOpts = &HTTPEndpoint{}
 	case "tcp":
-		unpackedOpts = &TCPOptions{}
+		unpackedOpts = &TCPEndpoint{}
 	case "tls":
-		unpackedOpts = &TLSOptions{}
+		unpackedOpts = &TLSEndpoint{}
 	case "ssh":
 		unpackedOpts = &SSHOptions{}
 	default:

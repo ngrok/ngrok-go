@@ -1,4 +1,4 @@
-package modules
+package config
 
 import "github.com/ngrok/ngrok-go/internal/pb_agent"
 
@@ -21,7 +21,7 @@ func (wv *webhookVerification) toProtoConfig() *pb_agent.MiddlewareConfiguration
 }
 
 // WithWebhookVerification configures webhook vericiation for this edge.
-func WithWebhookVerification(provider string, secret string) HTTPOption {
+func WithWebhookVerification(provider string, secret string) HTTPEndpointOption {
 	return httpOptionFunc(func(cfg *httpOptions) {
 		cfg.WebhookVerification = &webhookVerification{
 			Provider: provider,

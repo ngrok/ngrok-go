@@ -1,8 +1,8 @@
-package modules
+package config
 
 import "github.com/ngrok/ngrok-go/internal/tunnel/proto"
 
-type TCPOption interface {
+type TCPEndpointOption interface {
 	ApplyTCP(cfg *tcpOptions)
 }
 
@@ -13,7 +13,7 @@ func (of tcpOptionFunc) ApplyTCP(cfg *tcpOptions) {
 }
 
 // Construct a new set of HTTP tunnel options.
-func TCPOptions(opts ...TCPOption) TunnelOptions {
+func TCPEndpoint(opts ...TCPEndpointOption) Tunnel {
 	cfg := tcpOptions{}
 	for _, opt := range opts {
 		opt.ApplyTCP(&cfg)
@@ -30,14 +30,14 @@ type tcpOptions struct {
 }
 
 // Set the TCP address to request for this edge.
-func WithRemoteAddr(addr string) TCPOption {
+func WithRemoteAddr(addr string) TCPEndpointOption {
 	return tcpOptionFunc(func(cfg *tcpOptions) {
 		cfg.RemoteAddr = addr
 	})
 }
 
-func (cfg *tcpOptions) toProtoConfig() *proto.TCPOptions {
-	return &proto.TCPOptions{
+func (cfg *tcpOptions) toProtoConfig() *proto.TCPEndpoint {
+	return &proto.TCPEndpoint{
 		Addr:          cfg.RemoteAddr,
 		IPRestriction: cfg.commonOpts.CIDRRestrictions.toProtoConfig(),
 		ProxyProto:    proto.ProxyProto(cfg.commonOpts.ProxyProto),
