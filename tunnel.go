@@ -38,6 +38,10 @@ type Tunnel interface {
 	// Will be empty for non-labeled tunnels.
 	Labels() map[string]string
 
+	// Session returns the tunnel's parent Session object that it
+	// was started on.
+	Session() Session
+
 	// Convert this tunnel to a [net.Listener].
 	AsListener() ListenerTunnel
 	// Use this tunnel to serve HTTP requests.
@@ -58,6 +62,7 @@ type HTTPTunnel interface {
 }
 
 type tunnelImpl struct {
+	Sess   Session
 	Tunnel tunnel_client.Tunnel
 }
 
@@ -116,6 +121,10 @@ func (t *tunnelImpl) AsHTTP() HTTPTunnel {
 
 func (t *tunnelImpl) AsListener() ListenerTunnel {
 	return t
+}
+
+func (t *tunnelImpl) Session() Session {
+	return t.Sess
 }
 
 func (t *tunnelImpl) Serve(ctx context.Context, h http.Handler) error {
