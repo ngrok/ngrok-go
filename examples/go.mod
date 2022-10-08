@@ -4,7 +4,6 @@ go 1.18
 
 require (
 	github.com/ngrok/ngrok-go v0.0.0
-	github.com/ngrok/ngrok-go/log v0.0.0
 	golang.org/x/sync v0.0.0-20220923202941-7f9b1623fab7
 )
 
@@ -21,6 +20,5 @@ require (
 
 replace (
 	github.com/ngrok/ngrok-go => ../
-	github.com/ngrok/ngrok-go/log => ../log
 	github.com/ngrok/ngrok-go/log/log15adapter => ../log/log15adapter
 )

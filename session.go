@@ -21,6 +21,7 @@ import (
 	"github.com/ngrok/ngrok-go/internal/muxado"
 	tunnel_client "github.com/ngrok/ngrok-go/internal/tunnel/client"
 	"github.com/ngrok/ngrok-go/internal/tunnel/proto"
+	"github.com/ngrok/ngrok-go/log"
 	"golang.org/x/net/proxy"
 )
 
@@ -119,7 +120,7 @@ type connectConfig struct {
 	UpdateHandler  ServerCommandHandler
 
 	// The logger for the session to use.
-	Logger Logger
+	Logger log.Logger
 }
 
 // Use the provided opaque metadata string for this session.
@@ -215,7 +216,7 @@ func WithHeartbeatInterval(interval time.Duration) ConnectOption {
 // `pgxadapter`.
 // If the provided `Logger` also implements the `log15.Logger` interface, it
 // will be used directly.
-func WithLogger(logger Logger) ConnectOption {
+func WithLogger(logger log.Logger) ConnectOption {
 	return func(cfg *connectConfig) {
 		cfg.Logger = logger
 	}

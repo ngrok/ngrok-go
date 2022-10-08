@@ -5,36 +5,11 @@ import (
 	"fmt"
 
 	"github.com/inconshreveable/log15"
+	"github.com/ngrok/ngrok-go/log"
 )
-
-// The level of a log message.
-type LogLevel = int
-
-const (
-	LogLevelTrace = 6
-	LogLevelDebug = 5
-	LogLevelInfo  = 4
-	LogLevelWarn  = 3
-	LogLevelError = 2
-	LogLevelNone  = 1
-)
-
-// Logger defines a logging interface. It is identical to the log.Logger
-// interface in [github.com/ngrok/libngrok-go/log.Logger]. It is duplicated here
-// to avoid having to unconditionally import that submodule. Documentation lives
-// in the [github.com/ngrok/libngrok-go/log.Logger] submodule, as well as
-// adapters for other logging libraries.
-// If you are implementing a logger, you should use the `log` submodule instead,
-// as it also includes things like level formatting functions and doesn't
-// require importing the full `ngrok` module.
-type Logger interface {
-	// Log a message at the given level with data key/value pairs. data may be
-	// nil.
-	Log(context context.Context, level LogLevel, msg string, data map[string]interface{})
-}
 
 type log15Handler struct {
-	Logger
+	log.Logger
 }
 
 // The internals all use log15, so we need to convert the public logging
@@ -44,7 +19,7 @@ type log15Handler struct {
 // by the log15adapter module.
 // Otherwise, a new log15.Logger is constructed and the provided Logger used as
 // its Handler.
-func toLog15(l Logger) log15.Logger {
+func toLog15(l log.Logger) log15.Logger {
 	if logger, ok := l.(log15.Logger); ok {
 		return logger
 	}
@@ -56,22 +31,22 @@ func toLog15(l Logger) log15.Logger {
 }
 
 func (l *log15Handler) Log(r *log15.Record) error {
-	lvl := LogLevelNone
+	lvl := log.LogLevelNone
 	switch r.Lvl {
 	case log15.LvlCrit:
-		lvl = LogLevelError
+		lvl = log.LogLevelError
 	case log15.LvlError:
-		lvl = LogLevelError
+		lvl = log.LogLevelError
 	case log15.LvlWarn:
-		lvl = LogLevelWarn
+		lvl = log.LogLevelWarn
 	case log15.LvlInfo:
-		lvl = LogLevelInfo
+		lvl = log.LogLevelInfo
 	case log15.LvlDebug:
-		lvl = LogLevelDebug
+		lvl = log.LogLevelDebug
 	case log15.LvlDebug + 1:
 		// Also support trace, if someone happens to hack
 		// it in.
-		lvl = LogLevelTrace
+		lvl = log.LogLevelTrace
 	}
 
 	data := make(map[string]interface{}, len(r.Ctx)/2)
