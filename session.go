@@ -24,7 +24,7 @@ import (
 )
 
 // The ngrok library version.
-const VERSION = "4.0.0-library"
+const libraryAgentVersion = "0.0.0-ngrok-go"
 
 // The interface implemented by an ngrok session object.
 type Session interface {
@@ -324,7 +324,7 @@ func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
 	}
 
 	auth := proto.AuthExtra{
-		Version:            VERSION,
+		Version:            libraryAgentVersion,
 		Authtoken:          cfg.Authtoken,
 		Metadata:           cfg.Metadata,
 		OS:                 runtime.GOOS,
