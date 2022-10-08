@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"os"
 	"runtime"
 	"strings"
 	"sync/atomic"
@@ -159,6 +160,13 @@ func (cfg *ConnectConfig) WithResolver(resolver *net.Resolver) *ConnectConfig {
 func (cfg *ConnectConfig) WithAuthtoken(token string) *ConnectConfig {
 	cfg.Authtoken = token
 	return cfg
+}
+
+// WithAuthtokenFromEnv populates the authtoken with one defined in the standard
+// NGROK_AUTHTOKEN environment variable.
+// Sets the [ConnectConfig].Authtoken field.
+func (cfg *ConnectConfig) WithAuthtokenFromEnv() *ConnectConfig {
+	return cfg.WithAuthtoken(os.Getenv("NGROK_AUTHTOKEN"))
 }
 
 // Connect to the ngrok server in a specific region.
