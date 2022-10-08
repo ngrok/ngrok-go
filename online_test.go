@@ -20,12 +20,9 @@ import (
 	"golang.org/x/net/websocket"
 )
 
-func setupSession(ctx context.Context, t *testing.T, opts *ConnectConfig) Session {
-	if opts == nil {
-		opts = ConnectOptions()
-	}
-	opts.WithAuthtoken(os.Getenv("NGROK_AUTHTOKEN"))
-	sess, err := Connect(ctx, opts)
+func setupSession(ctx context.Context, t *testing.T, opts ...ConnectOption) Session {
+	opts = append(opts, WithAuthtokenFromEnv())
+	sess, err := Connect(ctx, opts...)
 	require.NoError(t, err, "Session Connect")
 	return sess
 }
@@ -40,8 +37,8 @@ var helloHandler = http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request
 	_, _ = fmt.Fprintln(rw, "Hello, world!")
 })
 
-func serveHTTP(ctx context.Context, t *testing.T, connectOpts *ConnectConfig, opts config.Tunnel, handler http.Handler) (Tunnel, <-chan error) {
-	sess := setupSession(ctx, t, connectOpts)
+func serveHTTP(ctx context.Context, t *testing.T, connectOpts []ConnectOption, opts config.Tunnel, handler http.Handler) (Tunnel, <-chan error) {
+	sess := setupSession(ctx, t, connectOpts...)
 
 	tun := startTunnel(ctx, t, sess, opts)
 	exited := make(chan error)
@@ -54,18 +51,17 @@ func serveHTTP(ctx context.Context, t *testing.T, connectOpts *ConnectConfig, op
 	return tun, exited
 }
 
-func TestConnectAndStartTunnel(t *testing.T) {
-	_, _, err := ConnectAndStartTunnel(context.Background(),
-		ConnectOptions().
-			WithAuthtoken(os.Getenv("NGROK_AUTHTOKEN")),
+func TestStartTunnel(t *testing.T) {
+	_, err := StartTunnel(context.Background(),
 		config.HTTPEndpoint(),
+		WithAuthtokenFromEnv(),
 	)
 	require.NoError(t, err, "Session Connect")
 }
 
 func TestTunnel(t *testing.T) {
 	ctx := context.Background()
-	sess := setupSession(ctx, t, nil)
+	sess := setupSession(ctx, t)
 
 	tun := startTunnel(ctx, t, sess, config.HTTPEndpoint(
 		config.WithMetadata("Hello, world!"),
@@ -331,8 +327,8 @@ func TestProxyProto(t *testing.T) {
 
 	for _, tcase := range cases {
 		t.Run(tcase.name, func(t *testing.T) {
-			sess := setupSession(ctx, t, nil)
-			tun := startTunnel(ctx, t, sess, tcase.optsFunc(tcase.version)).AsListener()
+			sess := setupSession(ctx, t)
+			tun := startTunnel(ctx, t, sess, tcase.optsFunc(tcase.version))
 
 			go tcase.reqFunc(t, tun.URL())
 
@@ -518,7 +514,7 @@ func TestLabeled(t *testing.T) {
 
 func TestWebsocketConversion(t *testing.T) {
 	ctx := context.Background()
-	sess := setupSession(ctx, t, nil)
+	sess := setupSession(ctx, t)
 	tun := startTunnel(ctx, t, sess,
 		config.HTTPEndpoint(
 			config.WithWebsocketTCPConversion()),
@@ -527,7 +523,7 @@ func TestWebsocketConversion(t *testing.T) {
 	// HTTP over websockets? suuuure lol
 	exited := make(chan error)
 	go func() {
-		exited <- http.Serve(tun.AsListener(), helloHandler)
+		exited <- http.Serve(tun, helloHandler)
 	}()
 
 	resp, err := http.Get(tun.URL())
@@ -571,17 +567,17 @@ func TestConnectcionCallbacks(t *testing.T) {
 	connects := 0
 	disconnectErrs := 0
 	disconnectNils := 0
-	sess := setupSession(ctx, t, ConnectOptions().
+	sess := setupSession(ctx, t,
 		WithConnectHandler(func(ctx context.Context, sess Session) {
 			connects += 1
-		}).
+		}),
 		WithDisconnectHandler(func(ctx context.Context, sess Session, err error) {
 			if err == nil {
 				disconnectNils += 1
 			} else {
 				disconnectErrs += 1
 			}
-		}).
+		}),
 		WithDialer(&sketchyDialer{1 * time.Second}))
 
 	time.Sleep(2*time.Second + 500*time.Millisecond)
@@ -621,10 +617,10 @@ func TestHeartbeatCallback(t *testing.T) {
 
 	ctx := context.Background()
 	heartbeats := 0
-	sess := setupSession(ctx, t, ConnectOptions().
+	sess := setupSession(ctx, t,
 		WithHeartbeatHandler(func(ctx context.Context, sess Session, latency time.Duration) {
 			heartbeats += 1
-		}).
+		}),
 		WithHeartbeatInterval(10*time.Second))
 
 	time.Sleep(20*time.Second + 500*time.Millisecond)
@@ -639,23 +635,23 @@ func TestErrors(t *testing.T) {
 	ctx := context.Background()
 	u, _ := url.Parse("notarealscheme://example.com")
 
-	_, err = Connect(ctx, ConnectOptions().WithProxyURL(u))
+	_, err = Connect(ctx, WithProxyURL(u))
 	var proxyErr errProxyInit
 	require.ErrorIs(t, err, proxyErr)
 	require.ErrorAs(t, err, &proxyErr)
 
-	_, err = Connect(ctx, ConnectOptions().WithServer("127.0.0.234:123"))
+	_, err = Connect(ctx, WithServer("127.0.0.234:123"))
 	var dialErr errSessionDial
 	require.ErrorIs(t, err, dialErr)
 	require.ErrorAs(t, err, &dialErr)
 
-	_, err = Connect(ctx, ConnectOptions().WithAuthtoken("lolnope"))
+	_, err = Connect(ctx, WithAuthtoken("lolnope"))
 	var authErr errAuthFailed
 	require.ErrorIs(t, err, authErr)
 	require.ErrorAs(t, err, &authErr)
 	require.True(t, authErr.Remote)
 
-	sess, err := Connect(ctx, ConnectOptions())
+	sess, err := Connect(ctx)
 	require.NoError(t, err)
 	_, err = sess.StartTunnel(ctx, config.TCPEndpoint())
 	var startErr errStartTunnel
@@ -666,7 +662,7 @@ func TestErrors(t *testing.T) {
 func TestNonExported(t *testing.T) {
 	ctx := context.Background()
 
-	sess := setupSession(ctx, t, nil)
+	sess := setupSession(ctx, t)
 
 	require.NotEmpty(t, sess.(interface{ Region() string }).Region())
 }

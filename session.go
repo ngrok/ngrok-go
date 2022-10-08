@@ -29,12 +29,12 @@ const libraryAgentVersion = "0.0.0-ngrok-go"
 
 // The interface implemented by an ngrok session object.
 type Session interface {
+	// Start a new tunnel over the ngrok session.
+	StartTunnel(ctx context.Context, cfg config.Tunnel) (Tunnel, error)
+
 	// Close the ngrok session.
 	// This also closes all existing tunnels tied to the session.
 	Close() error
-
-	// Start a new tunnel over the ngrok session.
-	StartTunnel(ctx context.Context, cfg config.Tunnel) (Tunnel, error)
 }
 
 const (
@@ -76,8 +76,10 @@ type SessionHeartbeatHandler func(ctx context.Context, sess Session, latency tim
 
 type ServerCommandHandler func(ctx context.Context, sess Session) error
 
+type ConnectOption func(*connectConfig)
+
 // Options to use when establishing an ngrok session.
-type ConnectConfig struct {
+type connectConfig struct {
 	// Your ngrok Authtoken.
 	Authtoken string
 	// The address of the ngrok server to connect to.
@@ -120,87 +122,91 @@ type ConnectConfig struct {
 	Logger Logger
 }
 
-// Construct a new set of Connect options.
-func ConnectOptions() *ConnectConfig {
-	return &ConnectConfig{}
-}
-
 // Use the provided opaque metadata string for this session.
 // Sets the [ConnectConfig].Metadata field.
-func (cfg *ConnectConfig) WithMetadata(meta string) *ConnectConfig {
-	cfg.Metadata = meta
-	return cfg
+func WithMetadata(meta string) ConnectOption {
+	return func(cfg *connectConfig) {
+		cfg.Metadata = meta
+	}
 }
 
 // Use the provided dialer for establishing a TCP connection to the ngrok
 // server.
 // Sets the [ConnectConfig].Dialer field. Takes precedence over ProxyURL if both
 // are specified.
-func (cfg *ConnectConfig) WithDialer(dialer Dialer) *ConnectConfig {
-	cfg.Dialer = dialer
-	return cfg
+func WithDialer(dialer Dialer) ConnectOption {
+	return func(cfg *connectConfig) {
+		cfg.Dialer = dialer
+	}
 }
 
 // Proxy requests through the server identified by the provided URL when using
 // the default Dialer.
 // Sets the [ConnectConfig].ProxyURL field. Ignored if a custom Dialer is in use.
-func (cfg *ConnectConfig) WithProxyURL(url *url.URL) *ConnectConfig {
-	cfg.ProxyURL = url
-	return cfg
+func WithProxyURL(url *url.URL) ConnectOption {
+	return func(cfg *connectConfig) {
+		cfg.ProxyURL = url
+	}
 }
 
 // Use the provided Authtoken to authenticate this session.
 // Sets the [ConnectConfig].Authtoken field.
-func (cfg *ConnectConfig) WithAuthtoken(token string) *ConnectConfig {
-	cfg.Authtoken = token
-	return cfg
+func WithAuthtoken(token string) ConnectOption {
+	return func(cfg *connectConfig) {
+		cfg.Authtoken = token
+	}
 }
 
 // WithAuthtokenFromEnv populates the authtoken with one defined in the standard
 // NGROK_AUTHTOKEN environment variable.
 // Sets the [ConnectConfig].Authtoken field.
-func (cfg *ConnectConfig) WithAuthtokenFromEnv() *ConnectConfig {
-	return cfg.WithAuthtoken(os.Getenv("NGROK_AUTHTOKEN"))
+func WithAuthtokenFromEnv() ConnectOption {
+	return WithAuthtoken(os.Getenv("NGROK_AUTHTOKEN"))
 }
 
 // Connect to the ngrok server in a specific region.
 // Overwrites the [ConnectConfig].ServerAddr field.
-func (cfg *ConnectConfig) WithRegion(region string) *ConnectConfig {
-	if region != "" {
-		cfg.ServerAddr = fmt.Sprintf("tunnel.%s.ngrok.com:443", region)
+func WithRegion(region string) ConnectOption {
+	return func(cfg *connectConfig) {
+		if region != "" {
+			cfg.ServerAddr = fmt.Sprintf("tunnel.%s.ngrok.com:443", region)
+		}
 	}
-	return cfg
 }
 
 // Connect to the provided ngrok server.
 // Sets the [ConnectConfig].Server field.
-func (cfg *ConnectConfig) WithServer(addr string) *ConnectConfig {
-	cfg.ServerAddr = addr
-	return cfg
+func WithServer(addr string) ConnectOption {
+	return func(cfg *connectConfig) {
+		cfg.ServerAddr = addr
+	}
 }
 
 // Use the provided [x509.CertPool] to authenticate the ngrok server
 // certificate.
 // Sets the [ConnectConfig].CAPool field.
-func (cfg *ConnectConfig) WithCA(pool *x509.CertPool) *ConnectConfig {
-	cfg.CAPool = pool
-	return cfg
+func WithCA(pool *x509.CertPool) ConnectOption {
+	return func(cfg *connectConfig) {
+		cfg.CAPool = pool
+	}
 }
 
 // Set the heartbeat tolerance for the session.
 // If the session's heartbeats are outside of their interval by this duration,
 // the server will assume the session is dead and close it.
-func (cfg *ConnectConfig) WithHeartbeatTolerance(tolerance time.Duration) *ConnectConfig {
-	cfg.HeartbeatTolerance = tolerance
-	return cfg
+func WithHeartbeatTolerance(tolerance time.Duration) ConnectOption {
+	return func(cfg *connectConfig) {
+		cfg.HeartbeatTolerance = tolerance
+	}
 }
 
 // Set the heartbeat interval for the session.
 // This value determines how often we send application level
 // heartbeats to the server go check connection liveness.
-func (cfg *ConnectConfig) WithHeartbeatInterval(interval time.Duration) *ConnectConfig {
-	cfg.HeartbeatInterval = interval
-	return cfg
+func WithHeartbeatInterval(interval time.Duration) ConnectOption {
+	return func(cfg *connectConfig) {
+		cfg.HeartbeatInterval = interval
+	}
 }
 
 // Log to a simplified logging interface.
@@ -209,33 +215,43 @@ func (cfg *ConnectConfig) WithHeartbeatInterval(interval time.Duration) *Connect
 // `pgxadapter`.
 // If the provided `Logger` also implements the `log15.Logger` interface, it
 // will be used directly.
-func (cfg *ConnectConfig) WithLogger(logger Logger) *ConnectConfig {
-	cfg.Logger = logger
-	return cfg
+func WithLogger(logger Logger) ConnectOption {
+	return func(cfg *connectConfig) {
+		cfg.Logger = logger
+	}
 }
 
-func (cfg *ConnectConfig) WithConnectHandler(handler SessionConnectHandler) *ConnectConfig {
-	cfg.ConnectHandler = handler
-	return cfg
+func WithConnectHandler(handler SessionConnectHandler) ConnectOption {
+	return func(cfg *connectConfig) {
+		cfg.ConnectHandler = handler
+	}
 }
-func (cfg *ConnectConfig) WithDisconnectHandler(handler SessionDisconnectHandler) *ConnectConfig {
-	cfg.DisconnectHandler = handler
-	return cfg
+func WithDisconnectHandler(handler SessionDisconnectHandler) ConnectOption {
+	return func(cfg *connectConfig) {
+		cfg.DisconnectHandler = handler
+	}
 }
-func (cfg *ConnectConfig) WithHeartbeatHandler(handler SessionHeartbeatHandler) *ConnectConfig {
-	cfg.HeartbeatHandler = handler
-	return cfg
+func WithHeartbeatHandler(handler SessionHeartbeatHandler) ConnectOption {
+	return func(cfg *connectConfig) {
+		cfg.HeartbeatHandler = handler
+	}
 }
 
-func (cfg *ConnectConfig) WithStopHandler(handler ServerCommandHandler) *ConnectConfig {
-	cfg.StopHandler = handler
-	return cfg
+func WithStopHandler(handler ServerCommandHandler) ConnectOption {
+	return func(cfg *connectConfig) {
+		cfg.StopHandler = handler
+	}
 }
 
 // Connect to the ngrok server and start a new session.
-func Connect(ctx context.Context, cfg *ConnectConfig) (Session, error) {
+func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 	logger := log15.New()
 	logger.SetHandler(log15.DiscardHandler())
+
+	cfg := connectConfig{}
+	for _, o := range opts {
+		o(&cfg)
+	}
 
 	if cfg.Logger != nil {
 		logger = toLog15(cfg.Logger)
