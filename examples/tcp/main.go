@@ -21,10 +21,9 @@ func main() {
 }
 
 func run(ctx context.Context) error {
-	_, tun, err := ngrok.ConnectAndStartTunnel(ctx,
-		ngrok.ConnectOptions().
-			WithAuthtoken(os.Getenv("NGROK_AUTHTOKEN")),
+	_, tun, err := ngrok.StartTunnel(ctx,
 		config.TCPEndpoint(),
+		WithAuthtokenFromEnv(),
 	)
 	if err != nil {
 		return err

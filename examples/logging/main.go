@@ -47,11 +47,10 @@ func run(ctx context.Context, lvlName string) error {
 		return err
 	}
 
-	_, tun, err := ngrok.ConnectAndStartTunnel(ctx,
-		ngrok.ConnectOptions().
-			WithLogger(&logger{lvl}).
-			WithAuthtoken(os.Getenv("NGROK_AUTHTOKEN")),
+	tun, err := ngrok.StartTunnel(ctx,
 		config.HTTPEndpoint(),
+		WithAuthtokenFromEnv(),
+		WithLogger(&logger{lvl}),
 	)
 	if err != nil {
 		return err

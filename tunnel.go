@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/ngrok/ngrok-go/config"
 	tunnel_client "github.com/ngrok/ngrok-go/internal/tunnel/client"
 )
 
@@ -48,6 +49,18 @@ type Tunnel interface {
 	// packet loss, etc., it is most correct to provide a context. See also
 	// `Close`, which matches the `io.Closer` interface method.
 	CloseWithContext(context.Context) error
+}
+
+// Create a new ngrok session and start a tunnel.
+// Shorthand for a [Connect] followed by a [Session].StartTunnel.
+// If an error is encoutered when starting the tunnel, but after a session has
+// been established, both the [Session] and error return values will be non-nil.
+func StartTunnel(ctx context.Context, tunnelConfig config.Tunnel, connectOpts ...ConnectOption) (Tunnel, error) {
+	sess, err := Connect(ctx, connectOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return sess.StartTunnel(ctx, tunnelConfig)
 }
 
 // A tunnel that may be used to serve HTTP.
