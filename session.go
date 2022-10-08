@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"net/url"
 	"os"
 	"runtime"
@@ -496,10 +497,22 @@ func (s *sessionImpl) StartTunnel(ctx context.Context, cfg config.Tunnel) (Tunne
 		return nil, errStartTunnel{err}
 	}
 
-	return &tunnelImpl{
+	t := &tunnelImpl{
 		Sess:   s,
 		Tunnel: tunnel,
-	}, nil
+	}
+
+	if httpServerCfg, ok := cfg.(interface {
+		HTTPServer() *http.Server
+	}); ok {
+		if srv := httpServerCfg.HTTPServer(); srv != nil {
+			go func() {
+				_ = srv.Serve(t)
+			}()
+		}
+	}
+
+	return t, nil
 }
 
 // The rest of the `sessionImpl` methods are non-public, but can be

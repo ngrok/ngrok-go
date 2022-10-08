@@ -70,10 +70,8 @@ func serveHTTP(ctx context.Context, t *testing.T, connectOpts []ConnectOption, o
 	tun := startTunnel(ctx, t, sess, opts)
 	exited := make(chan error)
 
-	httpTun := tun.AsHTTP()
-
 	go func() {
-		exited <- httpTun.Serve(ctx, handler)
+		exited <- http.Serve(tun, handler)
 	}()
 	return tun, exited
 }
@@ -98,6 +96,30 @@ func TestTunnel(t *testing.T) {
 	require.NotEmpty(t, tun.URL(), "Tunnel URL")
 	require.Equal(t, "Hello, world!", tun.Metadata())
 	require.Equal(t, "some application", tun.ForwardsTo())
+}
+
+func TestWithHTTPHandler(t *testing.T) {
+	ctx := context.Background()
+	sess := setupSession(ctx, t)
+
+	tun := startTunnel(ctx, t, sess, config.HTTPEndpoint(
+		config.WithMetadata("Hello, world!"),
+		config.WithForwardsTo("some application"),
+		config.WithHTTPHandler(helloHandler),
+	))
+
+	resp, err := http.Get(tun.URL())
+	require.NoError(t, err, "GET tunnel url")
+
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err, "Read response body")
+
+	require.Equal(t, "Hello, world!\n", string(body), "HTTP Body Contents")
+
+	require.NotNil(t, resp.TLS, "TLS established")
+
+	// Closing the tunnel should be fine
+	require.NoError(t, tun.CloseWithContext(ctx))
 }
 
 func TestHTTPS(t *testing.T) {

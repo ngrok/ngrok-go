@@ -3,7 +3,6 @@ package ngrok
 import (
 	"context"
 	"net"
-	"net/http"
 	"time"
 
 	"github.com/ngrok/ngrok-go/config"
@@ -38,9 +37,6 @@ type Tunnel interface {
 	// was started on.
 	Session() Session
 
-	// Use this tunnel to serve HTTP requests.
-	AsHTTP() HTTPTunnel
-
 	// Convenience method that calls `CloseWithContext` with a default timeout
 	// of 5 seconds.
 	Close() error
@@ -61,13 +57,6 @@ func StartTunnel(ctx context.Context, tunnelConfig config.Tunnel, connectOpts ..
 		return nil, err
 	}
 	return sess.StartTunnel(ctx, tunnelConfig)
-}
-
-// A tunnel that may be used to serve HTTP.
-type HTTPTunnel interface {
-	Tunnel
-	// Serve HTTP requests over this tunnel using the provided [http.Handler].
-	Serve(context.Context, http.Handler) error
 }
 
 type tunnelImpl struct {
@@ -124,20 +113,8 @@ func (t *tunnelImpl) Labels() map[string]string {
 	return t.Tunnel.RemoteBindConfig().Labels
 }
 
-func (t *tunnelImpl) AsHTTP() HTTPTunnel {
-	return t
-}
-
 func (t *tunnelImpl) Session() Session {
 	return t.Sess
-}
-
-func (t *tunnelImpl) Serve(ctx context.Context, h http.Handler) error {
-	srv := http.Server{
-		Handler:     h,
-		BaseContext: func(l net.Listener) context.Context { return ctx },
-	}
-	return srv.Serve(t)
 }
 
 type connImpl struct {

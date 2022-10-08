@@ -2,6 +2,7 @@ package config
 
 import (
 	"crypto/x509"
+	"net/http"
 
 	"github.com/ngrok/ngrok-go/internal/pb_agent"
 	"github.com/ngrok/ngrok-go/internal/tunnel/proto"
@@ -36,6 +37,10 @@ type httpOptions struct {
 
 	// The domain to request for this edge
 	Domain string
+
+	// If non-nil, start a goroutine which runs this http server
+	// accepting connections from the http tunnel
+	httpServer *http.Server
 
 	// Certificates to use for client authentication at the ngrok edge.
 	MutualTLSCA []*x509.Certificate
@@ -120,6 +125,11 @@ func (cfg httpOptions) Proto() string {
 func (cfg httpOptions) Opts() any {
 	return cfg.toProtoConfig()
 }
+
 func (cfg httpOptions) Labels() map[string]string {
 	return nil
+}
+
+func (cfg httpOptions) HTTPServer() *http.Server {
+	return cfg.httpServer
 }
