@@ -135,21 +135,10 @@ func (t *tunnelImpl) Serve(ctx context.Context, h http.Handler) error {
 	return srv.Serve(t)
 }
 
-// An ngrok tunnel connection.
-// For the time being, just a [net.Conn].
-// May have additional methods added in the future.
-// Must be type-asserted with the [net.Conn] returned from
-// [ListenerTunnel].Accept.
-type Conn interface {
-	net.Conn
-}
-
 type connImpl struct {
 	net.Conn
 	Proxy *tunnel_client.ProxyConn
 }
-
-var _ Conn = (*connImpl)(nil)
 
 func (c *connImpl) ProxyConn() *tunnel_client.ProxyConn {
 	return c.Proxy
