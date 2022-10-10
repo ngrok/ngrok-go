@@ -2,10 +2,7 @@ module github.com/ngrok/ngrok-go/log/pgxadapter
 
 go 1.18
 
-require (
-	github.com/jackc/pgx/v4 v4.17.0
-	github.com/ngrok/ngrok-go/log v0.0.0
-)
+require github.com/jackc/pgx/v4 v4.17.0
 
 require (
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
@@ -18,5 +15,3 @@ require (
 	golang.org/x/crypto v0.0.0-20220722155217-630584e8d5aa // indirect
 	golang.org/x/text v0.3.7 // indirect
 )
-
-replace github.com/ngrok/ngrok-go/log => ../
