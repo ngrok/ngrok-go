@@ -20,7 +20,34 @@ import (
 	"golang.org/x/net/websocket"
 )
 
+func skipUnless(t *testing.T, varname string, message ...any) {
+	if os.Getenv(varname) == "" && os.Getenv("NGROK_TEST_ALL") == "" {
+		t.Skip(message...)
+	}
+}
+
+func onlineTest(t *testing.T) {
+	skipUnless(t, "NGROK_TEST_ONLINE", "Skipping online test")
+	// For the moment, all online tests are authenticated, since we don't
+	// support unauthenticated pre-2.2.0 agents, which this library claims to
+	// be.
+	authenticatedTest(t)
+	// They're also paid. Looks like the tests run quickly enough in series that
+	// they trigger simultaneous session errors for free accounts. "Something
+	// something eventual consistency" most likely.
+	paidTest(t)
+}
+
+func authenticatedTest(t *testing.T) {
+	skipUnless(t, "NGROK_TEST_AUTHED", "Skipping test for authenticated features")
+}
+
+func paidTest(t *testing.T) {
+	skipUnless(t, "NGROK_TEST_PAID", "Skipping test for paid features")
+}
+
 func setupSession(ctx context.Context, t *testing.T, opts ...ConnectOption) Session {
+	onlineTest(t)
 	opts = append(opts, WithAuthtokenFromEnv())
 	sess, err := Connect(ctx, opts...)
 	require.NoError(t, err, "Session Connect")
@@ -28,6 +55,7 @@ func setupSession(ctx context.Context, t *testing.T, opts ...ConnectOption) Sess
 }
 
 func startTunnel(ctx context.Context, t *testing.T, sess Session, opts config.Tunnel) Tunnel {
+	onlineTest(t)
 	tun, err := sess.StartTunnel(ctx, opts)
 	require.NoError(t, err, "StartTunnel")
 	return tun
@@ -52,6 +80,7 @@ func serveHTTP(ctx context.Context, t *testing.T, connectOpts []ConnectOption, o
 }
 
 func TestStartTunnel(t *testing.T) {
+	onlineTest(t)
 	_, err := StartTunnel(context.Background(),
 		config.HTTPEndpoint(),
 		WithAuthtokenFromEnv(),
@@ -237,10 +266,7 @@ func TestBasicAuth(t *testing.T) {
 
 func TestCircuitBreaker(t *testing.T) {
 	// Don't run this one by default - it has to make ~50 requests.
-	if os.Getenv("NGROK_TEST_LONG") == "" {
-		t.Skip("Skipping long circuit breaker test")
-		return
-	}
+	skipUnless(t, "NGROK_TEST_LONG", "Skipping long circuit breaker test")
 	ctx := context.Background()
 
 	opts := config.HTTPEndpoint(config.WithCircuitBreaker(0.1))
@@ -556,12 +582,9 @@ func TestWebsocketConversion(t *testing.T) {
 	require.Error(t, <-exited)
 }
 
-func TestConnectcionCallbacks(t *testing.T) {
+func TestConnectionCallbacks(t *testing.T) {
 	// Don't run this one by default - it's timing-sensitive and prone to flakes
-	if os.Getenv("NGROK_TEST_FLAKEY") == "" {
-		t.Skip("Skipping flakey network test")
-		return
-	}
+	skipUnless(t, "NGROK_TEST_FLAKEY", "Skipping flakey network test")
 
 	ctx := context.Background()
 	connects := 0
@@ -610,10 +633,7 @@ func (sd *sketchyDialer) DialContext(ctx context.Context, network, addr string) 
 
 func TestHeartbeatCallback(t *testing.T) {
 	// Don't run this one by default - it's long
-	if os.Getenv("NGROK_TEST_LONG") == "" {
-		t.Skip("Skipping long network test")
-		return
-	}
+	skipUnless(t, "NGROK_TEST_LONG", "Skipping long network test")
 
 	ctx := context.Background()
 	heartbeats := 0
@@ -631,6 +651,7 @@ func TestHeartbeatCallback(t *testing.T) {
 }
 
 func TestErrors(t *testing.T) {
+	onlineTest(t)
 	var err error
 	ctx := context.Background()
 	u, _ := url.Parse("notarealscheme://example.com")
