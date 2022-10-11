@@ -49,8 +49,8 @@ func run(ctx context.Context, lvlName string) error {
 
 	tun, err := ngrok.StartTunnel(ctx,
 		config.HTTPEndpoint(),
-		WithAuthtokenFromEnv(),
-		WithLogger(&logger{lvl}),
+		ngrok.WithAuthtokenFromEnv(),
+		ngrok.WithLogger(&logger{lvl}),
 	)
 	if err != nil {
 		return err

@@ -29,9 +29,9 @@ func main() {
 }
 
 func run(ctx context.Context, dest string) error {
-	_, tun, err := ngrok.ConnectAndStartTunnel(ctx,
+	tun, err := ngrok.StartTunnel(ctx,
 		config.HTTPEndpoint(),
-		WithAuthtokenFromEnv(),
+		ngrok.WithAuthtokenFromEnv(),
 	)
 	if err != nil {
 		return err
@@ -39,10 +39,8 @@ func run(ctx context.Context, dest string) error {
 
 	log.Println("tunnel created:", tun.URL())
 
-	l := tun.AsListener()
-
 	for {
-		conn, err := l.Accept()
+		conn, err := tun.Accept()
 		if err != nil {
 			return err
 		}
