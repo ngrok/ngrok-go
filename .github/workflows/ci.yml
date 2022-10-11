@@ -7,6 +7,10 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      NGROK_TEST_ONLINE: 1
+      NGROK_TEST_LONG: 1
+      NGROK_TEST_FLAKEY: 1
     steps:
     - uses: actions/checkout@v3
     - name: Set up Go
