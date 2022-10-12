@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 
 	"github.com/ngrok/ngrok-go"
 	"github.com/ngrok/ngrok-go/config"
@@ -20,9 +19,9 @@ func main() {
 }
 
 func run(ctx context.Context) error {
-	_, tun, err := ngrok.ConnectAndStartTunnel(ctx,
+	tun, err := ngrok.StartTunnel(ctx,
 		config.HTTPEndpoint(),
-		WithAuthtokenFromEnv(),
+		ngrok.WithAuthtokenFromEnv(),
 	)
 	if err != nil {
 		return err

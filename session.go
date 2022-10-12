@@ -26,7 +26,7 @@ import (
 )
 
 // The ngrok library version.
-const libraryAgentVersion = "0.0.0-ngrok-go"
+const libraryAgentVersion = "3.0.0-ngrok-go"
 
 // The interface implemented by an ngrok session object.
 type Session interface {

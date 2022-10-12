@@ -8,7 +8,6 @@ import (
 	"io"
 	"log"
 	"net"
-	"os"
 
 	"github.com/ngrok/ngrok-go"
 	"github.com/ngrok/ngrok-go/config"
@@ -21,9 +20,9 @@ func main() {
 }
 
 func run(ctx context.Context) error {
-	_, tun, err := ngrok.StartTunnel(ctx,
+	tun, err := ngrok.StartTunnel(ctx,
 		config.TCPEndpoint(),
-		WithAuthtokenFromEnv(),
+		ngrok.WithAuthtokenFromEnv(),
 	)
 	if err != nil {
 		return err
@@ -31,9 +30,7 @@ func run(ctx context.Context) error {
 
 	log.Println("started tunnel:", tun.URL())
 
-	l := tun.AsListener()
-
-	return runListener(ctx, l)
+	return runListener(ctx, tun)
 }
 
 func runListener(ctx context.Context, l net.Listener) error {

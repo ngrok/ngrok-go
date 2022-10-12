@@ -20,7 +20,33 @@ import (
 	"golang.org/x/net/websocket"
 )
 
+func skipUnless(t *testing.T, varname string, message ...any) {
+	if os.Getenv(varname) == "" && os.Getenv("NGROK_TEST_ALL") == "" {
+		t.Skip(message...)
+	}
+}
+
+func onlineTest(t *testing.T) {
+	skipUnless(t, "NGROK_TEST_ONLINE", "Skipping online test")
+	// This is an annoying quirk of the free account limitations. It looks like
+	// the tests run quickly enough in series that they trigger simultaneous
+	// session errors for free accounts. "Something something eventual
+	// consistency" most likely.
+	if os.Getenv("NGROK_AUTHTOKEN") != "" {
+		skipUnless(t, "NGROK_TEST_PAID", "Skipping test for paid features")
+	}
+}
+
+func authenticatedTest(t *testing.T) {
+	skipUnless(t, "NGROK_TEST_AUTHED", "Skipping test for authenticated features")
+}
+
+func paidTest(t *testing.T) {
+	skipUnless(t, "NGROK_TEST_PAID", "Skipping test for paid features")
+}
+
 func setupSession(ctx context.Context, t *testing.T, opts ...ConnectOption) Session {
+	onlineTest(t)
 	opts = append(opts, WithAuthtokenFromEnv())
 	sess, err := Connect(ctx, opts...)
 	require.NoError(t, err, "Session Connect")
@@ -28,6 +54,7 @@ func setupSession(ctx context.Context, t *testing.T, opts ...ConnectOption) Sess
 }
 
 func startTunnel(ctx context.Context, t *testing.T, sess Session, opts config.Tunnel) Tunnel {
+	onlineTest(t)
 	tun, err := sess.StartTunnel(ctx, opts)
 	require.NoError(t, err, "StartTunnel")
 	return tun
@@ -52,6 +79,7 @@ func serveHTTP(ctx context.Context, t *testing.T, connectOpts []ConnectOption, o
 }
 
 func TestStartTunnel(t *testing.T) {
+	onlineTest(t)
 	_, err := StartTunnel(context.Background(),
 		config.HTTPEndpoint(),
 		WithAuthtokenFromEnv(),
@@ -122,6 +150,7 @@ func TestHTTP(t *testing.T) {
 }
 
 func TestHTTPCompression(t *testing.T) {
+	paidTest(t)
 	ctx := context.Background()
 	opts := config.HTTPEndpoint(config.WithCompression())
 	tun, exited := serveHTTP(ctx, t, nil, opts, helloHandler)
@@ -163,6 +192,7 @@ func (f failPanic) FailNow() {
 }
 
 func TestHTTPHeaders(t *testing.T) {
+	paidTest(t)
 	ctx := context.Background()
 	opts := config.HTTPEndpoint(
 		config.WithRequestHeader("foo", "bar"),
@@ -205,6 +235,7 @@ func TestHTTPHeaders(t *testing.T) {
 }
 
 func TestBasicAuth(t *testing.T) {
+	paidTest(t)
 	ctx := context.Background()
 
 	opts := config.HTTPEndpoint(config.WithBasicAuth("user", "foobarbaz"))
@@ -237,10 +268,8 @@ func TestBasicAuth(t *testing.T) {
 
 func TestCircuitBreaker(t *testing.T) {
 	// Don't run this one by default - it has to make ~50 requests.
-	if os.Getenv("NGROK_TEST_LONG") == "" {
-		t.Skip("Skipping long circuit breaker test")
-		return
-	}
+	skipUnless(t, "NGROK_TEST_LONG", "Skipping long circuit breaker test")
+	paidTest(t)
 	ctx := context.Background()
 
 	opts := config.HTTPEndpoint(config.WithCircuitBreaker(0.1))
@@ -271,6 +300,8 @@ func TestCircuitBreaker(t *testing.T) {
 }
 
 func TestProxyProto(t *testing.T) {
+	onlineTest(t)
+	paidTest(t)
 	ctx := context.Background()
 
 	type testCase struct {
@@ -347,6 +378,7 @@ func TestProxyProto(t *testing.T) {
 }
 
 func TestHostname(t *testing.T) {
+	paidTest(t)
 	ctx := context.Background()
 
 	tun, exited := serveHTTP(ctx, t, nil,
@@ -367,6 +399,7 @@ func TestHostname(t *testing.T) {
 }
 
 func TestSubdomain(t *testing.T) {
+	paidTest(t)
 	ctx := context.Background()
 
 	buf := make([]byte, 8)
@@ -393,6 +426,7 @@ func TestSubdomain(t *testing.T) {
 }
 
 func TestOAuth(t *testing.T) {
+	paidTest(t)
 	ctx := context.Background()
 
 	opts := config.HTTPEndpoint(config.WithOAuth("google"))
@@ -411,6 +445,7 @@ func TestOAuth(t *testing.T) {
 }
 
 func TestHTTPIPRestriction(t *testing.T) {
+	paidTest(t)
 	ctx := context.Background()
 
 	_, cidr, err := net.ParseCIDR("0.0.0.0/0")
@@ -432,6 +467,7 @@ func TestHTTPIPRestriction(t *testing.T) {
 }
 
 func TestTCP(t *testing.T) {
+	authenticatedTest(t)
 	ctx := context.Background()
 
 	opts := config.TCPEndpoint()
@@ -455,6 +491,7 @@ func TestTCP(t *testing.T) {
 }
 
 func TestTCPIPRestriction(t *testing.T) {
+	paidTest(t)
 	ctx := context.Background()
 
 	_, cidr, err := net.ParseCIDR("127.0.0.1/32")
@@ -480,9 +517,12 @@ func TestTCPIPRestriction(t *testing.T) {
 }
 
 func TestLabeled(t *testing.T) {
+	paidTest(t)
 	ctx := context.Background()
 	tun, exited := serveHTTP(ctx, t, nil,
 		config.LabeledTunnel(
+			// TODO: This actually only works with a specific testing account.
+			// We should find a better way.
 			config.WithLabel("edge", "edghts_2CtuOWQFCrvggKT34fRCFXs0AiK"),
 			config.WithMetadata("Hello, world!"),
 		),
@@ -513,6 +553,7 @@ func TestLabeled(t *testing.T) {
 }
 
 func TestWebsocketConversion(t *testing.T) {
+	paidTest(t)
 	ctx := context.Background()
 	sess := setupSession(ctx, t)
 	tun := startTunnel(ctx, t, sess,
@@ -556,12 +597,9 @@ func TestWebsocketConversion(t *testing.T) {
 	require.Error(t, <-exited)
 }
 
-func TestConnectcionCallbacks(t *testing.T) {
+func TestConnectionCallbacks(t *testing.T) {
 	// Don't run this one by default - it's timing-sensitive and prone to flakes
-	if os.Getenv("NGROK_TEST_FLAKEY") == "" {
-		t.Skip("Skipping flakey network test")
-		return
-	}
+	skipUnless(t, "NGROK_TEST_FLAKEY", "Skipping flakey network test")
 
 	ctx := context.Background()
 	connects := 0
@@ -610,10 +648,7 @@ func (sd *sketchyDialer) DialContext(ctx context.Context, network, addr string) 
 
 func TestHeartbeatCallback(t *testing.T) {
 	// Don't run this one by default - it's long
-	if os.Getenv("NGROK_TEST_LONG") == "" {
-		t.Skip("Skipping long network test")
-		return
-	}
+	skipUnless(t, "NGROK_TEST_LONG", "Skipping long network test")
 
 	ctx := context.Background()
 	heartbeats := 0
@@ -631,6 +666,7 @@ func TestHeartbeatCallback(t *testing.T) {
 }
 
 func TestErrors(t *testing.T) {
+	onlineTest(t)
 	var err error
 	ctx := context.Background()
 	u, _ := url.Parse("notarealscheme://example.com")

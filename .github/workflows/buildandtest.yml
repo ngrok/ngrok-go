@@ -1,0 +1,25 @@
+name: Go
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      NGROK_TEST_ONLINE: 1
+      NGROK_TEST_LONG: 1
+      NGROK_TEST_FLAKEY: 1
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.18
+    - name: Build
+      run: go build -v ./...
+    - name: Build Examples
+      run: go build -v ./examples/...
+    - name: Test
+      run: go test -v ./...
