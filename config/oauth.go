@@ -2,15 +2,7 @@ package config
 
 import "github.com/ngrok/ngrok-go/internal/pb_agent"
 
-type OAuthOption interface {
-	ApplyOAuth(cfg *oauthOptions)
-}
-
-type oauthOptionFunc func(cfg *oauthOptions)
-
-func (of oauthOptionFunc) ApplyOAuth(cfg *oauthOptions) {
-	of(cfg)
-}
+type OAuthOption func(cfg *oauthOptions)
 
 // oauthOptions configuration
 type oauthOptions struct {
@@ -33,23 +25,23 @@ func oauthProvider(name string) *oauthOptions {
 
 // Append email addresses to the list of allowed emails.
 func WithOAuthEmail(addr ...string) OAuthOption {
-	return oauthOptionFunc(func(cfg *oauthOptions) {
+	return func(cfg *oauthOptions) {
 		cfg.AllowEmails = append(cfg.AllowEmails, addr...)
-	})
+	}
 }
 
 // Append email domains to the list of allowed domains.
 func WithOAuthDomain(domain ...string) OAuthOption {
-	return oauthOptionFunc(func(cfg *oauthOptions) {
+	return func(cfg *oauthOptions) {
 		cfg.AllowDomains = append(cfg.AllowDomains, domain...)
-	})
+	}
 }
 
 // Append scopes to the list of scopes to request.
 func WithOAuthScope(scope ...string) OAuthOption {
-	return oauthOptionFunc(func(cfg *oauthOptions) {
+	return func(cfg *oauthOptions) {
 		cfg.Scopes = append(cfg.Scopes, scope...)
-	})
+	}
 }
 
 func (oauth *oauthOptions) toProtoConfig() *pb_agent.MiddlewareConfiguration_OAuth {
@@ -71,7 +63,7 @@ func WithOAuth(provider string, opts ...OAuthOption) HTTPEndpointOption {
 	return httpOptionFunc(func(cfg *httpOptions) {
 		oauth := oauthProvider(provider)
 		for _, opt := range opts {
-			opt.ApplyOAuth(oauth)
+			opt(oauth)
 		}
 		cfg.OAuth = oauth
 	})
