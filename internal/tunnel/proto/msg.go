@@ -72,7 +72,16 @@ type AuthExtra struct {
 	ConfigVersion   string
 	CustomInterface bool
 	CustomCAs       bool
+
+	ClientType ClientType // The type of client this is. Currently agent and library clients are supported
 }
+
+type ClientType string
+
+const (
+	Agent   ClientType = "agent"
+	Library ClientType = "library"
+)
 
 type Fingerprint struct {
 	M []string
