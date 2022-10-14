@@ -5,8 +5,6 @@ import (
 	"fmt"
 )
 
-type LogLevel = int
-
 type ErrInvalidLogLevel struct {
 	Level any
 }
@@ -14,6 +12,8 @@ type ErrInvalidLogLevel struct {
 func (e ErrInvalidLogLevel) Error() string {
 	return fmt.Sprintf("invalid log level: %v", e.Level)
 }
+
+type LogLevel = int
 
 const (
 	LogLevelTrace = 6
