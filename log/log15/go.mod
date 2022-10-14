@@ -1,4 +1,4 @@
-module github.com/ngrok/ngrok-go/log/log15adapter
+module github.com/ngrok/ngrok-go/log/log15
 
 go 1.18
 

@@ -9,8 +9,9 @@ go 1.18
 use (
 	.
 	./examples
-	./log/log15adapter
-	./log/pgxadapter
+	./log/log15
+	./log/logrus
+	./log/zap
 )
 
 replace (
