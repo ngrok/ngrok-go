@@ -516,42 +516,6 @@ func TestTCPIPRestriction(t *testing.T) {
 	require.Error(t, <-exited)
 }
 
-func TestLabeled(t *testing.T) {
-	paidTest(t)
-	ctx := context.Background()
-	tun, exited := serveHTTP(ctx, t, nil,
-		config.LabeledTunnel(
-			// TODO: This actually only works with a specific testing account.
-			// We should find a better way.
-			config.WithLabel("edge", "edghts_2CtuOWQFCrvggKT34fRCFXs0AiK"),
-			config.WithMetadata("Hello, world!"),
-		),
-		helloHandler,
-	)
-
-	require.Equal(t, "Hello, world!", tun.Metadata())
-
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-
-	for {
-		require.NoError(t, ctx.Err(), "context deadline reached while waiting for edge")
-		resp, err := http.Get("https://kzu7214a.ngrok.io/")
-		require.NoError(t, err, "GET tunnel url")
-
-		body, err := io.ReadAll(resp.Body)
-		require.NoError(t, err, "Read response body")
-
-		if string(body) == "Hello, world!\n" {
-			break
-		}
-	}
-
-	cancel()
-
-	require.NoError(t, tun.CloseWithContext(ctx))
-	require.Error(t, <-exited)
-}
-
 func TestWebsocketConversion(t *testing.T) {
 	paidTest(t)
 	ctx := context.Background()
