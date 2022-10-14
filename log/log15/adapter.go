@@ -1,4 +1,4 @@
-// Package logrus provides a logger that writes to a
+// Package log15 provides a logger that writes to a
 // github.com/inconshreveable/log15.Logger and implements the
 // github.com/ngrok/ngrok-go/log.Logger interface.
 //
