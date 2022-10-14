@@ -58,6 +58,9 @@ type httpOptions struct {
 	// OAuth configuration.
 	// If nil, OAuth is disabled.
 	OAuth *oauthOptions
+	// OIDC configuration.
+	// If nil, OIDC is disabled.
+	OIDC *oidcOptions
 	// WebhookVerification configuration.
 	// If nil, WebhookVerification is disabled.
 	WebhookVerification *webhookVerification
@@ -95,6 +98,7 @@ func (cfg *httpOptions) toProtoConfig() *proto.HTTPEndpoint {
 		}
 	}
 	opts.OAuth = cfg.OAuth.toProtoConfig()
+	opts.OIDC = cfg.OIDC.toProtoConfig()
 	opts.WebhookVerification = cfg.WebhookVerification.toProtoConfig()
 	opts.IPRestriction = cfg.commonOpts.CIDRRestrictions.toProtoConfig()
 
