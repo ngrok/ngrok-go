@@ -24,14 +24,14 @@ func oauthProvider(name string) *oauthOptions {
 }
 
 // Append email addresses to the list of allowed emails.
-func WithOAuthEmail(addr ...string) OAuthOption {
+func WithAllowOAuthEmail(addr ...string) OAuthOption {
 	return func(cfg *oauthOptions) {
 		cfg.AllowEmails = append(cfg.AllowEmails, addr...)
 	}
 }
 
 // Append email domains to the list of allowed domains.
-func WithOAuthDomain(domain ...string) OAuthOption {
+func WithAllowOAuthDomain(domain ...string) OAuthOption {
 	return func(cfg *oauthOptions) {
 		cfg.AllowDomains = append(cfg.AllowDomains, domain...)
 	}

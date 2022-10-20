@@ -47,14 +47,14 @@ func WithOIDC(issuerURL string, clientID string, clientSecret string, opts ...OI
 }
 
 // Append email addresses to the list of allowed emails.
-func WithOIDCEmail(addr ...string) OIDCOption {
+func WithAllowOIDCEmail(addr ...string) OIDCOption {
 	return func(cfg *oidcOptions) {
 		cfg.AllowEmails = append(cfg.AllowEmails, addr...)
 	}
 }
 
 // Append email domains to the list of allowed domains.
-func WithOIDCDomain(domain ...string) OIDCOption {
+func WithAllowOIDCDomain(domain ...string) OIDCOption {
 	return func(cfg *oidcOptions) {
 		cfg.AllowDomains = append(cfg.AllowDomains, domain...)
 	}
