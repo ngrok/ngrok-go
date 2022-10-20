@@ -26,7 +26,7 @@ import (
 )
 
 // The ngrok library version.
-const libraryAgentVersion = "3.0.0-ngrok-go"
+const libraryAgentVersion = "0.0.0"
 
 // The interface implemented by an ngrok session object.
 type Session interface {
@@ -351,7 +351,7 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 		StopUnsupportedError:    remoteStopErr,
 		UpdateUnsupportedError:  remoteUpdateErr,
 
-		// TODO: More fields here?
+		ClientType: proto.Library,
 	}
 
 	reconnect := func(sess tunnel_client.Session) error {
