@@ -1,6 +1,10 @@
 package config
 
-import "github.com/ngrok/ngrok-go/internal/tunnel/proto"
+import (
+	"net/http"
+
+	"github.com/ngrok/ngrok-go/internal/tunnel/proto"
+)
 
 type LabeledTunnelOption interface {
 	ApplyLabeled(cfg *labeledOptions)
@@ -28,6 +32,9 @@ type labeledOptions struct {
 
 	// A map of label, value pairs for this tunnel.
 	labels map[string]string
+
+	// An HTTP Server to run traffic on
+	httpServer *http.Server
 }
 
 // WithLabel adds a label to this tunnel's set of label, value pairs.
@@ -59,4 +66,7 @@ func (cfg labeledOptions) Opts() any {
 }
 func (cfg labeledOptions) Labels() map[string]string {
 	return cfg.labels
+}
+func (cfg labeledOptions) HTTPServer() *http.Server {
+	return cfg.httpServer
 }

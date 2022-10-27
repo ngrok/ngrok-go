@@ -2,6 +2,7 @@ package config
 
 import (
 	"crypto/x509"
+	"net/http"
 
 	"github.com/ngrok/ngrok-go/internal/pb_agent"
 	"github.com/ngrok/ngrok-go/internal/tunnel/proto"
@@ -42,6 +43,9 @@ type tlsOptions struct {
 	// The certificate to use for TLS termination at the ngrok edge in PEM
 	// format.
 	CertPEM []byte
+
+	// An HTTP Server to run traffic on
+	httpServer *http.Server
 }
 
 func (cfg *tlsOptions) toProtoConfig() *proto.TLSEndpoint {
@@ -80,4 +84,7 @@ func (cfg tlsOptions) Opts() any {
 }
 func (cfg tlsOptions) Labels() map[string]string {
 	return nil
+}
+func (cfg tlsOptions) HTTPServer() *http.Server {
+	return cfg.httpServer
 }

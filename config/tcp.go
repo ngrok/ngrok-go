@@ -1,6 +1,10 @@
 package config
 
-import "github.com/ngrok/ngrok-go/internal/tunnel/proto"
+import (
+	"net/http"
+
+	"github.com/ngrok/ngrok-go/internal/tunnel/proto"
+)
 
 type TCPEndpointOption interface {
 	ApplyTCP(cfg *tcpOptions)
@@ -27,6 +31,8 @@ type tcpOptions struct {
 	commonOpts
 	// The TCP address to request for this edge.
 	RemoteAddr string
+	// An HTTP Server to run traffic on
+	httpServer *http.Server
 }
 
 // Set the TCP address to request for this edge.
@@ -62,4 +68,7 @@ func (cfg tcpOptions) Opts() any {
 }
 func (cfg tcpOptions) Labels() map[string]string {
 	return nil
+}
+func (cfg tcpOptions) HTTPServer() *http.Server {
+	return cfg.httpServer
 }
