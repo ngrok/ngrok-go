@@ -10,9 +10,10 @@ import (
 	"net"
 	"os"
 
-	"github.com/ngrok/ngrok-go"
-	"github.com/ngrok/ngrok-go/config"
 	"golang.org/x/sync/errgroup"
+
+	"golang.ngrok.com/ngrok"
+	"golang.ngrok.com/ngrok/config"
 )
 
 func usage(bin string) {

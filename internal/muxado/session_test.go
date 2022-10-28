@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ngrok/ngrok-go/internal/muxado/frame"
+	"golang.ngrok.com/ngrok/internal/muxado/frame"
 )
 
 func newFakeStream(sess sessionPrivate, id frame.StreamId, windowSize uint32, fin bool, init bool) streamPrivate {

@@ -1,6 +1,6 @@
 package config
 
-import "github.com/ngrok/ngrok-go/internal/pb_agent"
+import "golang.ngrok.com/ngrok/internal/pb_agent"
 
 type OAuthOption func(cfg *oauthOptions)
 

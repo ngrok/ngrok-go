@@ -1,6 +1,6 @@
 // Package log15 provides a logger that writes to a
 // github.com/inconshreveable/log15.Logger and implements the
-// github.com/ngrok/ngrok-go/log.Logger interface.
+// golang.ngrok.com/ngrok/log.Logger interface.
 //
 // Adapted from the github.com/jackc/pgx log15 adapter.
 package log15
@@ -13,7 +13,7 @@ import (
 
 type LogLevel = int
 
-// Log level constants matching the ones in github.com/ngrok/ngrok-go/log
+// Log level constants matching the ones in golang.ngrok.com/ngrok/log
 const (
 	LogLevelTrace = 6
 	LogLevelDebug = 5

@@ -3,7 +3,7 @@ package config
 import (
 	"fmt"
 
-	"github.com/ngrok/ngrok-go/internal/pb_agent"
+	"golang.ngrok.com/ngrok/internal/pb_agent"
 )
 
 // HTTP Headers to modify at the ngrok edge.

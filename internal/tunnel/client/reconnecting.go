@@ -8,8 +8,9 @@ import (
 
 	log "github.com/inconshreveable/log15"
 	"github.com/jpillora/backoff"
-	"github.com/ngrok/ngrok-go/internal/tunnel/netx"
-	"github.com/ngrok/ngrok-go/internal/tunnel/proto"
+
+	"golang.ngrok.com/ngrok/internal/tunnel/netx"
+	"golang.ngrok.com/ngrok/internal/tunnel/proto"
 )
 
 var ErrSessionNotReady = errors.New("an ngrok tunnel session has not yet been established")

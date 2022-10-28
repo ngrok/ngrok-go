@@ -1,6 +1,6 @@
 package config
 
-import "github.com/ngrok/ngrok-go/internal/pb_agent"
+import "golang.ngrok.com/ngrok/internal/pb_agent"
 
 // BasicAuth is a set of credentials for basic authentication.
 type basicAuth struct {

@@ -4,7 +4,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 
-	"github.com/ngrok/ngrok-go/internal/pb_agent"
+	"golang.ngrok.com/ngrok/internal/pb_agent"
 )
 
 type mutualTLSEndpointOption []*x509.Certificate

@@ -4,7 +4,7 @@ import (
 	"io"
 	"sync"
 
-	"github.com/ngrok/ngrok-go/internal/muxado/frame"
+	"golang.ngrok.com/ngrok/internal/muxado/frame"
 )
 
 var zeroConfig Config

@@ -1,4 +1,4 @@
-module github.com/ngrok/ngrok-go/log/logrus
+module golang.ngrok.com/ngrok/log/logrus
 
 go 1.18
 

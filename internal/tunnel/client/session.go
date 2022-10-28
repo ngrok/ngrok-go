@@ -10,11 +10,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ngrok/ngrok-go/internal/tunnel/netx"
-	"github.com/ngrok/ngrok-go/internal/tunnel/proto"
+	"golang.ngrok.com/ngrok/internal/tunnel/netx"
+	"golang.ngrok.com/ngrok/internal/tunnel/proto"
 
 	log "github.com/inconshreveable/log15"
-	muxado "github.com/ngrok/ngrok-go/internal/muxado"
+
+	muxado "golang.ngrok.com/ngrok/internal/muxado"
 )
 
 // Session is a higher-level client session interface. You will almost always prefer this over

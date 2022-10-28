@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ngrok/ngrok-go/internal/muxado"
-	"github.com/ngrok/ngrok-go/internal/tunnel/netx"
-	"github.com/ngrok/ngrok-go/internal/tunnel/proto"
+	"golang.ngrok.com/ngrok/internal/muxado"
+	"golang.ngrok.com/ngrok/internal/tunnel/netx"
+	"golang.ngrok.com/ngrok/internal/tunnel/proto"
 
 	log "github.com/inconshreveable/log15"
 	logext "github.com/inconshreveable/log15/ext"

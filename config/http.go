@@ -4,8 +4,8 @@ import (
 	"crypto/x509"
 	"net/http"
 
-	"github.com/ngrok/ngrok-go/internal/pb_agent"
-	"github.com/ngrok/ngrok-go/internal/tunnel/proto"
+	"golang.ngrok.com/ngrok/internal/pb_agent"
+	"golang.ngrok.com/ngrok/internal/tunnel/proto"
 )
 
 type HTTPEndpointOption interface {

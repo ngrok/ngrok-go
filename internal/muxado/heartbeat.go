@@ -16,11 +16,11 @@ const (
 )
 
 type HeartbeatSession interface {
-        TypedStreamSession
-        Beat() time.Duration
-        Start()
-        SetInterval(d time.Duration)
-        SetTolerance(d time.Duration)
+	TypedStreamSession
+	Beat() time.Duration
+	Start()
+	SetInterval(d time.Duration)
+	SetTolerance(d time.Duration)
 }
 
 type HeartbeatConfig struct {

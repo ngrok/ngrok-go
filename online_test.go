@@ -15,9 +15,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ngrok/ngrok-go/config"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/websocket"
+
+	"golang.ngrok.com/ngrok/config"
 )
 
 func skipUnless(t *testing.T, varname string, message ...any) {

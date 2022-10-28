@@ -1,6 +1,6 @@
 package ngrok
 
-import "github.com/ngrok/ngrok-go/internal/tunnel/proto"
+import "golang.ngrok.com/ngrok/internal/tunnel/proto"
 
 type tunnelConfigPrivate interface {
 	ForwardsTo() string
