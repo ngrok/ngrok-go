@@ -3,7 +3,7 @@ package config
 import (
 	"net/http"
 
-	"github.com/ngrok/ngrok-go/internal/tunnel/proto"
+	"golang.ngrok.com/ngrok/internal/tunnel/proto"
 )
 
 type TCPEndpointOption interface {

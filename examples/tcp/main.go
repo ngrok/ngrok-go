@@ -9,8 +9,8 @@ import (
 	"log"
 	"net"
 
-	"github.com/ngrok/ngrok-go"
-	"github.com/ngrok/ngrok-go/config"
+	"golang.ngrok.com/ngrok"
+	"golang.ngrok.com/ngrok/config"
 )
 
 func main() {

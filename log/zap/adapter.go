@@ -1,5 +1,5 @@
 // Package zap provides a logger that writes to a go.uber.org/zap.Logger and
-// implements the github.com/ngrok/ngrok-go/log.Logger interface.
+// implements the golang.ngrok.com/ngrok/log.Logger interface.
 //
 // Adapted from the github.com/jackc/pgx zap adapter.
 package zap
@@ -13,7 +13,7 @@ import (
 
 type LogLevel = int
 
-// Log level constants matching the ones in github.com/ngrok/ngrok-go/log
+// Log level constants matching the ones in golang.ngrok.com/ngrok/log
 const (
 	LogLevelTrace = 6
 	LogLevelDebug = 5

@@ -5,8 +5,8 @@ import (
 	"net"
 	"time"
 
-	"github.com/ngrok/ngrok-go/config"
-	tunnel_client "github.com/ngrok/ngrok-go/internal/tunnel/client"
+	"golang.ngrok.com/ngrok/config"
+	tunnel_client "golang.ngrok.com/ngrok/internal/tunnel/client"
 )
 
 // An ngrok tunnel.

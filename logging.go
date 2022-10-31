@@ -5,7 +5,8 @@ import (
 	"fmt"
 
 	"github.com/inconshreveable/log15"
-	"github.com/ngrok/ngrok-go/log"
+
+	"golang.ngrok.com/ngrok/log"
 )
 
 type log15Handler struct {

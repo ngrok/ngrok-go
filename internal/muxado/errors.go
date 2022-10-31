@@ -3,7 +3,7 @@ package muxado
 import (
 	"errors"
 
-	"github.com/ngrok/ngrok-go/internal/muxado/frame"
+	"golang.ngrok.com/ngrok/internal/muxado/frame"
 )
 
 // ErrorCode is a 32-bit integer indicating the type of an error condition

@@ -18,12 +18,13 @@ import (
 	"unsafe"
 
 	"github.com/inconshreveable/log15"
-	"github.com/ngrok/ngrok-go/config"
-	"github.com/ngrok/ngrok-go/internal/muxado"
-	tunnel_client "github.com/ngrok/ngrok-go/internal/tunnel/client"
-	"github.com/ngrok/ngrok-go/internal/tunnel/proto"
-	"github.com/ngrok/ngrok-go/log"
 	"golang.org/x/net/proxy"
+
+	"golang.ngrok.com/ngrok/config"
+	"golang.ngrok.com/ngrok/internal/muxado"
+	tunnel_client "golang.ngrok.com/ngrok/internal/tunnel/client"
+	"golang.ngrok.com/ngrok/internal/tunnel/proto"
+	"golang.ngrok.com/ngrok/log"
 )
 
 // The ngrok library version.

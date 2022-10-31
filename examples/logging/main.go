@@ -10,9 +10,9 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/ngrok/ngrok-go"
-	"github.com/ngrok/ngrok-go/config"
-	ngrok_log "github.com/ngrok/ngrok-go/log"
+	"golang.ngrok.com/ngrok"
+	"golang.ngrok.com/ngrok/config"
+	ngrok_log "golang.ngrok.com/ngrok/log"
 )
 
 func usage(bin string) {

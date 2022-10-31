@@ -1,4 +1,4 @@
-module github.com/ngrok/ngrok-go/log/zap
+module golang.ngrok.com/ngrok/log/zap
 
 go 1.18
 

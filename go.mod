@@ -1,4 +1,4 @@
-module github.com/ngrok/ngrok-go
+module golang.ngrok.com/ngrok
 
 go 1.18
 

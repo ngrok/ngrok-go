@@ -3,7 +3,7 @@ package config
 import (
 	"net"
 
-	"github.com/ngrok/ngrok-go/internal/pb_agent"
+	"golang.ngrok.com/ngrok/internal/pb_agent"
 )
 
 // Restrictions placed on the origin of incoming connections to the edge.
