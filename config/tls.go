@@ -88,3 +88,8 @@ func (cfg tlsOptions) Labels() map[string]string {
 func (cfg tlsOptions) HTTPServer() *http.Server {
 	return cfg.httpServer
 }
+
+var _ interface {
+	tunnelConfigPrivate
+	Tunnel
+} = (*tlsOptions)(nil)
