@@ -58,9 +58,11 @@ func (cfg *tlsOptions) toProtoConfig() *proto.TLSEndpoint {
 
 	opts.MutualTLSAtEdge = mutualTLSEndpointOption(cfg.MutualTLSCA).toProtoConfig()
 
-	opts.TLSTermination = &pb_agent.MiddlewareConfiguration_TLSTermination{
-		Key:  cfg.KeyPEM,
-		Cert: cfg.CertPEM,
+	if cfg.KeyPEM != nil && cfg.CertPEM != nil {
+		opts.TLSTermination = &pb_agent.MiddlewareConfiguration_TLSTermination{
+			Key:  cfg.KeyPEM,
+			Cert: cfg.CertPEM,
+		}
 	}
 
 	return opts
@@ -89,6 +91,7 @@ func (cfg tlsOptions) HTTPServer() *http.Server {
 	return cfg.httpServer
 }
 
+// compile-time check that we're implementing the proper interfaces.
 var _ interface {
 	tunnelConfigPrivate
 	Tunnel

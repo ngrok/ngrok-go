@@ -14,24 +14,6 @@ type headers struct {
 	Removed []string
 }
 
-// Add a header to all requests or responses at the ngrok edge.
-// Inserts an entry into the [Headers].Added map.
-func (h *headers) Add(name, value string) *headers {
-	if h.Added == nil {
-		h.Added = map[string]string{}
-	}
-
-	h.Added[name] = value
-	return h
-}
-
-// Add a header to be removed from all requests or responses at the ngrok edge.
-// Appends to the [Headers].Removed slice.
-func (h *headers) Remove(name ...string) *headers {
-	h.Removed = append(h.Removed, name...)
-	return h
-}
-
 func (h *headers) toProtoConfig() *pb_agent.MiddlewareConfiguration_Headers {
 	if h == nil {
 		return nil

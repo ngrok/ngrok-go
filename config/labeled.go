@@ -72,6 +72,7 @@ func (cfg labeledOptions) HTTPServer() *http.Server {
 	return cfg.httpServer
 }
 
+// compile-time check that we're implementing the proper interfaces.
 var _ interface {
 	tunnelConfigPrivate
 	Tunnel

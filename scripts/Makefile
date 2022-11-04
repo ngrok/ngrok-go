@@ -1,6 +1,6 @@
 .PHONY: test
 test:
-	go test -coverprofile cover.out
+	go test -coverprofile cover.out ./...
 
 .PHONY: coverage
 coverage: test

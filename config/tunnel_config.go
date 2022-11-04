@@ -2,7 +2,7 @@ package config
 
 import "golang.ngrok.com/ngrok/internal/tunnel/proto"
 
-// Tunnel is a marker trait for options that can be used to start
+// Tunnel is a marker interface for options that can be used to start
 // tunnels.
 // It should not be implemented outside of this module.
 type Tunnel interface {
