@@ -1,6 +1,16 @@
 # Contributing to ngrok-go
 
-Thank you for deciding to contribute to ngrok-go. The easiest way to contribute is to [open a new issue](https://github.com/ngrok/ngrok-go/issues/new) with clear repro steps when you find an issue with the library. We will triage and investigate these issues at a regular interval.
+Thank you for deciding to contribute to ngrok-go!
+
+## Reporting a bug
+
+To report a bug, please [open a new issue](https://github.com/ngrok/ngrok-go/issues/new) with clear reproduction steps. We will triage and investigate these issues at a regular interval.
+
+## Contributing code
+
+Bugfixes and small improvements are always appreciated!
+
+For any larger changes or features, please [open a new issue](https://github.com/ngrok/ngrok-go/issues/new) first to discuss whether the change makes sense. When in doubt, it's always okay to open an issue first.
 
 ## Building and running tests
 

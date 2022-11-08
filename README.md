@@ -1,22 +1,33 @@
+[![Go Reference](https://pkg.go.dev/badge/github.com/ngrok/ngrok-go.svg)](https://pkg.go.dev/github.com/ngrok/ngrok-go)
+[![Go](https://github.com/ngrok/ngrok-go/actions/workflows/buildandtest.yml/badge.svg)](https://github.com/ngrok/ngrok-go/actions/workflows/buildandtest.yml)
 # ngrok-go
 
-This is the ngrok agent in library form, suitable for integrating directly into
-an application. See `example/http.go` for example usage, or the tests in
-`online_test.go`.
+ngrok is a globally distributed reverse proxy commonly used for quickly getting a public URL to a service running inside a private network, such as your laptop. The ngrok agent is usually deployed inside a private network and is used to communicate with the ngrok cloud service.
+
+This is the ngrok agent in library form, suitable for integrating directly into your Go application. This allows you to quickly build ngrok into your application with no separate process to manage. 
+
+See [`examples/http/main.go`](/examples/http/main.go) for example usage, or the tests in [`online_test.go`](/online_test.go).
 
 ## Installation
 
 The best way to install the ngrok agent SDK is through `go get`.
 
 ```sh
-go get github.com/ngrok/ngrok-go
+go get golang.ngrok.com/ngrok
 ```
 ## Documentation
-A quickstart guide and a full API reference are included in the [ngrok go sdk documentation on pkg.go.dev](https://pkg.go.dev/github.com/ngrok/ngrok-go). Check out the [ngrok Documentation](https://ngrok.com/docs) for more information about what you can do with ngrok.
+A full API reference is included in the [ngrok go sdk documentation on pkg.go.dev](https://pkg.go.dev/github.com/ngrok/ngrok-go). Check out the [ngrok Documentation](https://ngrok.com/docs) for more information about what you can do with ngrok.
 ## Quickstart
 For more examples of using ngrok-go, check out the [/examples](/examples) folder.
 
-The following example uses ngrok to start an http endpoint with a random url that will route traffic to the handler. The ngrok URL provided when running this example is accessible by anyone with an internet connection. 
+The following example uses ngrok to start an http endpoint with a random url that will route traffic to the handler. The ngrok URL provided when running this example is accessible by anyone with an internet connection.
+
+The ngrok authtoken is pulled from the `NGROK_AUTHTOKEN` environment variable. You can find your authtoken by logging into the [ngrok dashboard](https://dashboard.ngrok.com/get-started/your-authtoken).
+
+You can run this example with the following command:
+```sh
+NGROK_AUTHTOKEN=xxxx_xxxx go run examples/http/main.go
+```
 
 ```go
 package main
@@ -27,8 +38,8 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/ngrok/ngrok-go"
-	"github.com/ngrok/ngrok-go/config"
+	"golang.ngrok.com/ngrok"
+	"golang.ngrok.com/ngrok/config"
 )
 
 func main() {
@@ -48,7 +59,7 @@ func run(ctx context.Context) error {
 
 	log.Println("tunnel created:", tun.URL())
 
-	return tun.AsHTTP().Serve(ctx, http.HandlerFunc(handler))
+	return http.Serve(tun, http.HandlerFunc(handler))
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
@@ -56,9 +67,8 @@ func handler(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
-
 ## Support
-The best place to get support using ngrok-go is through the [ngrok Slack Community](https://ngrok.com/slack). If you find bugs or have feature requests, please follow the [contributing guide](/CONTRIBUTING.md) and open an issue.
+The best place to get support using ngrok-go is through the [ngrok Slack Community](https://ngrok.com/slack). If you find bugs or would like to contribute code, please follow the instructions in the [contributing guide](/CONTRIBUTING.md).
 
 ## License
 
