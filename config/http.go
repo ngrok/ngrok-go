@@ -73,7 +73,7 @@ type httpOptions struct {
 
 func (cfg *httpOptions) toProtoConfig() *proto.HTTPEndpoint {
 	opts := &proto.HTTPEndpoint{
-		Hostname: cfg.Domain,
+		Domain: cfg.Domain,
 	}
 
 	if cfg.Compression {

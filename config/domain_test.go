@@ -40,9 +40,9 @@ func testDomain[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 
 func TestDomain(t *testing.T) {
 	testDomain[httpOptions](t, HTTPEndpoint, func(opts *proto.HTTPEndpoint) string {
-		return opts.Hostname
+		return opts.Domain
 	})
 	testDomain[tlsOptions](t, TLSEndpoint, func(opts *proto.TLSEndpoint) string {
-		return opts.Hostname
+		return opts.Domain
 	})
 }
