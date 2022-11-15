@@ -400,27 +400,6 @@ func TestProxyProto(t *testing.T) {
 	}
 }
 
-func TestHostname(t *testing.T) {
-	paidTest(t)
-	ctx := context.Background()
-
-	tun, exited := serveHTTP(ctx, t, nil,
-		config.HTTPEndpoint(config.WithDomain("foo.robsonchase.com")),
-		helloHandler,
-	)
-	require.Equal(t, "https://foo.robsonchase.com", tun.URL())
-
-	resp, err := http.Get(tun.URL())
-	require.NoError(t, err)
-
-	content, err := io.ReadAll(resp.Body)
-	require.NoError(t, err)
-	require.Equal(t, "Hello, world!\n", string(content))
-
-	require.NoError(t, tun.CloseWithContext(ctx))
-	require.Error(t, <-exited)
-}
-
 func TestSubdomain(t *testing.T) {
 	paidTest(t)
 	ctx := context.Background()
