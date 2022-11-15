@@ -1,10 +1,10 @@
-[![Go Reference](https://pkg.go.dev/badge/github.com/ngrok/ngrok-go.svg)](https://pkg.go.dev/github.com/ngrok/ngrok-go)
+[![Go Reference](https://pkg.go.dev/badge/golang.ngrok.com/ngrok.svg)](https://pkg.go.dev/golang.ngrok.com/ngrok)
 [![Go](https://github.com/ngrok/ngrok-go/actions/workflows/buildandtest.yml/badge.svg)](https://github.com/ngrok/ngrok-go/actions/workflows/buildandtest.yml)
 # ngrok-go
 
-ngrok is a globally distributed reverse proxy commonly used for quickly getting a public URL to a service running inside a private network, such as your laptop. The ngrok agent is usually deployed inside a private network and is used to communicate with the ngrok cloud service.
+ngrok is a globally distributed reverse proxy commonly used for quickly getting a public URL to a service running inside a private network, such as on your local laptop. The ngrok agent is usually deployed inside a private network and is used to communicate with the ngrok cloud service.
 
-This is the ngrok agent in library form, suitable for integrating directly into your Go application. This allows you to quickly build ngrok into your application with no separate process to manage. 
+This is the ngrok agent in library form, suitable for integrating directly into Go applications. This allows you to quickly build ngrok into your application with no separate process to manage. 
 
 See [`examples/http/main.go`](/examples/http/main.go) for example usage, or the tests in [`online_test.go`](/online_test.go).
 
@@ -16,7 +16,7 @@ The best way to install the ngrok agent SDK is through `go get`.
 go get golang.ngrok.com/ngrok
 ```
 ## Documentation
-A full API reference is included in the [ngrok go sdk documentation on pkg.go.dev](https://pkg.go.dev/github.com/ngrok/ngrok-go). Check out the [ngrok Documentation](https://ngrok.com/docs) for more information about what you can do with ngrok.
+A full API reference is included in the [ngrok go sdk documentation on pkg.go.dev](https://pkg.go.dev/golang.ngrok.com/ngrok). Check out the [ngrok Documentation](https://ngrok.com/docs) for more information about what you can do with ngrok.
 ## Quickstart
 For more examples of using ngrok-go, check out the [/examples](/examples) folder.
 
