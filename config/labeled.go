@@ -67,6 +67,13 @@ func (cfg labeledOptions) Opts() any {
 func (cfg labeledOptions) Labels() map[string]string {
 	return cfg.labels
 }
+
 func (cfg labeledOptions) HTTPServer() *http.Server {
 	return cfg.httpServer
 }
+
+// compile-time check that we're implementing the proper interfaces.
+var _ interface {
+	tunnelConfigPrivate
+	Tunnel
+} = (*labeledOptions)(nil)

@@ -137,3 +137,9 @@ func (cfg httpOptions) Labels() map[string]string {
 func (cfg httpOptions) HTTPServer() *http.Server {
 	return cfg.httpServer
 }
+
+// compile-time check that we're implementing the proper interfaces.
+var _ interface {
+	tunnelConfigPrivate
+	Tunnel
+} = (*httpOptions)(nil)
