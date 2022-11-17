@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/inconshreveable/log15"
+	"golang.ngrok.com/ngrok/internal/log15"
 
 	"golang.ngrok.com/ngrok/log"
 )

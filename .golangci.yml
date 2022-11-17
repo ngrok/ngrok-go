@@ -1,3 +1,4 @@
 run:
   skip-dirs:
   - internal/muxado
+  - internal/log15

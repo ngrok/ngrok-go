@@ -13,8 +13,8 @@ import (
 	"golang.ngrok.com/ngrok/internal/tunnel/netx"
 	"golang.ngrok.com/ngrok/internal/tunnel/proto"
 
-	log "github.com/inconshreveable/log15"
-	logext "github.com/inconshreveable/log15/ext"
+	log "golang.ngrok.com/ngrok/internal/log15"
+	logext "golang.ngrok.com/ngrok/internal/log15/ext"
 )
 
 type RawSession interface {

@@ -9,7 +9,6 @@ go 1.18
 use (
 	.
 	./examples
-	./log/log15
 	./log/logrus
 	./log/zap
 )

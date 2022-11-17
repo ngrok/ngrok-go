@@ -3,8 +3,8 @@ package netx
 import (
 	"net"
 
-	log "github.com/inconshreveable/log15"
-	logext "github.com/inconshreveable/log15/ext"
+	log "golang.ngrok.com/ngrok/internal/log15"
+	logext "golang.ngrok.com/ngrok/internal/log15/ext"
 )
 
 // LoggedConn is a connection with an embedded logger

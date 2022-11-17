@@ -17,8 +17,9 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/inconshreveable/log15"
 	"golang.org/x/net/proxy"
+
+	"golang.ngrok.com/ngrok/internal/log15"
 
 	"golang.ngrok.com/ngrok/config"
 	"golang.ngrok.com/ngrok/internal/muxado"

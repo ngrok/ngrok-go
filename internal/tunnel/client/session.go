@@ -13,7 +13,7 @@ import (
 	"golang.ngrok.com/ngrok/internal/tunnel/netx"
 	"golang.ngrok.com/ngrok/internal/tunnel/proto"
 
-	log "github.com/inconshreveable/log15"
+	log "golang.ngrok.com/ngrok/internal/log15"
 
 	muxado "golang.ngrok.com/ngrok/internal/muxado"
 )
