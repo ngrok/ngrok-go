@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
 	"golang.ngrok.com/ngrok/internal/pb_agent"
 	"golang.ngrok.com/ngrok/internal/tunnel/proto"
 

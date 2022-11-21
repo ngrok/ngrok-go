@@ -5,7 +5,7 @@ on:
   pull_request:
     branches: [ "main" ]
 jobs:
-  build:
+  build-and-test:
     runs-on: ubuntu-latest
     env:
       NGROK_TEST_ONLINE: 1

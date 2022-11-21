@@ -1,3 +1,8 @@
+.PHONY: fmt
+fmt:
+	go install golang.org/x/tools/cmd/goimports@v0.3.0
+	goimports -format-only -w -local golang.ngrok.com *.go config examples
+
 .PHONY: test
 test:
 	go test -coverprofile cover.out ./...
