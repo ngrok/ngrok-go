@@ -17,4 +17,4 @@ docs:
 		xdg-open http://127.0.0.1:8080/golang.ngrok.com/ngrok
 
 gen-proto:
-	protoc --go_out=. --go_opt=paths=source_relative internal/pb_agent/middleware.proto
+	protoc --go_out=. --go_opt=module=golang.ngrok.com/ngrok ./internal/pb/middleware.proto

@@ -1,6 +1,6 @@
 package config
 
-import "golang.ngrok.com/ngrok/internal/pb_agent"
+import "golang.ngrok.com/ngrok/internal/pb"
 
 type OIDCOption func(cfg *oidcOptions)
 
@@ -13,12 +13,12 @@ type oidcOptions struct {
 	Scopes       []string
 }
 
-func (oidc *oidcOptions) toProtoConfig() *pb_agent.MiddlewareConfiguration_OIDC {
+func (oidc *oidcOptions) toProtoConfig() *pb.MiddlewareConfiguration_OIDC {
 	if oidc == nil {
 		return nil
 	}
 
-	return &pb_agent.MiddlewareConfiguration_OIDC{
+	return &pb.MiddlewareConfiguration_OIDC{
 		IssuerUrl:    oidc.IssuerURL,
 		ClientId:     oidc.ClientID,
 		ClientSecret: oidc.ClientSecret,

@@ -9,6 +9,17 @@ permissions:
   # Optional: allow read access to pull request. Use with `only-new-issues` option.
   # pull-requests: read
 jobs:
+  gen:
+    name: gen
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install dependencies
+        run: sudo apt-get install -y golang-goprotobuf-dev make
+      - name: Run generator
+        run: make -f scripts/Makefile gen-proto
+      - name: Check Diff
+        run: git diff --exit-code
   fmt:
     name: fmt
     runs-on: ubuntu-latest

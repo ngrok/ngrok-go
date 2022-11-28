@@ -3,7 +3,7 @@ package config
 import (
 	"net"
 
-	"golang.ngrok.com/ngrok/internal/pb_agent"
+	"golang.ngrok.com/ngrok/internal/pb"
 )
 
 // Restrictions placed on the origin of incoming connections to the edge.
@@ -69,12 +69,12 @@ func (base *cidrRestrictions) merge(set cidrRestrictions) *cidrRestrictions {
 	return base
 }
 
-func (ir *cidrRestrictions) toProtoConfig() *pb_agent.MiddlewareConfiguration_IPRestriction {
+func (ir *cidrRestrictions) toProtoConfig() *pb.MiddlewareConfiguration_IPRestriction {
 	if ir == nil {
 		return nil
 	}
 
-	return &pb_agent.MiddlewareConfiguration_IPRestriction{
+	return &pb.MiddlewareConfiguration_IPRestriction{
 		AllowCidrs: ir.Allowed,
 		DenyCidrs:  ir.Denied,
 	}
