@@ -34,7 +34,7 @@ func (cfg mutualTLSEndpointOption) toProtoConfig() *pb_agent.MiddlewareConfigura
 	}
 	opts := &pb_agent.MiddlewareConfiguration_MutualTLS{}
 	for _, cert := range cfg {
-		opts.MutualTLSCA = append(opts.MutualTLSCA, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})...)
+		opts.MutualTlsCa = append(opts.MutualTlsCa, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})...)
 	}
 	return opts
 }

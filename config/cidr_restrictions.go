@@ -75,8 +75,8 @@ func (ir *cidrRestrictions) toProtoConfig() *pb_agent.MiddlewareConfiguration_IP
 	}
 
 	return &pb_agent.MiddlewareConfiguration_IPRestriction{
-		AllowCIDRs: ir.Allowed,
-		DenyCIDRs:  ir.Denied,
+		AllowCidrs: ir.Allowed,
+		DenyCidrs:  ir.Denied,
 	}
 }
 

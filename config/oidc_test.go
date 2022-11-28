@@ -24,8 +24,8 @@ func TestOIDC(t *testing.T) {
 			expectOpts: func(t *testing.T, opts *proto.HTTPEndpoint) {
 				actual := opts.OIDC
 				require.NotNil(t, actual)
-				require.Equal(t, "https://google.com", actual.IssuerURL)
-				require.Equal(t, "foo", actual.ClientID)
+				require.Equal(t, "https://google.com", actual.IssuerUrl)
+				require.Equal(t, "foo", actual.ClientId)
 				require.Equal(t, "bar", actual.ClientSecret)
 			},
 		},

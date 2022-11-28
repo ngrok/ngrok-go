@@ -45,7 +45,7 @@ func testMutualTLS[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 			expectOpts: func(t *testing.T, opts *O) {
 				actual := getMTLS(opts)
 				require.NotNil(t, actual)
-				require.Equal(t, ngrokCA, actual.MutualTLSCA)
+				require.Equal(t, ngrokCA, actual.MutualTlsCa)
 			},
 		},
 	}

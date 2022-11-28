@@ -19,8 +19,8 @@ func (oidc *oidcOptions) toProtoConfig() *pb_agent.MiddlewareConfiguration_OIDC 
 	}
 
 	return &pb_agent.MiddlewareConfiguration_OIDC{
-		IssuerURL:    oidc.IssuerURL,
-		ClientID:     oidc.ClientID,
+		IssuerUrl:    oidc.IssuerURL,
+		ClientId:     oidc.ClientID,
 		ClientSecret: oidc.ClientSecret,
 		AllowEmails:  oidc.AllowEmails,
 		AllowDomains: oidc.AllowDomains,
