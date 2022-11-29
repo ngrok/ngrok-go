@@ -3,7 +3,7 @@ package client
 import (
 	"testing"
 
-	"github.com/inconshreveable/log15"
+	"github.com/inconshreveable/log15/v3"
 
 	"golang.ngrok.com/ngrok/internal/muxado"
 )

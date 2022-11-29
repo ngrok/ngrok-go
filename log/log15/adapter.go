@@ -8,7 +8,7 @@ package log15
 import (
 	"context"
 
-	"github.com/inconshreveable/log15"
+	"github.com/inconshreveable/log15/v3"
 )
 
 type LogLevel = int

@@ -3,8 +3,8 @@ package netx
 import (
 	"net"
 
-	log "github.com/inconshreveable/log15"
-	logext "github.com/inconshreveable/log15/ext"
+	log "github.com/inconshreveable/log15/v3"
+	logext "github.com/inconshreveable/log15/v3/ext"
 )
 
 // LoggedConn is a connection with an embedded logger
