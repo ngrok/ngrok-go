@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/inconshreveable/log15"
+	"github.com/inconshreveable/log15/v3"
 
 	"golang.ngrok.com/ngrok/log"
 )
@@ -31,7 +31,7 @@ func toLog15(l log.Logger) log15.Logger {
 	return logger
 }
 
-func (l *log15Handler) Log(r *log15.Record) error {
+func (l *log15Handler) Log(r log15.Record) error {
 	lvl := log.LogLevelNone
 	switch r.Lvl {
 	case log15.LvlCrit:

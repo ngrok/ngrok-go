@@ -6,7 +6,7 @@ import (
 	"time"
 	"unsafe"
 
-	log "github.com/inconshreveable/log15"
+	log "github.com/inconshreveable/log15/v3"
 	"github.com/jpillora/backoff"
 
 	"golang.ngrok.com/ngrok/internal/tunnel/netx"
