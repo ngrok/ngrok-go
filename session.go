@@ -354,7 +354,7 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 		StopUnsupportedError:    remoteStopErr,
 		UpdateUnsupportedError:  remoteUpdateErr,
 
-		ClientType: proto.Library,
+		ClientType: proto.LibraryOfficialGo,
 	}
 
 	reconnect := func(sess tunnel_client.Session) error {

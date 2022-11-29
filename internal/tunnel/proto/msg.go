@@ -1,9 +1,12 @@
 package proto
 
 import (
-	"golang.ngrok.com/ngrok/internal/pb"
+	"encoding/json"
+
+	"google.golang.org/protobuf/proto"
 
 	"golang.ngrok.com/ngrok/internal/muxado"
+	"golang.ngrok.com/ngrok/internal/pb"
 )
 
 type ReqType muxado.StreamType
@@ -79,13 +82,12 @@ type AuthExtra struct {
 type ClientType string
 
 const (
-	Agent   ClientType = "agent"
-	Library ClientType = "library"
+	LibraryOfficialGo ClientType = "library/official/go"
 )
 
 type Fingerprint struct {
-	M []string
-	D []string
+	M []string // mac addresses
+	D []string // disk serial numbers
 }
 
 // A server responds to an Auth message with an
@@ -187,8 +189,78 @@ func ParseProxyProto(proxyProto string) (ProxyProto, bool) {
 	}
 }
 
+func (o *HTTPEndpoint) UnmarshalJSON(bs []byte) error {
+	type orig HTTPEndpoint
+	err := json.Unmarshal(bs, (*orig)(o))
+
+	if err != nil {
+		return err
+	}
+
+	if o.ProtoMiddleware {
+		var mw pb.HTTPMiddleware
+		if err := proto.Unmarshal(o.MiddlewareBytes, &mw); err != nil {
+			return err
+		}
+
+		o.Compression = mw.Compression
+		o.CircuitBreaker = mw.CircuitBreaker
+		o.IPRestriction = mw.IpRestriction
+		o.BasicAuth = mw.BasicAuth
+		o.OAuth = mw.Oauth
+		o.OIDC = mw.Oidc
+		o.WebhookVerification = mw.WebhookVerification
+		o.MutualTLSCA = mw.MutualTls
+		o.RequestHeaders = mw.RequestHeaders
+		o.ResponseHeaders = mw.ResponseHeaders
+		o.WebsocketTCPConverter = mw.WebsocketTcpConverter
+	}
+
+	return nil
+}
+
+func (o *HTTPEndpoint) MarshalJSON() ([]byte, error) {
+	type orig HTTPEndpoint
+	var err error
+	if o.ProtoMiddleware {
+		clone := *o
+		clone.MiddlewareBytes, err = proto.Marshal(&pb.HTTPMiddleware{
+			Compression:           o.Compression,
+			CircuitBreaker:        o.CircuitBreaker,
+			IpRestriction:         o.IPRestriction,
+			BasicAuth:             o.BasicAuth,
+			Oauth:                 o.OAuth,
+			Oidc:                  o.OIDC,
+			WebhookVerification:   o.WebhookVerification,
+			MutualTls:             o.MutualTLSCA,
+			RequestHeaders:        o.RequestHeaders,
+			ResponseHeaders:       o.ResponseHeaders,
+			WebsocketTcpConverter: o.WebsocketTCPConverter,
+		})
+		if err != nil {
+			return nil, err
+		}
+		clone.Compression = nil
+		clone.CircuitBreaker = nil
+		clone.IPRestriction = nil
+		clone.BasicAuth = nil
+		clone.OAuth = nil
+		clone.OIDC = nil
+		clone.WebhookVerification = nil
+		clone.MutualTLSCA = nil
+		clone.RequestHeaders = nil
+		clone.ResponseHeaders = nil
+		clone.WebsocketTCPConverter = nil
+		return json.Marshal((*orig)(&clone))
+	}
+
+	return json.Marshal((*orig)(o))
+}
+
 type HTTPEndpoint struct {
 	Domain            string
+	Hostname          string // public hostname of the bind
+	Subdomain         string
 	Auth              string
 	HostHeaderRewrite bool   // true if the request's host header is being rewritten
 	LocalURLScheme    string // scheme of the local forward
@@ -206,6 +278,47 @@ type HTTPEndpoint struct {
 	RequestHeaders        *pb.MiddlewareConfiguration_Headers
 	ResponseHeaders       *pb.MiddlewareConfiguration_Headers
 	WebsocketTCPConverter *pb.MiddlewareConfiguration_WebsocketTCPConverter
+
+	ProtoMiddleware bool
+	MiddlewareBytes []byte
+}
+
+func (o *TCPEndpoint) UnmarshalJSON(bs []byte) error {
+	type orig TCPEndpoint
+	err := json.Unmarshal(bs, (*orig)(o))
+
+	if err != nil {
+		return err
+	}
+
+	if o.ProtoMiddleware {
+		var mw pb.TCPMiddleware
+		if err := proto.Unmarshal(o.MiddlewareBytes, &mw); err != nil {
+			return err
+		}
+
+		o.IPRestriction = mw.IpRestriction
+	}
+
+	return nil
+}
+
+func (o *TCPEndpoint) MarshalJSON() ([]byte, error) {
+	type orig TCPEndpoint
+	var err error
+	if o.ProtoMiddleware {
+		clone := *o
+		clone.MiddlewareBytes, err = proto.Marshal(&pb.TCPMiddleware{
+			IpRestriction: o.IPRestriction,
+		})
+		if err != nil {
+			return nil, err
+		}
+		clone.IPRestriction = nil
+		return json.Marshal((*orig)(&clone))
+	}
+
+	return json.Marshal((*orig)(o))
 }
 
 type TCPEndpoint struct {
@@ -214,10 +327,58 @@ type TCPEndpoint struct {
 
 	// middleware
 	IPRestriction *pb.MiddlewareConfiguration_IPRestriction
+
+	ProtoMiddleware bool
+	MiddlewareBytes []byte
+}
+
+func (o *TLSEndpoint) UnmarshalJSON(bs []byte) error {
+	type orig TLSEndpoint
+	err := json.Unmarshal(bs, (*orig)(o))
+
+	if err != nil {
+		return err
+	}
+
+	if o.ProtoMiddleware {
+		var mw pb.TLSMiddleware
+		if err := proto.Unmarshal(o.MiddlewareBytes, &mw); err != nil {
+			return err
+		}
+
+		o.MutualTLSAtEdge = mw.MutualTls
+		o.TLSTermination = mw.TlsTermination
+		o.IPRestriction = mw.IpRestriction
+	}
+
+	return nil
+}
+
+func (o *TLSEndpoint) MarshalJSON() ([]byte, error) {
+	type orig TLSEndpoint
+	var err error
+	if o.ProtoMiddleware {
+		clone := *o
+		clone.MiddlewareBytes, err = proto.Marshal(&pb.TLSMiddleware{
+			MutualTls:      o.MutualTLSAtEdge,
+			TlsTermination: o.TLSTermination,
+			IpRestriction:  o.IPRestriction,
+		})
+		if err != nil {
+			return nil, err
+		}
+		clone.MutualTLSAtEdge = nil
+		clone.TLSTermination = nil
+		clone.IPRestriction = nil
+		return json.Marshal((*orig)(&clone))
+	}
+	return json.Marshal((*orig)(o))
 }
 
 type TLSEndpoint struct {
-	Domain string
+	Domain    string
+	Hostname  string // public hostname of the bind
+	Subdomain string
 	ProxyProto
 	MutualTLSAtAgent bool
 
@@ -225,6 +386,9 @@ type TLSEndpoint struct {
 	MutualTLSAtEdge *pb.MiddlewareConfiguration_MutualTLS
 	TLSTermination  *pb.MiddlewareConfiguration_TLSTermination
 	IPRestriction   *pb.MiddlewareConfiguration_IPRestriction
+
+	ProtoMiddleware bool
+	MiddlewareBytes []byte
 }
 
 type SSHOptions struct {
