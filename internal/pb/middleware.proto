@@ -1,0 +1,75 @@
+syntax = "proto3";
+
+package agent_internal;
+
+option go_package = "golang.ngrok.com/ngrok/internal/pb";
+
+message MiddlewareConfiguration {
+  Compression compression = 1;
+  message Compression {}
+
+  CircuitBreaker circuit_breaker = 2;
+  message CircuitBreaker {
+    double error_threshold = 1;
+  }
+  IPRestriction ip_restriction = 3;
+  message IPRestriction {
+    repeated string allow_cidrs = 1;
+    repeated string deny_cidrs = 2;
+  }
+  BasicAuth basic_auth = 4;
+  message BasicAuth {
+    repeated BasicAuthCredential credentials = 1;
+  }
+  message BasicAuthCredential {
+    string username = 1;
+    string cleartext_password = 2;
+    bytes hashed_password = 3;
+  }
+  OAuth oauth = 5;
+  message OAuth {
+    string provider = 1;
+    string client_id = 6;
+    string client_secret = 7;
+    bytes sealed_client_secret = 2;
+    repeated string allow_emails = 3;
+    repeated string allow_domains = 4;
+    repeated string scopes = 5;
+  }
+  WebhookVerification webhook_verification = 6;
+  message WebhookVerification {
+    string provider = 1;
+    string secret = 2;
+    bytes sealed_secret = 3;
+  }
+  MutualTLS mutual_tls = 7;
+  message MutualTLS {
+    bytes mutual_tls_ca = 4;
+  }
+  TLSTermination tls_termination = 8;
+  message TLSTermination {
+    bytes cert = 1;
+    bytes key = 2;
+    bytes sealed_key = 3;
+  }
+  Headers request_headers = 9;
+  Headers response_headers = 10;
+  message Headers {
+    repeated string add = 1;
+    repeated string remove = 2;
+    map<string, string> addParsed = 3;
+  }
+  WebsocketTCPConverter websocket_tcp_converter = 11;
+  message WebsocketTCPConverter {}
+
+  OIDC oidc = 12;
+  message OIDC {
+    string issuer_url = 1;
+    string client_id = 2;
+    string client_secret = 3;
+    bytes sealed_client_secret = 4;
+    repeated string allow_emails = 5;
+    repeated string allow_domains = 6;
+    repeated string scopes = 7;
+  }
+}

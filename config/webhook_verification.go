@@ -1,6 +1,6 @@
 package config
 
-import "golang.ngrok.com/ngrok/internal/pb_agent"
+import "golang.ngrok.com/ngrok/internal/pb"
 
 // Configuration for webhook verification.
 type webhookVerification struct {
@@ -10,11 +10,11 @@ type webhookVerification struct {
 	Secret string
 }
 
-func (wv *webhookVerification) toProtoConfig() *pb_agent.MiddlewareConfiguration_WebhookVerification {
+func (wv *webhookVerification) toProtoConfig() *pb.MiddlewareConfiguration_WebhookVerification {
 	if wv == nil {
 		return nil
 	}
-	return &pb_agent.MiddlewareConfiguration_WebhookVerification{
+	return &pb.MiddlewareConfiguration_WebhookVerification{
 		Provider: wv.Provider,
 		Secret:   wv.Secret,
 	}

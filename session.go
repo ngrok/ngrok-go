@@ -21,6 +21,7 @@ import (
 	"golang.org/x/net/proxy"
 
 	"golang.ngrok.com/ngrok/config"
+
 	"golang.ngrok.com/ngrok/internal/muxado"
 	tunnel_client "golang.ngrok.com/ngrok/internal/tunnel/client"
 	"golang.ngrok.com/ngrok/internal/tunnel/proto"

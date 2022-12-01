@@ -1,6 +1,6 @@
 package config
 
-import "golang.ngrok.com/ngrok/internal/pb_agent"
+import "golang.ngrok.com/ngrok/internal/pb"
 
 type OAuthOption func(cfg *oauthOptions)
 
@@ -44,12 +44,12 @@ func WithOAuthScope(scope ...string) OAuthOption {
 	}
 }
 
-func (oauth *oauthOptions) toProtoConfig() *pb_agent.MiddlewareConfiguration_OAuth {
+func (oauth *oauthOptions) toProtoConfig() *pb.MiddlewareConfiguration_OAuth {
 	if oauth == nil {
 		return nil
 	}
 
-	return &pb_agent.MiddlewareConfiguration_OAuth{
+	return &pb.MiddlewareConfiguration_OAuth{
 		Provider:     string(oauth.Provider),
 		AllowEmails:  oauth.AllowEmails,
 		AllowDomains: oauth.AllowDomains,

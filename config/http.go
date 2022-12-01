@@ -4,7 +4,7 @@ import (
 	"crypto/x509"
 	"net/http"
 
-	"golang.ngrok.com/ngrok/internal/pb_agent"
+	"golang.ngrok.com/ngrok/internal/pb"
 	"golang.ngrok.com/ngrok/internal/tunnel/proto"
 )
 
@@ -77,15 +77,15 @@ func (cfg *httpOptions) toProtoConfig() *proto.HTTPEndpoint {
 	}
 
 	if cfg.Compression {
-		opts.Compression = &pb_agent.MiddlewareConfiguration_Compression{}
+		opts.Compression = &pb.MiddlewareConfiguration_Compression{}
 	}
 
 	if cfg.WebsocketTCPConversion {
-		opts.WebsocketTCPConverter = &pb_agent.MiddlewareConfiguration_WebsocketTCPConverter{}
+		opts.WebsocketTCPConverter = &pb.MiddlewareConfiguration_WebsocketTCPConverter{}
 	}
 
 	if cfg.CircuitBreaker != 0 {
-		opts.CircuitBreaker = &pb_agent.MiddlewareConfiguration_CircuitBreaker{
+		opts.CircuitBreaker = &pb.MiddlewareConfiguration_CircuitBreaker{
 			ErrorThreshold: cfg.CircuitBreaker,
 		}
 	}
@@ -97,7 +97,7 @@ func (cfg *httpOptions) toProtoConfig() *proto.HTTPEndpoint {
 	opts.RequestHeaders = cfg.RequestHeaders.toProtoConfig()
 	opts.ResponseHeaders = cfg.ResponseHeaders.toProtoConfig()
 	if len(cfg.BasicAuth) > 0 {
-		opts.BasicAuth = &pb_agent.MiddlewareConfiguration_BasicAuth{}
+		opts.BasicAuth = &pb.MiddlewareConfiguration_BasicAuth{}
 		for _, c := range cfg.BasicAuth {
 			opts.BasicAuth.Credentials = append(opts.BasicAuth.Credentials, c.toProtoConfig())
 		}

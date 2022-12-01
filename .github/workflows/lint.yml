@@ -1,4 +1,4 @@
-name: golangci
+name: lint
 on:
   push:
     branches: [ "main" ]
@@ -9,19 +9,34 @@ permissions:
   # Optional: allow read access to pull request. Use with `only-new-issues` option.
   # pull-requests: read
 jobs:
+  # TODO: For some reason, gen and fmt don't actually work correctly, i.e. they don't
+  #       show any diffs or fail.
+  gen:
+    name: gen
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 2
+      - name: Install dependencies
+        run: sudo apt-get install -y golang-goprotobuf-dev
+      - name: Run generator
+        run: make -f scripts/Makefile gen-proto
+      - name: Check diff
+        run: git diff --exit-code
   fmt:
     name: fmt
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 2
       - uses: actions/setup-go@v3
         with:
           go-version: 1.18
-      - uses: actions/checkout@v3
-      - name: Install goimports
-        run: go install golang.org/x/tools/cmd/goimports@v0.3.0
       - name: Run goimports
-        run: goimports -format-only -local golang.ngrok.com -w *.go ./config ./examples
-      - name: Check Diff
+        run: make -f scripts/Makefile fmt
+      - name: Check diff
         run: git diff --exit-code
   lint:
     name: lint

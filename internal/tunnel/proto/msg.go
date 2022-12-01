@@ -1,7 +1,7 @@
 package proto
 
 import (
-	"golang.ngrok.com/ngrok/internal/pb_agent"
+	"golang.ngrok.com/ngrok/internal/pb"
 
 	"golang.ngrok.com/ngrok/internal/muxado"
 )
@@ -195,17 +195,17 @@ type HTTPEndpoint struct {
 	ProxyProto
 
 	// middleware
-	Compression           *pb_agent.MiddlewareConfiguration_Compression
-	CircuitBreaker        *pb_agent.MiddlewareConfiguration_CircuitBreaker
-	IPRestriction         *pb_agent.MiddlewareConfiguration_IPRestriction
-	BasicAuth             *pb_agent.MiddlewareConfiguration_BasicAuth
-	OAuth                 *pb_agent.MiddlewareConfiguration_OAuth
-	OIDC                  *pb_agent.MiddlewareConfiguration_OIDC
-	WebhookVerification   *pb_agent.MiddlewareConfiguration_WebhookVerification
-	MutualTLSCA           *pb_agent.MiddlewareConfiguration_MutualTLS
-	RequestHeaders        *pb_agent.MiddlewareConfiguration_Headers
-	ResponseHeaders       *pb_agent.MiddlewareConfiguration_Headers
-	WebsocketTCPConverter *pb_agent.MiddlewareConfiguration_WebsocketTCPConverter
+	Compression           *pb.MiddlewareConfiguration_Compression
+	CircuitBreaker        *pb.MiddlewareConfiguration_CircuitBreaker
+	IPRestriction         *pb.MiddlewareConfiguration_IPRestriction
+	BasicAuth             *pb.MiddlewareConfiguration_BasicAuth
+	OAuth                 *pb.MiddlewareConfiguration_OAuth
+	OIDC                  *pb.MiddlewareConfiguration_OIDC
+	WebhookVerification   *pb.MiddlewareConfiguration_WebhookVerification
+	MutualTLSCA           *pb.MiddlewareConfiguration_MutualTLS
+	RequestHeaders        *pb.MiddlewareConfiguration_Headers
+	ResponseHeaders       *pb.MiddlewareConfiguration_Headers
+	WebsocketTCPConverter *pb.MiddlewareConfiguration_WebsocketTCPConverter
 }
 
 type TCPEndpoint struct {
@@ -213,7 +213,7 @@ type TCPEndpoint struct {
 	ProxyProto
 
 	// middleware
-	IPRestriction *pb_agent.MiddlewareConfiguration_IPRestriction
+	IPRestriction *pb.MiddlewareConfiguration_IPRestriction
 }
 
 type TLSEndpoint struct {
@@ -222,9 +222,9 @@ type TLSEndpoint struct {
 	MutualTLSAtAgent bool
 
 	// edge termination options
-	MutualTLSAtEdge *pb_agent.MiddlewareConfiguration_MutualTLS
-	TLSTermination  *pb_agent.MiddlewareConfiguration_TLSTermination
-	IPRestriction   *pb_agent.MiddlewareConfiguration_IPRestriction
+	MutualTLSAtEdge *pb.MiddlewareConfiguration_MutualTLS
+	TLSTermination  *pb.MiddlewareConfiguration_TLSTermination
+	IPRestriction   *pb.MiddlewareConfiguration_IPRestriction
 }
 
 type SSHOptions struct {

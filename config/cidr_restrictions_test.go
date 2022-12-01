@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"golang.ngrok.com/ngrok/internal/pb_agent"
+	"golang.ngrok.com/ngrok/internal/pb"
 	"golang.ngrok.com/ngrok/internal/tunnel/proto"
 )
 
@@ -20,7 +20,7 @@ func mustParseCIDR(cidr string) *net.IPNet {
 
 func testCIDRRestrictions[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 	makeOpts func(...OT) Tunnel,
-	getRestrictions func(*O) *pb_agent.MiddlewareConfiguration_IPRestriction,
+	getRestrictions func(*O) *pb.MiddlewareConfiguration_IPRestriction,
 ) {
 	optsFunc := func(opts ...any) Tunnel {
 		return makeOpts(assertSlice[OT](opts)...)
@@ -32,8 +32,8 @@ func testCIDRRestrictions[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 			expectOpts: func(t *testing.T, opts *O) {
 				actual := getRestrictions(opts)
 				require.NotNil(t, actual)
-				require.Len(t, actual.AllowCIDRs, 1)
-				require.Contains(t, actual.AllowCIDRs, "127.0.0.0/8")
+				require.Len(t, actual.AllowCidrs, 1)
+				require.Contains(t, actual.AllowCidrs, "127.0.0.0/8")
 			},
 		},
 		{
@@ -42,8 +42,8 @@ func testCIDRRestrictions[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 			expectOpts: func(t *testing.T, opts *O) {
 				actual := getRestrictions(opts)
 				require.NotNil(t, actual)
-				require.Len(t, actual.DenyCIDRs, 1)
-				require.Contains(t, actual.DenyCIDRs, "127.0.0.0/8")
+				require.Len(t, actual.DenyCidrs, 1)
+				require.Contains(t, actual.DenyCidrs, "127.0.0.0/8")
 			},
 		},
 		{
@@ -52,8 +52,8 @@ func testCIDRRestrictions[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 			expectOpts: func(t *testing.T, opts *O) {
 				actual := getRestrictions(opts)
 				require.NotNil(t, actual)
-				require.Len(t, actual.AllowCIDRs, 1)
-				require.Contains(t, actual.AllowCIDRs, "127.0.0.0/8")
+				require.Len(t, actual.AllowCidrs, 1)
+				require.Contains(t, actual.AllowCidrs, "127.0.0.0/8")
 			},
 		},
 		{
@@ -62,8 +62,8 @@ func testCIDRRestrictions[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 			expectOpts: func(t *testing.T, opts *O) {
 				actual := getRestrictions(opts)
 				require.NotNil(t, actual)
-				require.Len(t, actual.DenyCIDRs, 1)
-				require.Contains(t, actual.DenyCIDRs, "127.0.0.0/8")
+				require.Len(t, actual.DenyCidrs, 1)
+				require.Contains(t, actual.DenyCidrs, "127.0.0.0/8")
 			},
 		},
 		{
@@ -75,9 +75,9 @@ func testCIDRRestrictions[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 			expectOpts: func(t *testing.T, opts *O) {
 				actual := getRestrictions(opts)
 				require.NotNil(t, actual)
-				require.Len(t, actual.AllowCIDRs, 2)
-				require.Contains(t, actual.AllowCIDRs, "127.0.0.0/8")
-				require.Contains(t, actual.AllowCIDRs, "10.0.0.0/8")
+				require.Len(t, actual.AllowCidrs, 2)
+				require.Contains(t, actual.AllowCidrs, "127.0.0.0/8")
+				require.Contains(t, actual.AllowCidrs, "10.0.0.0/8")
 			},
 		},
 		{
@@ -89,9 +89,9 @@ func testCIDRRestrictions[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 			expectOpts: func(t *testing.T, opts *O) {
 				actual := getRestrictions(opts)
 				require.NotNil(t, actual)
-				require.Len(t, actual.DenyCIDRs, 2)
-				require.Contains(t, actual.DenyCIDRs, "127.0.0.0/8")
-				require.Contains(t, actual.DenyCIDRs, "10.0.0.0/8")
+				require.Len(t, actual.DenyCidrs, 2)
+				require.Contains(t, actual.DenyCidrs, "127.0.0.0/8")
+				require.Contains(t, actual.DenyCidrs, "10.0.0.0/8")
 			},
 		},
 		{
@@ -105,12 +105,12 @@ func testCIDRRestrictions[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 			expectOpts: func(t *testing.T, opts *O) {
 				actual := getRestrictions(opts)
 				require.NotNil(t, actual)
-				require.Len(t, actual.DenyCIDRs, 2)
-				require.Contains(t, actual.DenyCIDRs, "192.0.0.0/8")
-				require.Contains(t, actual.DenyCIDRs, "172.0.0.0/8")
-				require.Len(t, actual.AllowCIDRs, 2)
-				require.Contains(t, actual.AllowCIDRs, "127.0.0.0/8")
-				require.Contains(t, actual.AllowCIDRs, "10.0.0.0/8")
+				require.Len(t, actual.DenyCidrs, 2)
+				require.Contains(t, actual.DenyCidrs, "192.0.0.0/8")
+				require.Contains(t, actual.DenyCidrs, "172.0.0.0/8")
+				require.Len(t, actual.AllowCidrs, 2)
+				require.Contains(t, actual.AllowCidrs, "127.0.0.0/8")
+				require.Contains(t, actual.AllowCidrs, "10.0.0.0/8")
 			},
 		},
 		{
@@ -124,12 +124,12 @@ func testCIDRRestrictions[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 			expectOpts: func(t *testing.T, opts *O) {
 				actual := getRestrictions(opts)
 				require.NotNil(t, actual)
-				require.Len(t, actual.DenyCIDRs, 2)
-				require.Contains(t, actual.DenyCIDRs, "192.0.0.0/8")
-				require.Contains(t, actual.DenyCIDRs, "172.0.0.0/8")
-				require.Len(t, actual.AllowCIDRs, 2)
-				require.Contains(t, actual.AllowCIDRs, "127.0.0.0/8")
-				require.Contains(t, actual.AllowCIDRs, "10.0.0.0/8")
+				require.Len(t, actual.DenyCidrs, 2)
+				require.Contains(t, actual.DenyCidrs, "192.0.0.0/8")
+				require.Contains(t, actual.DenyCidrs, "172.0.0.0/8")
+				require.Len(t, actual.AllowCidrs, 2)
+				require.Contains(t, actual.AllowCidrs, "127.0.0.0/8")
+				require.Contains(t, actual.AllowCidrs, "10.0.0.0/8")
 			},
 		},
 	}
@@ -139,15 +139,15 @@ func testCIDRRestrictions[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 
 func TestCIDRRestrictions(t *testing.T) {
 	testCIDRRestrictions[httpOptions](t, HTTPEndpoint,
-		func(h *proto.HTTPEndpoint) *pb_agent.MiddlewareConfiguration_IPRestriction {
+		func(h *proto.HTTPEndpoint) *pb.MiddlewareConfiguration_IPRestriction {
 			return h.IPRestriction
 		})
 	testCIDRRestrictions[tcpOptions](t, TCPEndpoint,
-		func(h *proto.TCPEndpoint) *pb_agent.MiddlewareConfiguration_IPRestriction {
+		func(h *proto.TCPEndpoint) *pb.MiddlewareConfiguration_IPRestriction {
 			return h.IPRestriction
 		})
 	testCIDRRestrictions[tlsOptions](t, TLSEndpoint,
-		func(h *proto.TLSEndpoint) *pb_agent.MiddlewareConfiguration_IPRestriction {
+		func(h *proto.TLSEndpoint) *pb.MiddlewareConfiguration_IPRestriction {
 			return h.IPRestriction
 		})
 }

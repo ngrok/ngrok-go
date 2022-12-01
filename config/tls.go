@@ -4,7 +4,7 @@ import (
 	"crypto/x509"
 	"net/http"
 
-	"golang.ngrok.com/ngrok/internal/pb_agent"
+	"golang.ngrok.com/ngrok/internal/pb"
 	"golang.ngrok.com/ngrok/internal/tunnel/proto"
 )
 
@@ -59,7 +59,7 @@ func (cfg *tlsOptions) toProtoConfig() *proto.TLSEndpoint {
 	opts.MutualTLSAtEdge = mutualTLSEndpointOption(cfg.MutualTLSCA).toProtoConfig()
 
 	if cfg.KeyPEM != nil && cfg.CertPEM != nil {
-		opts.TLSTermination = &pb_agent.MiddlewareConfiguration_TLSTermination{
+		opts.TLSTermination = &pb.MiddlewareConfiguration_TLSTermination{
 			Key:  cfg.KeyPEM,
 			Cert: cfg.CertPEM,
 		}

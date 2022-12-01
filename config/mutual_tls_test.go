@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"golang.ngrok.com/ngrok/internal/pb_agent"
+	"golang.ngrok.com/ngrok/internal/pb"
 	"golang.ngrok.com/ngrok/internal/tunnel/proto"
 
 	_ "embed"
@@ -18,7 +18,7 @@ var ngrokCA []byte
 
 func testMutualTLS[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 	makeOpts func(...OT) Tunnel,
-	getMTLS func(*O) *pb_agent.MiddlewareConfiguration_MutualTLS,
+	getMTLS func(*O) *pb.MiddlewareConfiguration_MutualTLS,
 ) {
 	optsFunc := func(opts ...any) Tunnel {
 		return makeOpts(assertSlice[OT](opts)...)
@@ -45,7 +45,7 @@ func testMutualTLS[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 			expectOpts: func(t *testing.T, opts *O) {
 				actual := getMTLS(opts)
 				require.NotNil(t, actual)
-				require.Equal(t, ngrokCA, actual.MutualTLSCA)
+				require.Equal(t, ngrokCA, actual.MutualTlsCa)
 			},
 		},
 	}
@@ -54,10 +54,10 @@ func testMutualTLS[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 }
 
 func TestMutualTLS(t *testing.T) {
-	testMutualTLS[httpOptions](t, HTTPEndpoint, func(opts *proto.HTTPEndpoint) *pb_agent.MiddlewareConfiguration_MutualTLS {
+	testMutualTLS[httpOptions](t, HTTPEndpoint, func(opts *proto.HTTPEndpoint) *pb.MiddlewareConfiguration_MutualTLS {
 		return opts.MutualTLSCA
 	})
-	testMutualTLS[tlsOptions](t, TLSEndpoint, func(opts *proto.TLSEndpoint) *pb_agent.MiddlewareConfiguration_MutualTLS {
+	testMutualTLS[tlsOptions](t, TLSEndpoint, func(opts *proto.TLSEndpoint) *pb.MiddlewareConfiguration_MutualTLS {
 		return opts.MutualTLSAtEdge
 	})
 }

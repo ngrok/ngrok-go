@@ -14,6 +14,8 @@
           go_1_18
           go-tools
           gnumake
+          protobuf
+          protoc-gen-go
         ];
       };
     }));
