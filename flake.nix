@@ -12,6 +12,7 @@
       devShells.default = pkgs.mkShell {
         buildInputs = with pkgs; [
           go_1_18
+          gotools
           go-tools
           gnumake
           protobuf
