@@ -14,6 +14,7 @@
           go_1_18
           gotools
           go-tools
+          golangci-lint
           gnumake
           protobuf
           protoc-gen-go
