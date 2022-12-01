@@ -9,6 +9,8 @@ permissions:
   # Optional: allow read access to pull request. Use with `only-new-issues` option.
   # pull-requests: read
 jobs:
+  # TODO: For some reason, gen and fmt don't actually work correctly, i.e. they don't
+  #       show any diffs or fail.
   gen:
     name: gen
     runs-on: ubuntu-latest
