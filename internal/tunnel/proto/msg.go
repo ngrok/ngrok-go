@@ -85,9 +85,10 @@ const (
 	LibraryOfficialGo ClientType = "library/official/go"
 )
 
+// Note: entirely unused
 type Fingerprint struct {
-	M []string // mac addresses
-	D []string // disk serial numbers
+	M []string
+	D []string
 }
 
 // A server responds to an Auth message with an
