@@ -48,15 +48,15 @@ type Tunnel interface {
 }
 
 // Create a new ngrok session and start a tunnel.
-// Shorthand for a [Connect] followed by a [Session].StartTunnel.
+// Shorthand for a [Connect] followed by a [Session].Listen.
 // If an error is encoutered when starting the tunnel, but after a session has
 // been established, both the [Session] and error return values will be non-nil.
-func StartTunnel(ctx context.Context, tunnelConfig config.Tunnel, connectOpts ...ConnectOption) (Tunnel, error) {
+func Listen(ctx context.Context, tunnelConfig config.Tunnel, connectOpts ...ConnectOption) (Tunnel, error) {
 	sess, err := Connect(ctx, connectOpts...)
 	if err != nil {
 		return nil, err
 	}
-	return sess.StartTunnel(ctx, tunnelConfig)
+	return sess.Listen(ctx, tunnelConfig)
 }
 
 type tunnelImpl struct {
