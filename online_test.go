@@ -56,8 +56,8 @@ func setupSession(ctx context.Context, t *testing.T, opts ...ConnectOption) Sess
 
 func startTunnel(ctx context.Context, t *testing.T, sess Session, opts config.Tunnel) Tunnel {
 	onlineTest(t)
-	tun, err := sess.StartTunnel(ctx, opts)
-	require.NoError(t, err, "StartTunnel")
+	tun, err := sess.Listen(ctx, opts)
+	require.NoError(t, err, "Listen")
 	return tun
 }
 
@@ -77,9 +77,9 @@ func serveHTTP(ctx context.Context, t *testing.T, connectOpts []ConnectOption, o
 	return tun, exited
 }
 
-func TestStartTunnel(t *testing.T) {
+func TestListen(t *testing.T) {
 	onlineTest(t)
-	_, err := StartTunnel(context.Background(),
+	_, err := Listen(context.Background(),
 		config.HTTPEndpoint(),
 		WithAuthtokenFromEnv(),
 	)
@@ -656,8 +656,8 @@ func TestErrors(t *testing.T) {
 
 	sess, err := Connect(ctx)
 	require.NoError(t, err)
-	_, err = sess.StartTunnel(ctx, config.TCPEndpoint())
-	var startErr errStartTunnel
+	_, err = sess.Listen(ctx, config.TCPEndpoint())
+	var startErr errListen
 	require.ErrorIs(t, err, startErr)
 	require.ErrorAs(t, err, &startErr)
 }

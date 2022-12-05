@@ -30,7 +30,7 @@ func main() {
 }
 
 func run(ctx context.Context, dest string) error {
-	tun, err := ngrok.StartTunnel(ctx,
+	tun, err := ngrok.Listen(ctx,
 		config.HTTPEndpoint(),
 		ngrok.WithAuthtokenFromEnv(),
 	)

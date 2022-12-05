@@ -54,21 +54,21 @@ func (e errAcceptFailed) Is(target error) bool {
 }
 
 // Errors arising from a failure to start a tunnel.
-type errStartTunnel struct {
+type errListen struct {
 	// The underlying error.
 	Inner error
 }
 
-func (e errStartTunnel) Error() string {
+func (e errListen) Error() string {
 	return fmt.Sprintf("failed to start tunnel: %v", e.Inner)
 }
 
-func (e errStartTunnel) Unwrap() error {
+func (e errListen) Unwrap() error {
 	return e.Inner
 }
 
-func (e errStartTunnel) Is(target error) bool {
-	_, ok := target.(errStartTunnel)
+func (e errListen) Is(target error) bool {
+	_, ok := target.(errListen)
 	return ok
 }
 

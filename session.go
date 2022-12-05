@@ -34,7 +34,7 @@ const libraryAgentVersion = "0.0.0"
 // The interface implemented by an ngrok session object.
 type Session interface {
 	// Start a new tunnel over the ngrok session.
-	StartTunnel(ctx context.Context, cfg config.Tunnel) (Tunnel, error)
+	Listen(ctx context.Context, cfg config.Tunnel) (Tunnel, error)
 
 	// Close the ngrok session.
 	// This also closes all existing tunnels tied to the session.
@@ -476,7 +476,7 @@ func (s *sessionImpl) Close() error {
 	return s.inner().Close()
 }
 
-func (s *sessionImpl) StartTunnel(ctx context.Context, cfg config.Tunnel) (Tunnel, error) {
+func (s *sessionImpl) Listen(ctx context.Context, cfg config.Tunnel) (Tunnel, error) {
 	var (
 		tunnel tunnel_client.Tunnel
 		err    error
@@ -496,7 +496,7 @@ func (s *sessionImpl) StartTunnel(ctx context.Context, cfg config.Tunnel) (Tunne
 	}
 
 	if err != nil {
-		return nil, errStartTunnel{err}
+		return nil, errListen{err}
 	}
 
 	t := &tunnelImpl{
