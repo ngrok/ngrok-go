@@ -509,9 +509,10 @@ func TestTCPIPRestriction(t *testing.T) {
 	url, err := url.Parse(tun.URL())
 	require.NoError(t, err)
 	url.Scheme = "http"
-	_, err = http.Get(url.String())
+	resp, err := http.Get(url.String())
 
 	// Rather than layer-7 error, we should see it at the connection level
+	require.Nil(t, resp)
 	require.Error(t, err, "GET Tunnel URL")
 
 	require.NoError(t, tun.CloseWithContext(ctx))

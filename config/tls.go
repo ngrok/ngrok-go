@@ -50,8 +50,9 @@ type tlsOptions struct {
 
 func (cfg *tlsOptions) toProtoConfig() *proto.TLSEndpoint {
 	opts := &proto.TLSEndpoint{
-		Domain:     cfg.Domain,
-		ProxyProto: proto.ProxyProto(cfg.ProxyProto),
+		Domain:          cfg.Domain,
+		ProxyProto:      proto.ProxyProto(cfg.ProxyProto),
+		ProtoMiddleware: true,
 	}
 
 	opts.IPRestriction = cfg.commonOpts.CIDRRestrictions.toProtoConfig()

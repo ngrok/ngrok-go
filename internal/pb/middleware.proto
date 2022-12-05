@@ -73,3 +73,27 @@ message MiddlewareConfiguration {
     repeated string scopes = 7;
   }
 }
+
+message HTTPMiddleware {
+  MiddlewareConfiguration.Compression compression = 1;
+  MiddlewareConfiguration.CircuitBreaker circuit_breaker = 2;
+  MiddlewareConfiguration.IPRestriction ip_restriction = 3;
+  MiddlewareConfiguration.BasicAuth basic_auth = 4;
+  MiddlewareConfiguration.OAuth oauth = 5;
+  MiddlewareConfiguration.OIDC oidc = 6;
+  MiddlewareConfiguration.WebhookVerification webhook_verification = 7;
+  MiddlewareConfiguration.MutualTLS mutual_tls = 8;
+  MiddlewareConfiguration.Headers request_headers = 9;
+  MiddlewareConfiguration.Headers response_headers = 10;
+  MiddlewareConfiguration.WebsocketTCPConverter websocket_tcp_converter = 11;
+}
+
+message TCPMiddleware {
+  MiddlewareConfiguration.IPRestriction ip_restriction = 1;
+}
+
+message TLSMiddleware {
+  MiddlewareConfiguration.MutualTLS mutual_tls = 1;
+  MiddlewareConfiguration.TLSTermination tls_termination = 2;
+  MiddlewareConfiguration.IPRestriction ip_restriction = 3;
+}
