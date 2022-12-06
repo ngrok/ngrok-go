@@ -85,7 +85,7 @@ type ConnectOption func(*connectConfig)
 // Options to use when establishing an ngrok session.
 type connectConfig struct {
 	// Your ngrok Authtoken.
-	Authtoken string
+	Authtoken proto.ObfuscatedString
 	// The address of the ngrok server to connect to.
 	// Defaults to `tunnel.ngrok.com:443`
 	ServerAddr string
@@ -157,7 +157,7 @@ func WithProxyURL(url *url.URL) ConnectOption {
 // Sets the [ConnectConfig].Authtoken field.
 func WithAuthtoken(token string) ConnectOption {
 	return func(cfg *connectConfig) {
-		cfg.Authtoken = token
+		cfg.Authtoken = proto.ObfuscatedString(token)
 	}
 }
 
@@ -343,7 +343,7 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 
 	auth := proto.AuthExtra{
 		Version:            libraryAgentVersion,
-		Authtoken:          cfg.Authtoken,
+		Authtoken:          proto.ObfuscatedString(cfg.Authtoken),
 		Metadata:           cfg.Metadata,
 		OS:                 runtime.GOOS,
 		Arch:               runtime.GOARCH,

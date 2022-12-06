@@ -2,6 +2,7 @@ package proto
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -50,4 +51,16 @@ func TestProtoMiddleware(t *testing.T) {
 	require.Contains(t, rawIsh, "BasicAuth")
 	require.NotEmpty(t, rawIsh["BasicAuth"].(map[string]any)["credentials"])
 	require.Empty(t, rawIsh["MiddlewareBytes"])
+}
+
+func TestObfuscatedString(t *testing.T) {
+	t.Parallel()
+
+	fakeToken := "weeeeee"
+	obfuscatedString := ObfuscatedString(fakeToken)
+	require.Equal(t, fakeToken, obfuscatedString.PlainText())
+
+	printedString := fmt.Sprintf("%s", obfuscatedString)
+	require.NotEqual(t, fakeToken, printedString)
+	require.Equal(t, "HIDDEN", printedString)
 }
