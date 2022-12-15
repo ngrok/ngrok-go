@@ -74,4 +74,4 @@ The best place to get support using ngrok-go is through the [ngrok Slack Communi
 
 ngrok-go is licensed under the terms of the MIT license.
 
-See [LICENSE](./LICENSE) for details.
+See [LICENSE](./LICENSE.txt) for details.
