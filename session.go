@@ -31,32 +31,17 @@ import (
 // The ngrok library version.
 const libraryAgentVersion = "0.0.0"
 
-// The interface implemented by an ngrok session object.
+// Session encapsulates an established session with the ngrok service. Sessions
+// recover from network failures by automatically reconnecting.
 type Session interface {
-	// Start a new tunnel over the ngrok session.
+	// Listen creates a new [Tunnel] which will listen for new inbound
+	// connections. The returned [Tunnel] object is a [net.Listener].
 	Listen(ctx context.Context, cfg config.Tunnel) (Tunnel, error)
 
-	// Close the ngrok session.
-	// This also closes all existing tunnels tied to the session.
+	// Close ends the ngrok session. All [Tunnel] objects created by [Listen] on
+	// this session will be closed.
 	Close() error
 }
-
-const (
-	// The US ngrok region.
-	RegionUS = "us"
-	// The Europe ngrok region.
-	RegionEU = "eu"
-	// The South America ngrok region.
-	RegionSA = "sa"
-	// The Asia-Pacific ngrok region.
-	RegionAP = "ap"
-	// The Australia ngrok region.
-	RegionAU = "au"
-	// The Japan ngrok region.
-	RegionJP = "jp"
-	// The India ngrok region.
-	RegionIN = "in"
-)
 
 //go:embed assets/ngrok.ca.crt
 var defaultCACert []byte
@@ -144,32 +129,42 @@ func WithDialer(dialer Dialer) ConnectOption {
 	}
 }
 
-// Proxy requests through the server identified by the provided URL when using
-// the default Dialer.
-// Sets the [ConnectConfig].ProxyURL field. Ignored if a custom Dialer is in use.
+// WithProxyURL configures the session to connect to ngrok through an outbound
+// HTTP or SOCKS5 proxy. This parameter is ignored if you override the dialer
+// with `[WithDialer]`.
+//
+// See [https://ngrok.com/docs/ngrok-agent/config#proxy_url] for additional details.
 func WithProxyURL(url *url.URL) ConnectOption {
 	return func(cfg *connectConfig) {
 		cfg.ProxyURL = url
 	}
 }
 
-// Use the provided Authtoken to authenticate this session.
-// Sets the [ConnectConfig].Authtoken field.
+// WithAuthtoken configures the sesssion to authenticate with the provided authtoken.
+// This will associate the session with your ngrok account.
+//
+// Provision an authtoken at [https://dashboard.ngrok.com/tunnels/authtokens]
+// See [https://ngrok.com/docs/ngrok-agent/config#authtoken] for additional details.
 func WithAuthtoken(token string) ConnectOption {
 	return func(cfg *connectConfig) {
 		cfg.Authtoken = proto.ObfuscatedString(token)
 	}
 }
 
-// WithAuthtokenFromEnv populates the authtoken with one defined in the standard
+// WithAuthtokenFromEnv calls [WithAuthtoken] with the value of the
 // NGROK_AUTHTOKEN environment variable.
-// Sets the [ConnectConfig].Authtoken field.
 func WithAuthtokenFromEnv() ConnectOption {
 	return WithAuthtoken(os.Getenv("NGROK_AUTHTOKEN"))
 }
 
-// Connect to the ngrok server in a specific region.
-// Overwrites the [ConnectConfig].ServerAddr field.
+// WithRegion configures the session to connect to an explicit ngrok region.
+// If unspecified, ngrok will connect to the fastest region. You are advised
+// not to use this function and allow ngrok to use its default behavior of
+// choosing the fastest region.
+//
+// A list of available regions is documented at
+// [https://ngrok.com/docs/platform/pops].
+// See [https://ngrok.com/docs/ngrok-agent/config#region] for additional details.
 func WithRegion(region string) ConnectOption {
 	return func(cfg *connectConfig) {
 		if region != "" {
@@ -225,11 +220,16 @@ func WithLogger(logger log.Logger) ConnectOption {
 	}
 }
 
+// WithConnectHandler configures a callback which is called each time the ngrok
+// session successfully connects to the ngrok service. Use this option to
+// receive events about when ngrok successfully reconnects a session that was
+// disconnected because of a network failure.
 func WithConnectHandler(handler SessionConnectHandler) ConnectOption {
 	return func(cfg *connectConfig) {
 		cfg.ConnectHandler = handler
 	}
 }
+
 func WithDisconnectHandler(handler SessionDisconnectHandler) ConnectOption {
 	return func(cfg *connectConfig) {
 		cfg.DisconnectHandler = handler
@@ -247,7 +247,10 @@ func WithStopHandler(handler ServerCommandHandler) ConnectOption {
 	}
 }
 
-// Connect to the ngrok server and start a new session.
+// Connect begins a new ngrok [Session] by connecting to the ngrok service.
+// Connect blocks until the session is successfully established or fails with
+// an error. Customize session connection behavior by providing
+// `[ConnectOption]`s.
 func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 	logger := log15.New()
 	logger.SetHandler(log15.DiscardHandler())
