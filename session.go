@@ -34,12 +34,12 @@ const libraryAgentVersion = "0.0.0"
 // Session encapsulates an established session with the ngrok service. Sessions
 // recover from network failures by automatically reconnecting.
 type Session interface {
-	// Listen creates a new [Tunnel] which will listen for new inbound
-	// connections. The returned [Tunnel] object is a [net.Listener].
+	// Listen creates a new Tunnel which will listen for new inbound
+	// connections. The returned Tunnel object is a net.Listener.
 	Listen(ctx context.Context, cfg config.Tunnel) (Tunnel, error)
 
-	// Close ends the ngrok session. All [Tunnel] objects created by [Listen] on
-	// this session will be closed.
+	// Close ends the ngrok session. All Tunnel objects created by Listen
+	// on this session will be closed.
 	Close() error
 }
 
@@ -48,23 +48,31 @@ var defaultCACert []byte
 
 const defaultServer = "tunnel.ngrok.com:443"
 
-// Interface implemented by supported dialers for establishing a connection to
-// the ngrok server.
+// Dialer is the interface a custom connection dialer must implement for use
+// with the `WithDialer` option.
 type Dialer interface {
 	// Connect to an address on the named network.
-	// See the documentation for [net.Dial].
+	// See the documentation for net.Dial.
 	Dial(network, address string) (net.Conn, error)
 	// Connect to an address on the named network with the provided
-	// [context.Context].
+	// context.
 	DialContext(ctx context.Context, network, address string) (net.Conn, error)
 }
 
+// SessionConnectHandler is the callback type for [WithConnectHandler]
 type SessionConnectHandler func(ctx context.Context, sess Session)
+
+// SessionDisconnectHandler is the callback type for [WithDisconnectHandler]
 type SessionDisconnectHandler func(ctx context.Context, sess Session, err error)
+
+// SessionHearbeatHandler is the callback type for [WithHearbeatHandler]
 type SessionHeartbeatHandler func(ctx context.Context, sess Session, latency time.Duration)
 
+// ServerCommandHandler is the callback type for [WithStopHandler]
 type ServerCommandHandler func(ctx context.Context, sess Session) error
 
+// ConnectOptions are passed to [Connect] to customize session connection and
+// establishment.
 type ConnectOption func(*connectConfig)
 
 // Options to use when establishing an ngrok session.
@@ -111,18 +119,21 @@ type connectConfig struct {
 	Logger log.Logger
 }
 
-// Use the provided opaque metadata string for this session.
-// Sets the [ConnectConfig].Metadata field.
+// WithMetdata configures the opaque machine-readable metadata string for this
+// session. Metadata is made available to you in the ngrok dashboard and the
+// Agents API resource. It is a useful way to allow you to uniquely identify
+// sessions. We suggest encoding the value in a structured format like JSON.
+//
+// [Additional Docs]: https://ngrok.com/docs/ngrok-agent/config#server_addr
 func WithMetadata(meta string) ConnectOption {
 	return func(cfg *connectConfig) {
 		cfg.Metadata = meta
 	}
 }
 
-// Use the provided dialer for establishing a TCP connection to the ngrok
-// server.
-// Sets the [ConnectConfig].Dialer field. Takes precedence over ProxyURL if both
-// are specified.
+// WithDialer configures the session to use the provided Dialer when
+// establishing a connection to the ngrok service. This option will cause
+// [WithProxyURL] to be ignored.
 func WithDialer(dialer Dialer) ConnectOption {
 	return func(cfg *connectConfig) {
 		cfg.Dialer = dialer
@@ -131,7 +142,7 @@ func WithDialer(dialer Dialer) ConnectOption {
 
 // WithProxyURL configures the session to connect to ngrok through an outbound
 // HTTP or SOCKS5 proxy. This parameter is ignored if you override the dialer
-// with `[WithDialer]`.
+// with [WithDialer].
 //
 // See [https://ngrok.com/docs/ngrok-agent/config#proxy_url] for additional details.
 func WithProxyURL(url *url.URL) ConnectOption {
@@ -140,19 +151,19 @@ func WithProxyURL(url *url.URL) ConnectOption {
 	}
 }
 
-// WithAuthtoken configures the sesssion to authenticate with the provided authtoken.
-// This will associate the session with your ngrok account.
+// WithAuthtoken configures the sesssion to authenticate with the provided
+// authtoken.
 //
-// Provision an authtoken at [https://dashboard.ngrok.com/tunnels/authtokens]
-// See [https://ngrok.com/docs/ngrok-agent/config#authtoken] for additional details.
+// [Create an authtoken]: https://dashboard.ngrok.com/tunnels/authtokens
+// [Additional Docs]: https://ngrok.com/docs/ngrok-agent/config#authtoken
 func WithAuthtoken(token string) ConnectOption {
 	return func(cfg *connectConfig) {
 		cfg.Authtoken = proto.ObfuscatedString(token)
 	}
 }
 
-// WithAuthtokenFromEnv calls [WithAuthtoken] with the value of the
-// NGROK_AUTHTOKEN environment variable.
+// WithAuthtokenFromEnv is a shortcut for calling [WithAuthtoken] with the
+// value of the NGROK_AUTHTOKEN environment variable.
 func WithAuthtokenFromEnv() ConnectOption {
 	return WithAuthtoken(os.Getenv("NGROK_AUTHTOKEN"))
 }
@@ -162,9 +173,8 @@ func WithAuthtokenFromEnv() ConnectOption {
 // not to use this function and allow ngrok to use its default behavior of
 // choosing the fastest region.
 //
-// A list of available regions is documented at
-// [https://ngrok.com/docs/platform/pops].
-// See [https://ngrok.com/docs/ngrok-agent/config#region] for additional details.
+// [Available Regions]: https://ngrok.com/docs/platform/pops
+// [Additional Docs]: https://ngrok.com/docs/ngrok-agent/config#region
 func WithRegion(region string) ConnectOption {
 	return func(cfg *connectConfig) {
 		if region != "" {
@@ -173,56 +183,60 @@ func WithRegion(region string) ConnectOption {
 	}
 }
 
-// Connect to the provided ngrok server.
-// Sets the [ConnectConfig].Server field.
+// WithServer configures the network address to dial to connect to the ngrok
+// service. Use this option only if you are connecting to a custom agent
+// ingress.
+//
+// [Additional Docs]: https://ngrok.com/docs/ngrok-agent/config#server_addr
 func WithServer(addr string) ConnectOption {
 	return func(cfg *connectConfig) {
 		cfg.ServerAddr = addr
 	}
 }
 
-// Use the provided [x509.CertPool] to authenticate the ngrok server
-// certificate.
-// Sets the [ConnectConfig].CAPool field.
+// WithCA configures the CAs used to validate the TLS certificate returned by
+// the ngrok service while establishing the session. Use this option only if
+// you are connecting through a man-in-the-middle or deep packet inspection
+// proxy.
+//
+// [Additional Docs]: https://ngrok.com/docs/ngrok-agent/config#root_cas
 func WithCA(pool *x509.CertPool) ConnectOption {
 	return func(cfg *connectConfig) {
 		cfg.CAPool = pool
 	}
 }
 
-// Set the heartbeat tolerance for the session.
-// If the session's heartbeats are outside of their interval by this duration,
-// the server will assume the session is dead and close it.
+// WithHeartbeatTolerance configures the duration to wait for a response to a heartbeat
+// before assuming the session connection is dead and attempting to reconnect.
+//
+// [Additional Docs]: https://ngrok.com/docs/ngrok-agent/config#heartbeat_tolerance
 func WithHeartbeatTolerance(tolerance time.Duration) ConnectOption {
 	return func(cfg *connectConfig) {
 		cfg.HeartbeatTolerance = tolerance
 	}
 }
 
-// Set the heartbeat interval for the session.
-// This value determines how often we send application level
-// heartbeats to the server go check connection liveness.
+// WithHeartbeatInterval configures how often the session will send heartbeat
+// messages to the ngrok service to check session liveness.
+//
+// [Additional Docs]: https://ngrok.com/docs/ngrok-agent/config#heartbeat_interval
 func WithHeartbeatInterval(interval time.Duration) ConnectOption {
 	return func(cfg *connectConfig) {
 		cfg.HeartbeatInterval = interval
 	}
 }
 
-// Log to a simplified logging interface.
-// This is a "lowest common denominator" interface that should be simple to
-// adapt other loggers to. Examples are provided in `log15adapter` and
-// `pgxadapter`.
-// If the provided `Logger` also implements the `log15.Logger` interface, it
-// will be used directly.
+// WithLogger configures a logger to recieve log messages from the Session. The
+// log subpackage contains adapters for both logrus and zap.
 func WithLogger(logger log.Logger) ConnectOption {
 	return func(cfg *connectConfig) {
 		cfg.Logger = logger
 	}
 }
 
-// WithConnectHandler configures a callback which is called each time the ngrok
+// WithConnectHandler configures a function which is called each time the ngrok
 // session successfully connects to the ngrok service. Use this option to
-// receive events about when ngrok successfully reconnects a session that was
+// receive events when ngrok successfully reconnects a [Session] that was
 // disconnected because of a network failure.
 func WithConnectHandler(handler SessionConnectHandler) ConnectOption {
 	return func(cfg *connectConfig) {
@@ -230,17 +244,38 @@ func WithConnectHandler(handler SessionConnectHandler) ConnectOption {
 	}
 }
 
+// WithDisconnectHandler configures a function which is called each time the
+// ngrok session disconnects from the ngrok service. Use this option to detect
+// when the ngrok session has gone temporarily offline.
 func WithDisconnectHandler(handler SessionDisconnectHandler) ConnectOption {
 	return func(cfg *connectConfig) {
 		cfg.DisconnectHandler = handler
 	}
 }
+
+// WithHeartbeatHandler configures a function which is called each time the
+// [Session] successfully heartbeats the ngrok service. The callback receives
+// the latency of the round trip time from initiating the heartbeat to
+// receiving an acknowledgement back from the ngrok service.
 func WithHeartbeatHandler(handler SessionHeartbeatHandler) ConnectOption {
 	return func(cfg *connectConfig) {
 		cfg.HeartbeatHandler = handler
 	}
 }
 
+// WithStopHandler configures a function which is called when the ngrok service
+// requests that this [Session] stop. Your application may choose to interpret
+// this callback as a request to terminate the [Session] or the entire process.
+//
+// Errors returned by this function will be visible to the ngrok dashboard or
+// API as the response to the Stop operation.
+//
+// Do not block inside this callback. It will cause the Dashboard or API stop
+// operation to hang. Do not call [Session.Close] or [os.Exit] inside this
+// callback, it will also cause the operation to hang.
+//
+// Instead, either return an error or if you intend to Stop, spawn a goroutine
+// to asynchronously call [Session.Close] or [os.Exit].
 func WithStopHandler(handler ServerCommandHandler) ConnectOption {
 	return func(cfg *connectConfig) {
 		cfg.StopHandler = handler
@@ -249,8 +284,8 @@ func WithStopHandler(handler ServerCommandHandler) ConnectOption {
 
 // Connect begins a new ngrok [Session] by connecting to the ngrok service.
 // Connect blocks until the session is successfully established or fails with
-// an error. Customize session connection behavior by providing
-// `[ConnectOption]`s.
+// an error. Customize session connection behavior with [ConnectOption]
+// arguments.
 func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 	logger := log15.New()
 	logger.SetHandler(log15.DiscardHandler())
