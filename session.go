@@ -49,7 +49,7 @@ var defaultCACert []byte
 const defaultServer = "tunnel.ngrok.com:443"
 
 // Dialer is the interface a custom connection dialer must implement for use
-// with the `WithDialer` option.
+// with the [WithDialer] option.
 type Dialer interface {
 	// Connect to an address on the named network.
 	// See the documentation for net.Dial.
@@ -119,19 +119,21 @@ type connectConfig struct {
 	Logger log.Logger
 }
 
-// WithMetdata configures the opaque machine-readable metadata string for this
+// WithMetdata configures the opaque, machine-readable metadata string for this
 // session. Metadata is made available to you in the ngrok dashboard and the
 // Agents API resource. It is a useful way to allow you to uniquely identify
 // sessions. We suggest encoding the value in a structured format like JSON.
 //
-// [Additional Docs]: https://ngrok.com/docs/ngrok-agent/config#server_addr
+// See the [metdata parameter in the ngrok docs] for additional details.
+//
+// [metdata parameter in the ngrok docs]: https://ngrok.com/docs/ngrok-agent/config#metadata
 func WithMetadata(meta string) ConnectOption {
 	return func(cfg *connectConfig) {
 		cfg.Metadata = meta
 	}
 }
 
-// WithDialer configures the session to use the provided Dialer when
+// WithDialer configures the session to use the provided [Dialer] when
 // establishing a connection to the ngrok service. This option will cause
 // [WithProxyURL] to be ignored.
 func WithDialer(dialer Dialer) ConnectOption {
@@ -144,7 +146,9 @@ func WithDialer(dialer Dialer) ConnectOption {
 // HTTP or SOCKS5 proxy. This parameter is ignored if you override the dialer
 // with [WithDialer].
 //
-// See [https://ngrok.com/docs/ngrok-agent/config#proxy_url] for additional details.
+// See the [proxy url paramter in the ngrok docs] for additional details.
+//
+// [proxy url paramter in the ngrok docs]: https://ngrok.com/docs/ngrok-agent/config#proxy_url
 func WithProxyURL(url *url.URL) ConnectOption {
 	return func(cfg *connectConfig) {
 		cfg.ProxyURL = url
@@ -152,10 +156,13 @@ func WithProxyURL(url *url.URL) ConnectOption {
 }
 
 // WithAuthtoken configures the sesssion to authenticate with the provided
-// authtoken.
+// authtoken. You can [find your existing authtoken] or [create a new one] in the ngrok dashboard.
 //
-// [Create an authtoken]: https://dashboard.ngrok.com/tunnels/authtokens
-// [Additional Docs]: https://ngrok.com/docs/ngrok-agent/config#authtoken
+// See the [authtoken parameter in the ngrok docs] for additional details.
+//
+// [find your existing authtoken]: https://dashboard.ngrok.com/get-started/your-authtoken
+// [create a new one]: https://dashboard.ngrok.com/tunnels/authtokens
+// [authtoken parameter in the ngrok docs]: https://ngrok.com/docs/ngrok-agent/config#authtoken
 func WithAuthtoken(token string) ConnectOption {
 	return func(cfg *connectConfig) {
 		cfg.Authtoken = proto.ObfuscatedString(token)
@@ -168,13 +175,14 @@ func WithAuthtokenFromEnv() ConnectOption {
 	return WithAuthtoken(os.Getenv("NGROK_AUTHTOKEN"))
 }
 
-// WithRegion configures the session to connect to an explicit ngrok region.
-// If unspecified, ngrok will connect to the fastest region. You are advised
-// not to use this function and allow ngrok to use its default behavior of
-// choosing the fastest region.
+// WithRegion configures the session to connect to a specific ngrok region.
+// If unspecified, ngrok will connect to the fastest region, which is usually what you want.
+// The [full list of ngrok regions] can be found in the ngrok documentation.
 //
-// [Available Regions]: https://ngrok.com/docs/platform/pops
-// [Additional Docs]: https://ngrok.com/docs/ngrok-agent/config#region
+// See the [region parameter in the ngrok docs] for additional details.
+//
+// [full list of ngrok regions]: https://ngrok.com/docs/platform/pops
+// [region parameter in the ngrok docs]: https://ngrok.com/docs/ngrok-agent/config#region
 func WithRegion(region string) ConnectOption {
 	return func(cfg *connectConfig) {
 		if region != "" {
@@ -187,7 +195,9 @@ func WithRegion(region string) ConnectOption {
 // service. Use this option only if you are connecting to a custom agent
 // ingress.
 //
-// [Additional Docs]: https://ngrok.com/docs/ngrok-agent/config#server_addr
+// See the [server_addr parameter in the ngrok docs] for additional details.
+//
+// [server_addr parameter in the ngrok docs]: https://ngrok.com/docs/ngrok-agent/config#server_addr
 func WithServer(addr string) ConnectOption {
 	return func(cfg *connectConfig) {
 		cfg.ServerAddr = addr
@@ -199,7 +209,9 @@ func WithServer(addr string) ConnectOption {
 // you are connecting through a man-in-the-middle or deep packet inspection
 // proxy.
 //
-// [Additional Docs]: https://ngrok.com/docs/ngrok-agent/config#root_cas
+// See the [root_cas parameter in the ngrok docs] for additional details.
+//
+// [root_cas parameter in the ngrok docs]: https://ngrok.com/docs/ngrok-agent/config#root_cas
 func WithCA(pool *x509.CertPool) ConnectOption {
 	return func(cfg *connectConfig) {
 		cfg.CAPool = pool
@@ -209,7 +221,9 @@ func WithCA(pool *x509.CertPool) ConnectOption {
 // WithHeartbeatTolerance configures the duration to wait for a response to a heartbeat
 // before assuming the session connection is dead and attempting to reconnect.
 //
-// [Additional Docs]: https://ngrok.com/docs/ngrok-agent/config#heartbeat_tolerance
+// See the [heartbeat_tolerance parameter in the ngrok docs] for additional details.
+//
+// [heartbeat_tolerance parameter in the ngrok docs]: https://ngrok.com/docs/ngrok-agent/config#heartbeat_tolerance
 func WithHeartbeatTolerance(tolerance time.Duration) ConnectOption {
 	return func(cfg *connectConfig) {
 		cfg.HeartbeatTolerance = tolerance
@@ -219,15 +233,20 @@ func WithHeartbeatTolerance(tolerance time.Duration) ConnectOption {
 // WithHeartbeatInterval configures how often the session will send heartbeat
 // messages to the ngrok service to check session liveness.
 //
-// [Additional Docs]: https://ngrok.com/docs/ngrok-agent/config#heartbeat_interval
+// See the [heartbeat_interval parameter in the ngrok docs] for additional details.
+//
+// [heartbeat_interval parameter in the ngrok docs]: https://ngrok.com/docs/ngrok-agent/config#heartbeat_interval
 func WithHeartbeatInterval(interval time.Duration) ConnectOption {
 	return func(cfg *connectConfig) {
 		cfg.HeartbeatInterval = interval
 	}
 }
 
-// WithLogger configures a logger to recieve log messages from the Session. The
-// log subpackage contains adapters for both logrus and zap.
+// WithLogger configures a logger to recieve log messages from the [Session]. The
+// log subpackage contains adapters for both [logrus] and [zap].
+//
+// [logrus]: https://pkg.go.dev/github.com/sirupsen/logrus
+// [zap]: https://pkg.go.dev/go.uber.org/zap
 func WithLogger(logger log.Logger) ConnectOption {
 	return func(cfg *connectConfig) {
 		cfg.Logger = logger
@@ -235,7 +254,7 @@ func WithLogger(logger log.Logger) ConnectOption {
 }
 
 // WithConnectHandler configures a function which is called each time the ngrok
-// session successfully connects to the ngrok service. Use this option to
+// [Session] successfully connects to the ngrok service. Use this option to
 // receive events when ngrok successfully reconnects a [Session] that was
 // disconnected because of a network failure.
 func WithConnectHandler(handler SessionConnectHandler) ConnectOption {
@@ -245,7 +264,7 @@ func WithConnectHandler(handler SessionConnectHandler) ConnectOption {
 }
 
 // WithDisconnectHandler configures a function which is called each time the
-// ngrok session disconnects from the ngrok service. Use this option to detect
+// ngrok [Session] disconnects from the ngrok service. Use this option to detect
 // when the ngrok session has gone temporarily offline.
 func WithDisconnectHandler(handler SessionDisconnectHandler) ConnectOption {
 	return func(cfg *connectConfig) {
@@ -264,7 +283,7 @@ func WithHeartbeatHandler(handler SessionHeartbeatHandler) ConnectOption {
 }
 
 // WithStopHandler configures a function which is called when the ngrok service
-// requests that this [Session] stop. Your application may choose to interpret
+// requests that this [Session] stops. Your application may choose to interpret
 // this callback as a request to terminate the [Session] or the entire process.
 //
 // Errors returned by this function will be visible to the ngrok dashboard or

@@ -10,7 +10,7 @@ import (
 )
 
 // Tunnel is a [net.Listener] created by a call to [Listen] or
-// [Session.Listen].  A Tunnel allows your application to receive [net.Conn]
+// [Session].Listen. A Tunnel allows your application to receive [net.Conn]
 // connections from endpoints created on the ngrok service.
 type Tunnel interface {
 	// Every Tunnel is a net.Listener. It can be plugged into any existing
@@ -35,7 +35,7 @@ type Tunnel interface {
 	// Labels returns the labels set by config.WithLabel if this is a
 	// labeled tunnel. Non-labeled tunnels will return an empty map.
 	Labels() map[string]string
-	// Metadata returns the arbitraray Returns the Metadata string for this tunnel.
+	// Metadata returns the arbitraray metadata string for this tunnel.
 	Metadata() string
 	// Proto returns the protocol of the tunnel's endpoint.
 	// Labeled tunnels will return the empty string.
@@ -52,9 +52,9 @@ type Tunnel interface {
 // shortcut for calling [Connect] then [Session].Listen.
 //
 // Access to the underlying [Session] that was started automatically can be
-// accessed via [Tunnel.Session].
+// accessed via [Tunnel].Session.
 //
-// If an error is encoutered during [Session.Listen], the [Session] object that
+// If an error is encoutered during [Session].Listen, the [Session] object that
 // was created will be closed automatically.
 func Listen(ctx context.Context, tunnelConfig config.Tunnel, connectOpts ...ConnectOption) (Tunnel, error) {
 	sess, err := Connect(ctx, connectOpts...)
