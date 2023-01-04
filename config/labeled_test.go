@@ -40,6 +40,18 @@ func TestLabeled(t *testing.T) {
 			expectProto:      stringPtr(""),
 			expectNilOpts:    true,
 		},
+		{
+			name: "withMetadata",
+			opts: LabeledTunnel(WithLabel("foo", "bar"), WithMetadata("choochoo")),
+			expectLabels: labelPtr(map[string]*string{
+				"foo": stringPtr("bar"),
+			}),
+			expectExtra: &matchBindExtra{
+				Metadata: stringPtr("choochoo"),
+			},
+			expectProto:   stringPtr(""),
+			expectNilOpts: true,
+		},
 	}
 
 	cases.runAll(t)
