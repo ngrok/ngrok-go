@@ -290,11 +290,11 @@ func WithHeartbeatHandler(handler SessionHeartbeatHandler) ConnectOption {
 // API as the response to the Stop operation.
 //
 // Do not block inside this callback. It will cause the Dashboard or API stop
-// operation to hang. Do not call [Session.Close] or [os.Exit] inside this
+// operation to hang. Do not call [Session].Close or [os.Exit] inside this
 // callback, it will also cause the operation to hang.
 //
 // Instead, either return an error or if you intend to Stop, spawn a goroutine
-// to asynchronously call [Session.Close] or [os.Exit].
+// to asynchronously call [Session].Close or [os.Exit].
 func WithStopHandler(handler ServerCommandHandler) ConnectOption {
 	return func(cfg *connectConfig) {
 		cfg.StopHandler = handler
