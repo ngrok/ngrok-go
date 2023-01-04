@@ -30,6 +30,16 @@ func TestLabeled(t *testing.T) {
 			}),
 			expectNilOpts: true,
 		},
+		{
+			name: "withForwardsTo",
+			opts: LabeledTunnel(WithLabel("foo", "bar"), WithForwardsTo("localhost:8080")),
+			expectLabels: labelPtr(map[string]*string{
+				"foo": stringPtr("bar"),
+			}),
+			expectForwardsTo: stringPtr("localhost:8080"),
+			expectProto:      stringPtr(""),
+			expectNilOpts:    true,
+		},
 	}
 
 	cases.runAll(t)
