@@ -9,54 +9,64 @@ import (
 	tunnel_client "golang.ngrok.com/ngrok/internal/tunnel/client"
 )
 
-// An ngrok tunnel.
+// Tunnel is a [net.Listener] created by a call to [Listen] or
+// [Session].Listen. A Tunnel allows your application to receive [net.Conn]
+// connections from endpoints created on the ngrok service.
 type Tunnel interface {
 	// Every Tunnel is a net.Listener. It can be plugged into any existing
 	// code that expects a net.Listener seamlessly without any changes.
 	net.Listener
 
-	// Returns the ForwardsTo string for this tunnel.
+	// Close is a convenience method for calling Tunnel.CloseWithContext
+	// with a context that has a timeout of 5 seconds. This also allows the
+	// Tunnel to satisfy the io.Closer interface.
+	Close() error
+	// CloseWithContext closes the Tunnel. Closing a tunnel is an operation
+	// that involves sending a "close" message over the parent session.
+	// Since this is a network operation, it is most correct to provide a
+	// context with a timeout.
+	CloseWithContext(context.Context) error
+	// ForwardsTo returns a human-readable string presented in the ngrok
+	// dashboard and the Tunnels API. Use config.WithForwardsTo when
+	// calling Session.Listen to set this value explicitly.
 	ForwardsTo() string
-	// Returns the Metadata string for this tunnel.
-	Metadata() string
-	// Returns this tunnel's ID.
+	// ID returns a tunnel's unique ID.
 	ID() string
-
-	// Returns this tunnel's protocol.
-	// Will be empty for labeled tunnels.
-	Proto() string
-	// Returns the URL for this tunnel.
-	// Will be empty for labeled tunnels.
-	URL() string
-
-	// Returns the labels for this tunnel.
-	// Will be empty for non-labeled tunnels.
+	// Labels returns the labels set by config.WithLabel if this is a
+	// labeled tunnel. Non-labeled tunnels will return an empty map.
 	Labels() map[string]string
-
+	// Metadata returns the arbitraray metadata string for this tunnel.
+	Metadata() string
+	// Proto returns the protocol of the tunnel's endpoint.
+	// Labeled tunnels will return the empty string.
+	Proto() string
 	// Session returns the tunnel's parent Session object that it
 	// was started on.
 	Session() Session
-
-	// Convenience method that calls `CloseWithContext` with a default timeout
-	// of 5 seconds.
-	Close() error
-	// Closing a tunnel is an operation that involves sending a "close" message
-	// over the existing session. Since this is subject to network latency,
-	// packet loss, etc., it is most correct to provide a context. See also
-	// `Close`, which matches the `io.Closer` interface method.
-	CloseWithContext(context.Context) error
+	// URL returns the tunnel endpoint's URL.
+	// Labeled tunnels will return the empty string.
+	URL() string
 }
 
-// Create a new ngrok session and start a tunnel.
-// Shorthand for a [Connect] followed by a [Session].Listen.
-// If an error is encoutered when starting the tunnel, but after a session has
-// been established, both the [Session] and error return values will be non-nil.
+// Listen creates a new [Tunnel] after connecting a new [Session]. This is a
+// shortcut for calling [Connect] then [Session].Listen.
+//
+// Access to the underlying [Session] that was started automatically can be
+// accessed via [Tunnel].Session.
+//
+// If an error is encoutered during [Session].Listen, the [Session] object that
+// was created will be closed automatically.
 func Listen(ctx context.Context, tunnelConfig config.Tunnel, connectOpts ...ConnectOption) (Tunnel, error) {
 	sess, err := Connect(ctx, connectOpts...)
 	if err != nil {
 		return nil, err
 	}
-	return sess.Listen(ctx, tunnelConfig)
+	tunnel, err := sess.Listen(ctx, tunnelConfig)
+	if err != nil {
+		_ = sess.Close()
+		return nil, err
+	}
+	return tunnel, nil
 }
 
 type tunnelImpl struct {
