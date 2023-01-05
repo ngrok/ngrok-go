@@ -10,6 +10,7 @@ import (
 // This can be veiwed via the API or dashboard.
 func WithForwardsTo(meta string) interface {
 	HTTPEndpointOption
+	LabeledTunnelOption
 	TCPEndpointOption
 	TLSEndpointOption
 } {
