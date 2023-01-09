@@ -8,6 +8,8 @@ This is the ngrok agent in library form, suitable for integrating directly into 
 
 See [`examples/http/main.go`](/examples/http/main.go) for example usage, or the tests in [`online_test.go`](/online_test.go).
 
+For working with the [ngrok API](https://ngrok.com/docs/api/), check out the [ngrok Go API Client Library](https://github.com/ngrok/ngrok-api-go).
+
 ## Installation
 
 The best way to install the ngrok agent SDK is through `go get`.
