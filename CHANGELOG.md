@@ -1,4 +1,4 @@
-## 1.0.0 (2022-11-29)
+## 1.0.0 (2023-01-10)
 
 Enhancements:
 * Initial release
