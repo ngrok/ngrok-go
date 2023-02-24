@@ -4,7 +4,7 @@
 
 ngrok is a simplified API-first ingress-as-a-service that adds connectivity, security, and observability to your apps with no code changes.
 
-ngrok-go is an open-source and idiomatic library for embedding ngrok networking directly into Go applications. If you’ve used ngrok before, you can think of ngrok-go as the ngrok agent packaged as a Go library.
+ngrok-go is an open source and idiomatic library for embedding ngrok networking directly into Go applications. If you’ve used ngrok before, you can think of ngrok-go as the ngrok agent packaged as a Go library.
 
 ngrok-go let developers serve Go apps on the internet in a single line of code without requiring VPC routing, load balancers, certificates, or even ports! Applications using ngrok-go listen on ngrok’s global ingress network through the same interface (`net.Listener`) any Go app would expect if it listened on a local port by calling `net.Listen()`, making it an easy drop in to any application using go's native net and net/http packages.
 
