@@ -1,13 +1,16 @@
 package config
 
-import "golang.ngrok.com/ngrok/internal/pb"
+import (
+	"golang.ngrok.com/ngrok/internal/pb"
+	"golang.ngrok.com/ngrok/internal/tunnel/proto"
+)
 
 type OIDCOption func(cfg *oidcOptions)
 
 type oidcOptions struct {
 	IssuerURL    string
 	ClientID     string
-	ClientSecret string
+	ClientSecret proto.ObfuscatedString
 	AllowEmails  []string
 	AllowDomains []string
 	Scopes       []string
@@ -21,7 +24,7 @@ func (oidc *oidcOptions) toProtoConfig() *pb.MiddlewareConfiguration_OIDC {
 	return &pb.MiddlewareConfiguration_OIDC{
 		IssuerUrl:    oidc.IssuerURL,
 		ClientId:     oidc.ClientID,
-		ClientSecret: oidc.ClientSecret,
+		ClientSecret: oidc.ClientSecret.PlainText(),
 		AllowEmails:  oidc.AllowEmails,
 		AllowDomains: oidc.AllowDomains,
 		Scopes:       oidc.Scopes,
@@ -35,7 +38,7 @@ func WithOIDC(issuerURL string, clientID string, clientSecret string, opts ...OI
 		oidc := &oidcOptions{
 			IssuerURL:    issuerURL,
 			ClientID:     clientID,
-			ClientSecret: clientSecret,
+			ClientSecret: proto.ObfuscatedString(clientSecret),
 		}
 
 		for _, opt := range opts {

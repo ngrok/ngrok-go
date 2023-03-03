@@ -1,13 +1,16 @@
 package config
 
-import "golang.ngrok.com/ngrok/internal/pb"
+import (
+	"golang.ngrok.com/ngrok/internal/pb"
+	"golang.ngrok.com/ngrok/internal/tunnel/proto"
+)
 
 // Configuration for webhook verification.
 type webhookVerification struct {
 	// The webhook provider
 	Provider string
 	// The secret for verifying webhooks from this provider.
-	Secret string
+	Secret proto.ObfuscatedString
 }
 
 func (wv *webhookVerification) toProtoConfig() *pb.MiddlewareConfiguration_WebhookVerification {
@@ -16,7 +19,7 @@ func (wv *webhookVerification) toProtoConfig() *pb.MiddlewareConfiguration_Webho
 	}
 	return &pb.MiddlewareConfiguration_WebhookVerification{
 		Provider: wv.Provider,
-		Secret:   wv.Secret,
+		Secret:   wv.Secret.PlainText(),
 	}
 }
 
@@ -25,7 +28,7 @@ func WithWebhookVerification(provider string, secret string) HTTPEndpointOption 
 	return httpOptionFunc(func(cfg *httpOptions) {
 		cfg.WebhookVerification = &webhookVerification{
 			Provider: provider,
-			Secret:   secret,
+			Secret:   proto.ObfuscatedString(secret),
 		}
 	})
 }
