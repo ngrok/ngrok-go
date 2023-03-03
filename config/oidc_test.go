@@ -26,7 +26,7 @@ func TestOIDC(t *testing.T) {
 				require.NotNil(t, actual)
 				require.Equal(t, "https://google.com", actual.IssuerUrl)
 				require.Equal(t, "foo", actual.ClientId)
-				require.Equal(t, "bar", actual.ClientSecret.PlainText())
+				require.Equal(t, "bar", actual.ClientSecret)
 			},
 		},
 		{

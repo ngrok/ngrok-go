@@ -25,7 +25,7 @@ func TestWebhookVerification(t *testing.T) {
 				actual := opts.WebhookVerification
 				require.NotNil(t, actual)
 				require.Equal(t, "google", actual.Provider)
-				require.Equal(t, "domoarigato", actual.Secret.PlainText())
+				require.Equal(t, "domoarigato", actual.Secret)
 			},
 		},
 	}
