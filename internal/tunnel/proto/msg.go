@@ -37,15 +37,7 @@ type Auth struct {
 	Extra    AuthExtra // clients may add whatever data the like to auth messages
 }
 
-type ObfuscatedString string
-
-func (t ObfuscatedString) String() string {
-	return "HIDDEN"
-}
-
-func (t ObfuscatedString) PlainText() string {
-	return string(t)
-}
+type ObfuscatedString = pb.ObfuscatedString
 
 type AuthExtra struct {
 	OS                 string

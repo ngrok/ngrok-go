@@ -649,7 +649,9 @@ type MiddlewareConfiguration_OAuth struct {
 
 	Provider           string   `protobuf:"bytes,1,opt,name=provider,proto3" json:"provider,omitempty"`
 	ClientId           string   `protobuf:"bytes,6,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
-	ClientSecret       string   `protobuf:"bytes,7,opt,name=client_secret,json=clientSecret,proto3" json:"client_secret,omitempty"`
+	// Hack(josh): This needs to be shielded from getting naively printed in
+	// logs, but making the protobuf generator spit it out is non-trivial.
+	ClientSecret       ObfuscatedString   `protobuf:"bytes,7,opt,name=client_secret,json=clientSecret,proto3" json:"client_secret,omitempty"`
 	SealedClientSecret []byte   `protobuf:"bytes,2,opt,name=sealed_client_secret,json=sealedClientSecret,proto3" json:"sealed_client_secret,omitempty"`
 	AllowEmails        []string `protobuf:"bytes,3,rep,name=allow_emails,json=allowEmails,proto3" json:"allow_emails,omitempty"`
 	AllowDomains       []string `protobuf:"bytes,4,rep,name=allow_domains,json=allowDomains,proto3" json:"allow_domains,omitempty"`
@@ -702,7 +704,7 @@ func (x *MiddlewareConfiguration_OAuth) GetClientId() string {
 	return ""
 }
 
-func (x *MiddlewareConfiguration_OAuth) GetClientSecret() string {
+func (x *MiddlewareConfiguration_OAuth) GetClientSecret() ObfuscatedString {
 	if x != nil {
 		return x.ClientSecret
 	}
@@ -743,7 +745,9 @@ type MiddlewareConfiguration_WebhookVerification struct {
 	unknownFields protoimpl.UnknownFields
 
 	Provider     string `protobuf:"bytes,1,opt,name=provider,proto3" json:"provider,omitempty"`
-	Secret       string `protobuf:"bytes,2,opt,name=secret,proto3" json:"secret,omitempty"`
+	// Hack(josh): This needs to be shielded from getting naively printed in
+	// logs, but making the protobuf generator spit it out is non-trivial.
+	Secret       ObfuscatedString `protobuf:"bytes,2,opt,name=secret,proto3" json:"secret,omitempty"`
 	SealedSecret []byte `protobuf:"bytes,3,opt,name=sealed_secret,json=sealedSecret,proto3" json:"sealed_secret,omitempty"`
 }
 
@@ -786,7 +790,7 @@ func (x *MiddlewareConfiguration_WebhookVerification) GetProvider() string {
 	return ""
 }
 
-func (x *MiddlewareConfiguration_WebhookVerification) GetSecret() string {
+func (x *MiddlewareConfiguration_WebhookVerification) GetSecret() ObfuscatedString {
 	if x != nil {
 		return x.Secret
 	}
@@ -1018,7 +1022,9 @@ type MiddlewareConfiguration_OIDC struct {
 
 	IssuerUrl          string   `protobuf:"bytes,1,opt,name=issuer_url,json=issuerUrl,proto3" json:"issuer_url,omitempty"`
 	ClientId           string   `protobuf:"bytes,2,opt,name=client_id,json=clientId,proto3" json:"client_id,omitempty"`
-	ClientSecret       string   `protobuf:"bytes,3,opt,name=client_secret,json=clientSecret,proto3" json:"client_secret,omitempty"`
+	// Hack(josh): This needs to be shielded from getting naively printed in
+	// logs, but making the protobuf generator spit it out is non-trivial.
+	ClientSecret       ObfuscatedString   `protobuf:"bytes,3,opt,name=client_secret,json=clientSecret,proto3" json:"client_secret,omitempty"`
 	SealedClientSecret []byte   `protobuf:"bytes,4,opt,name=sealed_client_secret,json=sealedClientSecret,proto3" json:"sealed_client_secret,omitempty"`
 	AllowEmails        []string `protobuf:"bytes,5,rep,name=allow_emails,json=allowEmails,proto3" json:"allow_emails,omitempty"`
 	AllowDomains       []string `protobuf:"bytes,6,rep,name=allow_domains,json=allowDomains,proto3" json:"allow_domains,omitempty"`
@@ -1071,7 +1077,7 @@ func (x *MiddlewareConfiguration_OIDC) GetClientId() string {
 	return ""
 }
 
-func (x *MiddlewareConfiguration_OIDC) GetClientSecret() string {
+func (x *MiddlewareConfiguration_OIDC) GetClientSecret() ObfuscatedString {
 	if x != nil {
 		return x.ClientSecret
 	}

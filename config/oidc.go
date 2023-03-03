@@ -1,13 +1,15 @@
 package config
 
-import "golang.ngrok.com/ngrok/internal/pb"
+import (
+	"golang.ngrok.com/ngrok/internal/pb"
+)
 
 type OIDCOption func(cfg *oidcOptions)
 
 type oidcOptions struct {
 	IssuerURL    string
 	ClientID     string
-	ClientSecret string
+	ClientSecret pb.ObfuscatedString
 	AllowEmails  []string
 	AllowDomains []string
 	Scopes       []string
@@ -35,7 +37,7 @@ func WithOIDC(issuerURL string, clientID string, clientSecret string, opts ...OI
 		oidc := &oidcOptions{
 			IssuerURL:    issuerURL,
 			ClientID:     clientID,
-			ClientSecret: clientSecret,
+			ClientSecret: pb.ObfuscatedString(clientSecret),
 		}
 
 		for _, opt := range opts {
