@@ -1,6 +1,9 @@
 package config
 
-import "golang.ngrok.com/ngrok/internal/pb"
+import (
+	"golang.ngrok.com/ngrok/internal/pb"
+	"golang.ngrok.com/ngrok/internal/tunnel/proto"
+)
 
 type OAuthOption func(cfg *oauthOptions)
 
@@ -14,12 +17,30 @@ type oauthOptions struct {
 	AllowDomains []string
 	// OAuth scopes to request from the provider.
 	Scopes []string
+	// OAuth custom app ID
+	ClientID string
+	// OAuth custom app secret
+	ClientSecret proto.ObfuscatedString
 }
 
 // Construct a new OAuth provider with the given name.
 func oauthProvider(name string) *oauthOptions {
 	return &oauthOptions{
 		Provider: name,
+	}
+}
+
+// WithOAuthClientID provides a client ID for custom OAuth apps.
+func WithOAuthClientID(id string) OAuthOption {
+	return func(cfg *oauthOptions) {
+		cfg.ClientID = id
+	}
+}
+
+// WithOAuthClientSecret provides a client secret for custom OAuth apps.
+func WithOAuthClientSecret(secret string) OAuthOption {
+	return func(cfg *oauthOptions) {
+		cfg.ClientSecret = proto.ObfuscatedString(secret)
 	}
 }
 
@@ -51,6 +72,8 @@ func (oauth *oauthOptions) toProtoConfig() *pb.MiddlewareConfiguration_OAuth {
 
 	return &pb.MiddlewareConfiguration_OAuth{
 		Provider:     string(oauth.Provider),
+		ClientId:     oauth.ClientID,
+		ClientSecret: oauth.ClientSecret.PlainText(),
 		AllowEmails:  oauth.AllowEmails,
 		AllowDomains: oauth.AllowDomains,
 		Scopes:       oauth.Scopes,
