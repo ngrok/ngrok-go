@@ -16,7 +16,7 @@ func (of tcpOptionFunc) ApplyTCP(cfg *tcpOptions) {
 	of(cfg)
 }
 
-// Construct a new set of HTTP tunnel options.
+// Construct a new set of TCP tunnel options.
 func TCPEndpoint(opts ...TCPEndpointOption) Tunnel {
 	cfg := tcpOptions{}
 	for _, opt := range opts {
