@@ -1,6 +1,6 @@
 module golang.ngrok.com/ngrok/examples
 
-go 1.18
+go 1.19
 
 require (
 	golang.ngrok.com/ngrok v0.0.0
