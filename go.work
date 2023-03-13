@@ -4,13 +4,14 @@
 // because `go mod tidy` & co seem to ignore the ones at the workspace level.
 // See: https://github.com/golang/go/issues/50750.
 
-go 1.18
+go 1.19
 
 use (
 	.
 	./examples
 	./log/log15
 	./log/logrus
+	./log/slog
 	./log/zap
 )
 

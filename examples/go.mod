@@ -1,9 +1,11 @@
 module golang.ngrok.com/ngrok/examples
 
-go 1.18
+go 1.19
 
 require (
 	golang.ngrok.com/ngrok v0.0.0
+	golang.ngrok.com/ngrok/log/slog v0.0.0-00010101000000-000000000000
+	golang.org/x/exp v0.0.0-20230307190834-24139beb5833
 	golang.org/x/sync v0.0.0-20220923202941-7f9b1623fab7
 )
 
@@ -22,5 +24,6 @@ require (
 
 replace (
 	golang.ngrok.com/ngrok => ../
-	golang.ngrok.com/ngrok/log/log15adapter => ../log/log15adapter
+	golang.ngrok.com/ngrok/log/log15 => ../log/log15
+	golang.ngrok.com/ngrok/log/slog => ../log/slog
 )
