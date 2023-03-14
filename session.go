@@ -115,6 +115,10 @@ type connectConfig struct {
 	RestartHandler ServerCommandHandler
 	UpdateHandler  ServerCommandHandler
 
+	remoteStopErr    *string
+	remoteRestartErr *string
+	remoteUpdateErr  *string
+
 	// The logger for the session to use.
 	Logger log.Logger
 }
@@ -339,6 +343,48 @@ func WithUpdateHandler(handler ServerCommandHandler) ConnectOption {
 	}
 }
 
+// WithStopCommandDisabled specifies a user-friendly error message to be reported
+// by the ngrok dashboard or API when a user attempts to issue a Stop command for
+// this [Session].
+//
+// Set this error only if you wish to provide a more detailed reason for entirely
+// disabling the Stop command for your application. If you wish to report an error
+// while attempting to handle a Stop command, instead return that error from the
+// handler function set by [WithStopHandler].
+func WithStopCommandDisabled(err string) ConnectOption {
+	return func(cfg *connectConfig) {
+		cfg.remoteStopErr = &err
+	}
+}
+
+// WithRestartCommandDisabled specifies a user-friendly error message to be reported
+// by the ngrok dashboard or API when a user attempts to issue a Restart command for
+// this [Session].
+//
+// Set this error only if you wish to provide a more detailed reason for entirely
+// disabling the Restart command for your application. If you wish to report an error
+// while attempting to handle a Restart command, instead return that error from the
+// handler function set by [WithRestartHandler].
+func WithRestartCommandDisabled(err string) ConnectOption {
+	return func(cfg *connectConfig) {
+		cfg.remoteRestartErr = &err
+	}
+}
+
+// WithUpdateCommandDisabled specifies a user-friendly error message to be reported
+// by the ngrok dashboard or API when a user attempts to issue a Update command for
+// this [Session].
+//
+// Set this error only if you wish to provide a more detailed reason for entirely
+// disabling the Update command for your application. If you wish to report an error
+// while attempting to handle a Update command, instead return that error from the
+// handler function set by [WithUpdateHandler].
+func WithUpdateCommandDisabled(err string) ConnectOption {
+	return func(cfg *connectConfig) {
+		cfg.remoteUpdateErr = &err
+	}
+}
+
 // Connect begins a new ngrok [Session] by connecting to the ngrok service.
 // Connect blocks until the session is successfully established or fails with
 // an error. Customize session connection behavior with [ConnectOption]
@@ -424,16 +470,24 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 	empty := ""
 	notImplemented := "the agent has not defined a callback for this operation"
 
-	var remoteStopErr, remoteRestartErr, remoteUpdateErr = &notImplemented, &notImplemented, &notImplemented
-
 	if cfg.StopHandler != nil {
-		remoteStopErr = &empty
+		cfg.remoteStopErr = &empty
 	}
 	if cfg.RestartHandler != nil {
-		remoteRestartErr = &empty
+		cfg.remoteRestartErr = &empty
 	}
 	if cfg.UpdateHandler != nil {
-		remoteUpdateErr = &empty
+		cfg.remoteUpdateErr = &empty
+	}
+
+	if cfg.remoteStopErr == nil {
+		cfg.remoteStopErr = &notImplemented
+	}
+	if cfg.remoteRestartErr == nil {
+		cfg.remoteRestartErr = &notImplemented
+	}
+	if cfg.remoteUpdateErr == nil {
+		cfg.remoteUpdateErr = &notImplemented
 	}
 
 	auth := proto.AuthExtra{
@@ -445,9 +499,9 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 		HeartbeatInterval:  int64(heartbeatConfig.Interval),
 		HeartbeatTolerance: int64(heartbeatConfig.Tolerance),
 
-		RestartUnsupportedError: remoteRestartErr,
-		StopUnsupportedError:    remoteStopErr,
-		UpdateUnsupportedError:  remoteUpdateErr,
+		RestartUnsupportedError: cfg.remoteRestartErr,
+		StopUnsupportedError:    cfg.remoteStopErr,
+		UpdateUnsupportedError:  cfg.remoteUpdateErr,
 
 		ClientType: proto.LibraryOfficialGo,
 	}
