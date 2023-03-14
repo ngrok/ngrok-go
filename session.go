@@ -289,7 +289,7 @@ func WithHeartbeatHandler(handler SessionHeartbeatHandler) ConnectOption {
 // Errors returned by this function will be visible to the ngrok dashboard or
 // API as the response to the Stop operation.
 //
-// Do not block inside this callback. It will cause the Dashboard or API stop
+// Do not block inside this callback. It will cause the Dashboard or API Stop
 // operation to hang. Do not call [Session].Close or [os.Exit] inside this
 // callback, it will also cause the operation to hang.
 //
@@ -298,6 +298,44 @@ func WithHeartbeatHandler(handler SessionHeartbeatHandler) ConnectOption {
 func WithStopHandler(handler ServerCommandHandler) ConnectOption {
 	return func(cfg *connectConfig) {
 		cfg.StopHandler = handler
+	}
+}
+
+// WithRestartHandler configures a function which is called when the ngrok service
+// requests that this [Session] restarts. Your application may choose to interpret
+// this callback as a request to reconnect the [Session] or restart the entire process.
+//
+// Errors returned by this function will be visible to the ngrok dashboard or
+// API as the response to the Restart operation.
+//
+// Do not block inside this callback. It will cause the Dashboard or API Restart
+// operation to hang. Do not call [Session].Close or [os.Exit] inside this
+// callback, it will also cause the operation to hang.
+//
+// Instead, either spawn a goroutine to asynchronously restart, or return an error.
+func WithRestartHandler(handler ServerCommandHandler) ConnectOption {
+	return func(cfg *connectConfig) {
+		cfg.RestartHandler = handler
+	}
+}
+
+// WithUpdateHandler configures a function which is called when the ngrok service
+// requests that the application running this [Session] updates. Your application
+// may use this callback to trigger a check for a newer version followed by an update
+// and restart if one exists.
+//
+// Errors returned by this function will be visible to the ngrok dashboard or
+// API as the response to the Update operation.
+//
+// Do not block inside this callback. It will cause the Dashboard or API Update
+// operation to hang. Do not call [Session].Close or [os.Exit] inside this
+// callback, it will also cause the operation to hang.
+//
+// Instead, spawn a goroutine to asynchronously handle the update process
+// or return an error if there is no newer version to update to.
+func WithUpdateHandler(handler ServerCommandHandler) ConnectOption {
+	return func(cfg *connectConfig) {
+		cfg.UpdateHandler = handler
 	}
 }
 
