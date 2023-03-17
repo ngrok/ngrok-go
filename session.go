@@ -610,41 +610,61 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 	}
 
 	sess := tunnel_client.NewReconnectingSession(logger, rawDialer, stateChanges, reconnect)
+	// allow consumers to .Close() the session before a successful connect
+	session.setInner(&sessionInner{
+		Session: sess,
+	})
 
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case err := <-stateChanges:
-		if err != nil {
+	// performs one "pump" of the session update channel
+	// returns true if there are more updates to handle
+	runSessionHandlers := func() (bool, error) {
+		select {
+		case <-ctx.Done():
 			sess.Close()
+			return false, ctx.Err()
+		case err, ok := <-stateChanges:
+			switch {
+			case !ok: // session has given up on reconnecting
+				if cfg.DisconnectHandler != nil {
+					logger.Info("no more state changes")
+					cfg.DisconnectHandler(ctx, session, nil)
+				}
+				sess.Close()
+				return false, nil
+			case err != nil: // session encountered an error
+				if cfg.DisconnectHandler != nil {
+					cfg.DisconnectHandler(ctx, session, err)
+				}
+				return true, err
+			case err == nil: // session connected successfully
+				if cfg.ConnectHandler != nil {
+					cfg.ConnectHandler(ctx, session)
+				}
+				return true, nil
+			}
+		}
+
+		panic("inexhaustive case match when handling session state change")
+	}
+
+	var lastErr error
+	var err error
+	for again := true; again; {
+		again, err = runSessionHandlers()
+		switch {
+		case again && err == nil: // successfully connected, move to goroutine and return
+			again = false
+		case again && err != nil: // error on reconnect
+			lastErr = err
+		case !again && err == nil: // permanent reconnect failure
+			return nil, lastErr
+		case !again && err != nil: // context done
 			return nil, err
 		}
 	}
 
-	if cfg.ConnectHandler != nil {
-		cfg.ConnectHandler(ctx, session)
-	}
-
 	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case err, ok := <-stateChanges:
-				if !ok {
-					if cfg.DisconnectHandler != nil {
-						logger.Info("no more state changes")
-						cfg.DisconnectHandler(ctx, session, nil)
-					}
-					return
-				}
-				if err == nil && cfg.ConnectHandler != nil {
-					cfg.ConnectHandler(ctx, session)
-				}
-				if err != nil && cfg.DisconnectHandler != nil {
-					cfg.DisconnectHandler(ctx, session, err)
-				}
-			}
+		for again := true; again; again, _ = runSessionHandlers() {
 		}
 	}()
 
