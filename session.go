@@ -311,8 +311,8 @@ func WithLogger(logger log.Logger) ConnectOption {
 
 // WithConnectHandler configures a function which is called each time the ngrok
 // [Session] successfully connects to the ngrok service. Use this option to
-// receive events when ngrok successfully reconnects a [Session] that was
-// disconnected because of a network failure.
+// receive events when the [Session] successfully connects or reconnects after
+// a disconnection due to network failure.
 func WithConnectHandler(handler SessionConnectHandler) ConnectOption {
 	return func(cfg *connectConfig) {
 		cfg.ConnectHandler = handler
@@ -322,6 +322,13 @@ func WithConnectHandler(handler SessionConnectHandler) ConnectOption {
 // WithDisconnectHandler configures a function which is called each time the
 // ngrok [Session] disconnects from the ngrok service. Use this option to detect
 // when the ngrok session has gone temporarily offline.
+//
+// This handler will be called every time a [Session] encounters an error during
+// or after connection. It may be called multiple times in a row, and it may be
+// called before any Connect handler is called and before [Connect] returns.
+//
+// If this function is called with a nil error, the [Session] has stopped trying
+// to connect, usually due to [Session.Close] being called.
 func WithDisconnectHandler(handler SessionDisconnectHandler) ConnectOption {
 	return func(cfg *connectConfig) {
 		cfg.DisconnectHandler = handler
