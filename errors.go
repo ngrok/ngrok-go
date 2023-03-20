@@ -1,10 +1,8 @@
 package ngrok
 
 import (
-	"errors"
 	"fmt"
 	"net/url"
-	"strings"
 )
 
 // Errors arising from authentication failure.
@@ -114,57 +112,4 @@ func (e errSessionDial) Unwrap() error {
 func (e errSessionDial) Is(target error) bool {
 	_, ok := target.(errSessionDial)
 	return ok
-}
-
-type errMultiple struct {
-	inners []error
-}
-
-var _ error = &errMultiple{}
-
-func (e *errMultiple) Add(err error) {
-	if err == nil {
-		return
-	}
-
-	e.inners = append(e.inners, err)
-}
-
-func (e *errMultiple) Error() string {
-	switch len(e.inners) {
-	case 0:
-		return "error: no errors recorded"
-	case 1:
-		return e.inners[0].Error()
-	default:
-		errBuilder := strings.Builder{}
-		errBuilder.WriteString("multiple errors occurred:\n")
-		for i := len(e.inners); i > 0; i-- {
-			errBuilder.WriteString(e.inners[i-1].Error())
-			errBuilder.WriteString("\n")
-		}
-		return errBuilder.String()
-	}
-}
-
-func (e *errMultiple) Unwrap() []error {
-	return e.inners
-}
-
-func (e *errMultiple) Is(err error) bool {
-	for _, inner := range e.inners {
-		if errors.Is(inner, err) {
-			return true
-		}
-	}
-	return false
-}
-
-func (e *errMultiple) As(err any) bool {
-	for _, inner := range e.inners {
-		if errors.As(inner, err) {
-			return true
-		}
-	}
-	return false
 }

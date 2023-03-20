@@ -19,6 +19,7 @@ import (
 	"unsafe"
 
 	"github.com/inconshreveable/log15/v3"
+	"go.uber.org/multierr"
 	"golang.org/x/net/proxy"
 
 	"golang.ngrok.com/ngrok/config"
@@ -627,6 +628,11 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 	runSessionHandlers := func() (bool, error) {
 		select {
 		case <-ctx.Done():
+			if cfg.DisconnectHandler != nil {
+				cfg.DisconnectHandler(ctx, session, ctx.Err())
+				logger.Info("no more state changes")
+				cfg.DisconnectHandler(ctx, session, nil)
+			}
 			sess.Close()
 			return false, ctx.Err()
 		case err, ok := <-stateChanges:
@@ -654,19 +660,17 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 		panic("inexhaustive case match when handling session state change")
 	}
 
-	errs := &errMultiple{}
-	var err error
+	var errs error
 	for again := true; again; {
+		var err error
 		again, err = runSessionHandlers()
 		switch {
 		case again && err == nil: // successfully connected, move to goroutine and return
 			again = false
 		case again && err != nil: // error on reconnect
-			errs.Add(err)
-		case !again && err == nil: // permanent reconnect failure
-			return nil, errs
-		case !again && err != nil: // context done
-			errs.Add(err)
+			errs = multierr.Append(errs, err)
+		case !again: // gave up trying to reconnect
+			errs = multierr.Append(errs, err)
 			return nil, errs
 		}
 	}

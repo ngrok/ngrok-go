@@ -14,6 +14,7 @@ require (
 	github.com/google/go-cmp v0.5.8 // indirect
 	github.com/inconshreveable/log15 v3.0.0-testing.3+incompatible // indirect
 	github.com/kr/text v0.2.0 // indirect
+	go.uber.org/multierr v1.10.0 // indirect
 	golang.org/x/term v0.2.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 )
