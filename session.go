@@ -654,7 +654,7 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 		panic("inexhaustive case match when handling session state change")
 	}
 
-	var lastErr error
+	errs := &errMultiple{}
 	var err error
 	for again := true; again; {
 		again, err = runSessionHandlers()
@@ -662,11 +662,12 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 		case again && err == nil: // successfully connected, move to goroutine and return
 			again = false
 		case again && err != nil: // error on reconnect
-			lastErr = err
+			errs.Add(err)
 		case !again && err == nil: // permanent reconnect failure
-			return nil, lastErr
+			return nil, errs
 		case !again && err != nil: // context done
-			return nil, err
+			errs.Add(err)
+			return nil, errs
 		}
 	}
 

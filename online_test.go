@@ -681,27 +681,20 @@ func TestRetryableErrors(t *testing.T) {
 	var err error
 	ctx := context.Background()
 
+	// give up on connecting after first attempt
 	disconnect := WithDisconnectHandler(func(_ context.Context, sess Session, disconnectErr error) {
-		// save the first session error and exit
-		if disconnectErr != nil && err == nil {
-			err = disconnectErr
-			sess.Close()
-		}
+		sess.Close()
 	})
 	connect := WithConnectHandler(func(_ context.Context, sess Session) {
-		// exit if connection somehow succeeds
-		err = nil
 		sess.Close()
 	})
 
-	err = nil
-	_, _ = Connect(ctx, WithServer("127.0.0.234:123"), connect, disconnect)
+	_, err = Connect(ctx, WithServer("127.0.0.234:123"), connect, disconnect)
 	var dialErr errSessionDial
 	require.ErrorIs(t, err, dialErr)
 	require.ErrorAs(t, err, &dialErr)
 
-	err = nil
-	_, _ = Connect(ctx, WithAuthtoken("lolnope"), connect, disconnect)
+	_, err = Connect(ctx, WithAuthtoken("lolnope"), connect, disconnect)
 	var authErr errAuthFailed
 	require.ErrorIs(t, err, authErr)
 	require.ErrorAs(t, err, &authErr)
