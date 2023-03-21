@@ -445,10 +445,12 @@ func WithUpdateCommandDisabled(err string) ConnectOption {
 	}
 }
 
-// Connect begins a new ngrok [Session] by connecting to the ngrok service.
+// Connect begins a new ngrok [Session] by connecting to the ngrok service,
+// retrying transient failures if they occur.
+//
 // Connect blocks until the session is successfully established or fails with
-// an error. Customize session connection behavior with [ConnectOption]
-// arguments.
+// an error that will not be retried. Customize session connection behavior
+// with [ConnectOption] arguments.
 func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 	logger := log15.New()
 	logger.SetHandler(log15.DiscardHandler())
