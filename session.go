@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync/atomic"
@@ -75,6 +76,37 @@ type ServerCommandHandler func(ctx context.Context, sess Session) error
 // establishment.
 type ConnectOption func(*connectConfig)
 
+type clientInfo struct {
+	Type    string
+	Version string
+}
+
+var bannedUAchar = regexp.MustCompile("[^!#$%&'*+-.^_`|~0-9a-zA-Z]")
+
+// Formats client info as a well-formed user agent string
+func (c *clientInfo) ToUserAgent() string {
+	return sanitizeUserAgentString(c.Type) + "/" + sanitizeUserAgentString(c.Version)
+}
+
+func sanitizeUserAgentString(s string) string {
+	s = strings.ReplaceAll(s, "/", "-")
+	s = bannedUAchar.ReplaceAllString(s, "#")
+	return s
+}
+
+// version, type, user-agent
+func generateInfo(cs []clientInfo) (string, string, string) {
+	var versions, types, uas []string
+
+	for _, c := range cs {
+		versions = append(versions, c.Version)
+		types = append(types, c.Type)
+		uas = append(uas, c.ToUserAgent())
+	}
+
+	return strings.Join(versions, ","), strings.Join(types, ","), strings.Join(uas, " ")
+}
+
 // Options to use when establishing an ngrok session.
 type connectConfig struct {
 	// Your ngrok Authtoken.
@@ -99,6 +131,10 @@ type connectConfig struct {
 	// Opaque metadata string to be associated with the session.
 	// Viewable from the ngrok dashboard or API.
 	Metadata string
+
+	// Child client types and versions used to identify specific applications
+	// using this library to the ngrok service.
+	ClientInfo []clientInfo
 
 	// HeartbeatInterval determines how often we send application level
 	// heartbeats to the server go check connection liveness.
@@ -134,6 +170,22 @@ type connectConfig struct {
 func WithMetadata(meta string) ConnectOption {
 	return func(cfg *connectConfig) {
 		cfg.Metadata = meta
+	}
+}
+
+// WithChildClient configures client type and version information for applications
+// built on this library. This is a way for consumers of this library to identify
+// themselves to the ngrok service.
+//
+// The protocol-level semantics of adding additional type/version information are
+// currently unstable, as is the format of the type and version strings. The server
+// may reject client types that it doesn't recognize, or versions that are too far
+// out of date.
+//
+// For now, don't use this outside of official consumers.
+func WithChildClient(clientType, version string) ConnectOption {
+	return func(cfg *connectConfig) {
+		cfg.ClientInfo = append(cfg.ClientInfo, clientInfo{clientType, version})
 	}
 }
 
@@ -490,8 +542,17 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 		cfg.remoteUpdateErr = &notImplemented
 	}
 
+	cfg.ClientInfo = append(
+		[]clientInfo{clientInfo{string(proto.LibraryOfficialGo), libraryAgentVersion}},
+		cfg.ClientInfo...,
+	)
+
+	version, clientType, userAgent := generateInfo(cfg.ClientInfo)
+
 	auth := proto.AuthExtra{
-		Version:            libraryAgentVersion,
+		Version:            version,
+		ClientType:         proto.ClientType(clientType),
+		UserAgent:          userAgent,
 		Authtoken:          proto.ObfuscatedString(cfg.Authtoken),
 		Metadata:           cfg.Metadata,
 		OS:                 runtime.GOOS,
@@ -502,8 +563,6 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 		RestartUnsupportedError: cfg.remoteRestartErr,
 		StopUnsupportedError:    cfg.remoteStopErr,
 		UpdateUnsupportedError:  cfg.remoteUpdateErr,
-
-		ClientType: proto.LibraryOfficialGo,
 	}
 
 	reconnect := func(sess tunnel_client.Session) error {
