@@ -325,11 +325,11 @@ func WithConnectHandler(handler SessionConnectHandler) ConnectOption {
 // when the ngrok session has gone temporarily offline.
 //
 // This handler will be called every time a [Session] encounters an error during
-// or after connection. It may be called multiple times in a row, and it may be
+// or after connection. It may be called multiple times in a row; it may be
 // called before any Connect handler is called and before [Connect] returns.
 //
-// If this function is called with a nil error, the [Session] has stopped trying
-// to connect, usually due to [Session.Close] being called.
+// If this function is called with a nil error, the [Session] has stopped and will
+// not reconnect, usually due to [Session.Close] being called.
 func WithDisconnectHandler(handler SessionDisconnectHandler) ConnectOption {
 	return func(cfg *connectConfig) {
 		cfg.DisconnectHandler = handler
