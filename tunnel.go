@@ -7,6 +7,7 @@ import (
 
 	"golang.ngrok.com/ngrok/config"
 	tunnel_client "golang.ngrok.com/ngrok/internal/tunnel/client"
+	"golang.ngrok.com/ngrok/internal/tunnel/proto"
 )
 
 // Tunnel is a [net.Listener] created by a call to [Listen] or
@@ -127,11 +128,57 @@ func (t *tunnelImpl) Session() Session {
 	return t.Sess
 }
 
+// Conn is a connection from an ngrok [Tunnel].
+//
+// It implements the standard [net.Conn] interface and has additional methods
+// to query ngrok-specific connection metadata.
+//
+// Because the [net.Listener] interface requires `Accept` to return a
+// [net.Conn], you will have to type-assert it to an ngrok [Conn]:
+// ```
+// conn, _ := tun.Accept()
+// ngrokConn := conn.(ngrok.Conn)
+// ```
+type Conn interface {
+	net.Conn
+	// Proto returns the tunnel protocol (http, https, tls, or tcp) for this connection.
+	Proto() string
+	// EdgeType returns the type of the edge (https, tls, or tcp) that matched this tunnel.
+	EdgeType() EdgeType
+	// PassthroughTLS returns whether this connection contains an end-to-end tls
+	// connection.
+	PassthroughTLS() bool
+}
+
+type EdgeType proto.EdgeType
+
+const (
+	EdgeTypeUndefined EdgeType = 0
+	EdgeTypeTCP       EdgeType = 1
+	EdgeTypeTLS       EdgeType = 2
+	EdgeTypeHTTPS     EdgeType = 3
+)
+
 type connImpl struct {
 	net.Conn
 	Proxy *tunnel_client.ProxyConn
 }
 
+var _ Conn = &connImpl{}
+
 func (c *connImpl) ProxyConn() *tunnel_client.ProxyConn {
 	return c.Proxy
+}
+
+func (c *connImpl) Proto() string {
+	return c.Proxy.Header.Proto
+}
+
+func (c *connImpl) EdgeType() EdgeType {
+	et, _ := proto.ParseEdgeType(c.Proxy.Header.EdgeType)
+	return EdgeType(et)
+}
+
+func (c *connImpl) PassthroughTLS() bool {
+	return c.Proxy.Header.PassthroughTLS
 }
