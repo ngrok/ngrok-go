@@ -270,10 +270,10 @@ type EdgeType int32
 
 // in sync with rpx.EdgesTypes_Edge
 const (
-	EdgeTypeUndefined = 0
-	EdgeTypeTCP       = 1
-	EdgeTypeTLS       = 2
-	EdgeTypeHTTPS     = 3
+	EdgeTypeUndefined EdgeType = 0
+	EdgeTypeTCP                = 1
+	EdgeTypeTLS                = 2
+	EdgeTypeHTTPS              = 3
 )
 
 func ParseEdgeType(et string) (EdgeType, bool) {

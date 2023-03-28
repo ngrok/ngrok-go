@@ -99,6 +99,26 @@ func TestTunnel(t *testing.T) {
 	require.Equal(t, "some application", tun.ForwardsTo())
 }
 
+func TestTunnelConnMetadata(t *testing.T) {
+	ctx := context.Background()
+	sess := setupSession(ctx, t)
+
+	tun := startTunnel(ctx, t, sess, config.HTTPEndpoint())
+
+	go func() {
+		_, _ = http.Get(tun.URL())
+	}()
+
+	conn, err := tun.Accept()
+	require.NoError(t, err)
+
+	proxyconn, ok := conn.(Conn)
+	require.True(t, ok, "conn doesn't implement proxy conn interface")
+
+	require.Equal(t, "https", proxyconn.Proto())
+	require.Equal(t, EdgeTypeUndefined, proxyconn.EdgeType())
+}
+
 func TestWithHTTPHandler(t *testing.T) {
 	ctx := context.Background()
 	sess := setupSession(ctx, t)
