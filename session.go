@@ -108,7 +108,7 @@ func generateInfo(cs []clientInfo) (string, string, string) {
 	return strings.Join(versions, ","), strings.Join(types, ","), strings.Join(uas, " ")
 }
 
-// Options to use when establishing an ngrok session.
+// Options to use when establishing the ngrok session.
 type connectConfig struct {
 	// Your ngrok Authtoken.
 	Authtoken proto.ObfuscatedString
@@ -324,7 +324,7 @@ func WithConnectHandler(handler SessionConnectHandler) ConnectOption {
 // ngrok [Session] disconnects from the ngrok service. Use this option to detect
 // when the ngrok session has gone temporarily offline.
 //
-// This handler will be called every time a [Session] encounters an error during
+// This handler will be called every time the [Session] encounters an error during
 // or after connection. It may be called multiple times in a row; it may be
 // called before any Connect handler is called and before [Connect] returns.
 //
