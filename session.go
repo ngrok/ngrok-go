@@ -114,6 +114,9 @@ type connectConfig struct {
 	// The address of the ngrok server to connect to.
 	// Defaults to `tunnel.ngrok.com:443`
 	ServerAddr string
+	// The SNI used to connect to the ngrok server.
+	// Defaults to the hostname in [ServerAddr]
+	SNI string
 	// The [x509.CertPool] used to authenticate the ngrok server certificate.
 	CAPool *x509.CertPool
 
@@ -257,6 +260,19 @@ func WithRegion(region string) ConnectOption {
 func WithServer(addr string) ConnectOption {
 	return func(cfg *connectConfig) {
 		cfg.ServerAddr = addr
+	}
+}
+
+// WithSNI configures the server name indication to use when connecting to the
+// ngrok service. If unset, this value defaults to the host portion of the
+// default server address or the address configured with `WithServer`.
+//
+// Use this only if you are specifying a custom server address which differs from
+// the one provided for your custom agent ingress. Otherwise, the default behavior
+// of the agent is correct.
+func WithSNI(name string) ConnectOption {
+	return func(cfg *connectConfig) {
+		cfg.SNI = name
 	}
 }
 
@@ -463,9 +479,14 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 		cfg.ServerAddr = defaultServer
 	}
 
+	serverName := cfg.SNI
+	if serverName == "" {
+		serverName = strings.Split(cfg.ServerAddr, ":")[0]
+	}
+
 	tlsConfig := &tls.Config{
 		RootCAs:    cfg.CAPool,
-		ServerName: strings.Split(cfg.ServerAddr, ":")[0],
+		ServerName: serverName,
 		MinVersion: tls.VersionTLS12,
 	}
 
