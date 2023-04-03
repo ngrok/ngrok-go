@@ -19,6 +19,7 @@ import (
 	"unsafe"
 
 	"github.com/inconshreveable/log15/v3"
+	"go.uber.org/multierr"
 	"golang.org/x/net/proxy"
 
 	"golang.ngrok.com/ngrok/config"
@@ -107,7 +108,7 @@ func generateInfo(cs []clientInfo) (string, string, string) {
 	return strings.Join(versions, ","), strings.Join(types, ","), strings.Join(uas, " ")
 }
 
-// Options to use when establishing an ngrok session.
+// Options to use when establishing the ngrok session.
 type connectConfig struct {
 	// Your ngrok Authtoken.
 	Authtoken proto.ObfuscatedString
@@ -311,8 +312,8 @@ func WithLogger(logger log.Logger) ConnectOption {
 
 // WithConnectHandler configures a function which is called each time the ngrok
 // [Session] successfully connects to the ngrok service. Use this option to
-// receive events when ngrok successfully reconnects a [Session] that was
-// disconnected because of a network failure.
+// receive events when the [Session] successfully connects or reconnects after
+// a disconnection due to network failure.
 func WithConnectHandler(handler SessionConnectHandler) ConnectOption {
 	return func(cfg *connectConfig) {
 		cfg.ConnectHandler = handler
@@ -322,6 +323,13 @@ func WithConnectHandler(handler SessionConnectHandler) ConnectOption {
 // WithDisconnectHandler configures a function which is called each time the
 // ngrok [Session] disconnects from the ngrok service. Use this option to detect
 // when the ngrok session has gone temporarily offline.
+//
+// This handler will be called every time the [Session] encounters an error during
+// or after connection. It may be called multiple times in a row; it may be
+// called before any Connect handler is called and before [Connect] returns.
+//
+// If this function is called with a nil error, the [Session] has stopped and will
+// not reconnect, usually due to [Session.Close] being called.
 func WithDisconnectHandler(handler SessionDisconnectHandler) ConnectOption {
 	return func(cfg *connectConfig) {
 		cfg.DisconnectHandler = handler
@@ -437,10 +445,12 @@ func WithUpdateCommandDisabled(err string) ConnectOption {
 	}
 }
 
-// Connect begins a new ngrok [Session] by connecting to the ngrok service.
+// Connect begins a new ngrok [Session] by connecting to the ngrok service,
+// retrying transient failures if they occur.
+//
 // Connect blocks until the session is successfully established or fails with
-// an error. Customize session connection behavior with [ConnectOption]
-// arguments.
+// an error that will not be retried. Customize session connection behavior
+// with [ConnectOption] arguments.
 func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 	logger := log15.New()
 	logger.SetHandler(log15.DiscardHandler())
@@ -610,41 +620,65 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 	}
 
 	sess := tunnel_client.NewReconnectingSession(logger, rawDialer, stateChanges, reconnect)
+	// allow consumers to .Close() the session before a successful connect
+	session.setInner(&sessionInner{
+		Session: sess,
+	})
 
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case err := <-stateChanges:
-		if err != nil {
+	// performs one "pump" of the session update channel
+	// returns true if there are more updates to handle
+	runSessionHandlers := func() (bool, error) {
+		select {
+		case <-ctx.Done():
+			if cfg.DisconnectHandler != nil {
+				cfg.DisconnectHandler(ctx, session, ctx.Err())
+				logger.Info("no more state changes")
+				cfg.DisconnectHandler(ctx, session, nil)
+			}
 			sess.Close()
-			return nil, err
+			return false, ctx.Err()
+		case err, ok := <-stateChanges:
+			switch {
+			case !ok: // session has given up on reconnecting
+				if cfg.DisconnectHandler != nil {
+					logger.Info("no more state changes")
+					cfg.DisconnectHandler(ctx, session, nil)
+				}
+				sess.Close()
+				return false, nil
+			case err != nil: // session encountered an error
+				if cfg.DisconnectHandler != nil {
+					cfg.DisconnectHandler(ctx, session, err)
+				}
+				return true, err
+			case err == nil: // session connected successfully
+				if cfg.ConnectHandler != nil {
+					cfg.ConnectHandler(ctx, session)
+				}
+				return true, nil
+			}
+		}
+
+		panic("inexhaustive case match when handling session state change")
+	}
+
+	var errs error
+	for again := true; again; {
+		var err error
+		again, err = runSessionHandlers()
+		switch {
+		case again && err == nil: // successfully connected, move to goroutine and return
+			again = false
+		case again && err != nil: // error on reconnect
+			errs = multierr.Append(errs, err)
+		case !again: // gave up trying to reconnect
+			errs = multierr.Append(errs, err)
+			return nil, errs
 		}
 	}
 
-	if cfg.ConnectHandler != nil {
-		cfg.ConnectHandler(ctx, session)
-	}
-
 	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case err, ok := <-stateChanges:
-				if !ok {
-					if cfg.DisconnectHandler != nil {
-						logger.Info("no more state changes")
-						cfg.DisconnectHandler(ctx, session, nil)
-					}
-					return
-				}
-				if err == nil && cfg.ConnectHandler != nil {
-					cfg.ConnectHandler(ctx, session)
-				}
-				if err != nil && cfg.DisconnectHandler != nil {
-					cfg.DisconnectHandler(ctx, session, err)
-				}
-			}
+		for again := true; again; again, _ = runSessionHandlers() {
 		}
 	}()
 

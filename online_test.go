@@ -652,7 +652,7 @@ func TestHeartbeatCallback(t *testing.T) {
 	require.Equal(t, 2, heartbeats, "should've seen some heartbeats")
 }
 
-func TestErrors(t *testing.T) {
+func TestPermanentErrors(t *testing.T) {
 	onlineTest(t)
 	var err error
 	ctx := context.Background()
@@ -663,23 +663,42 @@ func TestErrors(t *testing.T) {
 	require.ErrorIs(t, err, proxyErr)
 	require.ErrorAs(t, err, &proxyErr)
 
-	_, err = Connect(ctx, WithServer("127.0.0.234:123"))
-	var dialErr errSessionDial
-	require.ErrorIs(t, err, dialErr)
-	require.ErrorAs(t, err, &dialErr)
-
-	_, err = Connect(ctx, WithAuthtoken("lolnope"))
-	var authErr errAuthFailed
-	require.ErrorIs(t, err, authErr)
-	require.ErrorAs(t, err, &authErr)
-	require.True(t, authErr.Remote)
-
 	sess, err := Connect(ctx)
 	require.NoError(t, err)
 	_, err = sess.Listen(ctx, config.TCPEndpoint())
 	var startErr errListen
 	require.ErrorIs(t, err, startErr)
 	require.ErrorAs(t, err, &startErr)
+
+	timeoutCtx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	_, err = Connect(timeoutCtx, WithServer("127.0.0.234:123"))
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+}
+
+func TestRetryableErrors(t *testing.T) {
+	onlineTest(t)
+	var err error
+	ctx := context.Background()
+
+	// give up on connecting after first attempt
+	disconnect := WithDisconnectHandler(func(_ context.Context, sess Session, disconnectErr error) {
+		sess.Close()
+	})
+	connect := WithConnectHandler(func(_ context.Context, sess Session) {
+		sess.Close()
+	})
+
+	_, err = Connect(ctx, WithServer("127.0.0.234:123"), connect, disconnect)
+	var dialErr errSessionDial
+	require.ErrorIs(t, err, dialErr)
+	require.ErrorAs(t, err, &dialErr)
+
+	_, err = Connect(ctx, WithAuthtoken("lolnope"), connect, disconnect)
+	var authErr errAuthFailed
+	require.ErrorIs(t, err, authErr)
+	require.ErrorAs(t, err, &authErr)
+	require.True(t, authErr.Remote)
 }
 
 func TestNonExported(t *testing.T) {
