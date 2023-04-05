@@ -115,6 +115,8 @@ type connectConfig struct {
 	// The address of the ngrok server to connect to.
 	// Defaults to `tunnel.ngrok.com:443`
 	ServerAddr string
+	// The [tls.Config] used when connecting to the ngrok server
+	TLSConfigCustomizer func(*tls.Config)
 	// The [x509.CertPool] used to authenticate the ngrok server certificate.
 	CAPool *x509.CertPool
 
@@ -258,6 +260,15 @@ func WithRegion(region string) ConnectOption {
 func WithServer(addr string) ConnectOption {
 	return func(cfg *connectConfig) {
 		cfg.ServerAddr = addr
+	}
+}
+
+// WithTLSConfig allows customization of the TLS connection made from the agent
+// to the ngrok service. Customization is applied after the [WithServer] and
+// [WithCA] options are applied.
+func WithTLSConfig(tlsCustomizer func(*tls.Config)) ConnectOption {
+	return func(cfg *connectConfig) {
+		cfg.TLSConfigCustomizer = tlsCustomizer
 	}
 }
 
@@ -477,6 +488,9 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 		RootCAs:    cfg.CAPool,
 		ServerName: strings.Split(cfg.ServerAddr, ":")[0],
 		MinVersion: tls.VersionTLS12,
+	}
+	if cfg.TLSConfigCustomizer != nil {
+		cfg.TLSConfigCustomizer(tlsConfig)
 	}
 
 	var dialer Dialer
