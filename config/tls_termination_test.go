@@ -27,6 +27,16 @@ func TestTLSTermination(t *testing.T) {
 				require.Equal(t, []byte("key"), actual.Key)
 			},
 		},
+		{
+			name: "managed",
+			opts: TLSEndpoint(WithManagedTermination()),
+			expectOpts: func(t *testing.T, opts *proto.TLSEndpoint) {
+				actual := opts.TLSTermination
+				require.NotNil(t, actual)
+				require.NotNil(t, actual.Cert)
+				require.NotNil(t, actual.Key)
+			},
+		},
 	}
 
 	cases.runAll(t)
