@@ -32,8 +32,13 @@ type tlsOptions struct {
 	// Common tunnel options
 	commonOpts
 
-	// The domain to request for this edge.
+	// The fqdn to request for this edge.
 	Domain string
+
+	// Note: these are "the old way", and shouldn't actually be used. Their
+	// setters are both deprecated.
+	Hostname  string
+	Subdomain string
 
 	// Certificates to use for client authentication at the ngrok edge.
 	MutualTLSCA []*x509.Certificate
@@ -52,6 +57,9 @@ func (cfg *tlsOptions) toProtoConfig() *proto.TLSEndpoint {
 	opts := &proto.TLSEndpoint{
 		Domain:     cfg.Domain,
 		ProxyProto: proto.ProxyProto(cfg.ProxyProto),
+
+		Subdomain: cfg.Subdomain,
+		Hostname:  cfg.Hostname,
 	}
 
 	opts.IPRestriction = cfg.commonOpts.CIDRRestrictions.toProtoConfig()
