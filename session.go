@@ -31,7 +31,7 @@ import (
 )
 
 // The ngrok library version.
-const libraryAgentVersion = "0.0.0"
+const libraryAgentVersion = "1.0.0"
 
 // Session encapsulates an established session with the ngrok service. Sessions
 // recover from network failures by automatically reconnecting.
@@ -96,16 +96,14 @@ func sanitizeUserAgentString(s string) string {
 }
 
 // version, type, user-agent
-func generateInfo(cs []clientInfo) (string, string, string) {
-	var versions, types, uas []string
+func generateUserAgent(cs []clientInfo) string {
+	var uas []string
 
 	for _, c := range cs {
-		versions = append(versions, c.Version)
-		types = append(types, c.Type)
 		uas = append(uas, c.ToUserAgent())
 	}
 
-	return strings.Join(versions, ","), strings.Join(types, ","), strings.Join(uas, " ")
+	return strings.Join(uas, " ")
 }
 
 // Options to use when establishing the ngrok session.
@@ -188,7 +186,7 @@ func WithMetadata(meta string) ConnectOption {
 // For now, don't use this outside of official consumers.
 func WithChildClient(clientType, version string) ConnectOption {
 	return func(cfg *connectConfig) {
-		cfg.ClientInfo = append(cfg.ClientInfo, clientInfo{clientType, version})
+		cfg.ClientInfo = append([]clientInfo{{clientType, version}}, cfg.ClientInfo...)
 	}
 }
 
@@ -567,15 +565,15 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 	}
 
 	cfg.ClientInfo = append(
-		[]clientInfo{clientInfo{string(proto.LibraryOfficialGo), libraryAgentVersion}},
-		cfg.ClientInfo...,
+		cfg.ClientInfo,
+		clientInfo{string(proto.LibraryOfficialGo), libraryAgentVersion},
 	)
 
-	version, clientType, userAgent := generateInfo(cfg.ClientInfo)
+	userAgent := generateUserAgent(cfg.ClientInfo)
 
 	auth := proto.AuthExtra{
-		Version:            version,
-		ClientType:         proto.ClientType(clientType),
+		Version:            cfg.ClientInfo[0].Version,
+		ClientType:         proto.ClientType(cfg.ClientInfo[0].Type),
 		UserAgent:          userAgent,
 		Authtoken:          proto.ObfuscatedString(cfg.Authtoken),
 		Metadata:           cfg.Metadata,
