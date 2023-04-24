@@ -78,15 +78,20 @@ type ServerCommandHandler func(ctx context.Context, sess Session) error
 type ConnectOption func(*connectConfig)
 
 type clientInfo struct {
-	Type    string
-	Version string
+	Type     string
+	Version  string
+	Comments []string
 }
 
 var bannedUAchar = regexp.MustCompile("[^!#$%&'*+-.^_`|~0-9a-zA-Z]")
 
 // Formats client info as a well-formed user agent string
 func (c *clientInfo) ToUserAgent() string {
-	return sanitizeUserAgentString(c.Type) + "/" + sanitizeUserAgentString(c.Version)
+	comment := ""
+	if len(c.Comments) > 0 {
+		comment = fmt.Sprintf(" (%s)", strings.Join(c.Comments, "; "))
+	}
+	return sanitizeUserAgentString(c.Type) + "/" + sanitizeUserAgentString(c.Version) + comment
 }
 
 func sanitizeUserAgentString(s string) string {
@@ -184,9 +189,9 @@ func WithMetadata(meta string) ConnectOption {
 // out of date.
 //
 // For now, don't use this outside of official consumers.
-func WithChildClient(clientType, version string) ConnectOption {
+func WithChildClient(clientType, version string, comments ...string) ConnectOption {
 	return func(cfg *connectConfig) {
-		cfg.ClientInfo = append([]clientInfo{{clientType, version}}, cfg.ClientInfo...)
+		cfg.ClientInfo = append([]clientInfo{{clientType, version, comments}}, cfg.ClientInfo...)
 	}
 }
 
@@ -566,7 +571,7 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 
 	cfg.ClientInfo = append(
 		cfg.ClientInfo,
-		clientInfo{string(proto.LibraryOfficialGo), libraryAgentVersion},
+		clientInfo{Type: string(proto.LibraryOfficialGo), Version: libraryAgentVersion},
 	)
 
 	userAgent := generateUserAgent(cfg.ClientInfo)
