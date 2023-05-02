@@ -35,8 +35,13 @@ type httpOptions struct {
 	// Defaults to [SchemeHTTPS].
 	Scheme Scheme
 
-	// The domain to request for this edge
+	// The fqdn to request for this edge
 	Domain string
+
+	// Note: these are "the old way", and shouldn't actually be used. Their
+	// setters are both deprecated.
+	Hostname  string
+	Subdomain string
 
 	// If non-nil, start a goroutine which runs this http server
 	// accepting connections from the http tunnel
@@ -73,7 +78,9 @@ type httpOptions struct {
 
 func (cfg *httpOptions) toProtoConfig() *proto.HTTPEndpoint {
 	opts := &proto.HTTPEndpoint{
-		Domain: cfg.Domain,
+		Domain:    cfg.Domain,
+		Hostname:  cfg.Hostname,
+		Subdomain: cfg.Subdomain,
 	}
 
 	if cfg.Compression {
