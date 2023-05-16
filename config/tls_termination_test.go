@@ -27,6 +27,26 @@ func TestTLSTermination(t *testing.T) {
 				require.Equal(t, []byte("key"), actual.Key)
 			},
 		},
+		{
+			name: "with new termination",
+			opts: TLSEndpoint(WithTLSTermination()),
+			expectOpts: func(t *testing.T, opts *proto.TLSEndpoint) {
+				actual := opts.TLSTermination
+				require.NotNil(t, actual)
+				require.Equal(t, []byte{}, actual.Cert)
+				require.Equal(t, []byte{}, actual.Key)
+			},
+		},
+		{
+			name: "with new custom termination",
+			opts: TLSEndpoint(WithTLSTermination(WithTLSTerminationKeyPair([]byte("cert"), []byte("key")))),
+			expectOpts: func(t *testing.T, opts *proto.TLSEndpoint) {
+				actual := opts.TLSTermination
+				require.NotNil(t, actual)
+				require.Equal(t, []byte("cert"), actual.Cert)
+				require.Equal(t, []byte("key"), actual.Key)
+			},
+		},
 	}
 
 	cases.runAll(t)
