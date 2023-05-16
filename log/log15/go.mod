@@ -1,6 +1,6 @@
 module golang.ngrok.com/ngrok/log/log15
 
-go 1.19
+go 1.20
 
 require github.com/inconshreveable/log15/v3 v3.0.0-testing.1
 
