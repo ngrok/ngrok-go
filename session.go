@@ -31,7 +31,9 @@ import (
 )
 
 // The ngrok library version.
-const libraryAgentVersion = "1.0.0"
+//
+//go:embed VERSION
+var libraryAgentVersion string
 
 // Session encapsulates an established session with the ngrok service. Sessions
 // recover from network failures by automatically reconnecting.

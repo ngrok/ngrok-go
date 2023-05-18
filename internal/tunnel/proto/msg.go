@@ -88,7 +88,7 @@ type AuthExtra struct {
 type ClientType string
 
 const (
-	LibraryOfficialGo ClientType = "library/official/go"
+	LibraryOfficialGo ClientType = "ngrok-go"
 )
 
 // Note: entirely unused
