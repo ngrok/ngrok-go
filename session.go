@@ -181,17 +181,13 @@ func WithMetadata(meta string) ConnectOption {
 	}
 }
 
-// WithChildClient configures client type and version information for applications
+// WithClientInfo configures client type and version information for applications
 // built on this library. This is a way for consumers of this library to identify
 // themselves to the ngrok service.
 //
-// The protocol-level semantics of adding additional type/version information are
-// currently unstable, as is the format of the type and version strings. The server
-// may reject client types that it doesn't recognize, or versions that are too far
-// out of date.
-//
-// For now, don't use this outside of official consumers.
-func WithChildClient(clientType, version string, comments ...string) ConnectOption {
+// This will add a new entry to the `User-Agent` field in the "most significant"
+// (first) position.
+func WithClientInfo(clientType, version string, comments ...string) ConnectOption {
 	return func(cfg *connectConfig) {
 		cfg.ClientInfo = append([]clientInfo{{clientType, version, comments}}, cfg.ClientInfo...)
 	}
