@@ -43,6 +43,8 @@ type tlsOptions struct {
 	// Certificates to use for client authentication at the ngrok edge.
 	MutualTLSCA []*x509.Certificate
 
+	// True if the TLS connection should be terminated at the ngrok edge.
+	terminateAtEdge bool
 	// The key to use for TLS termination at the ngrok edge in PEM format.
 	KeyPEM []byte
 	// The certificate to use for TLS termination at the ngrok edge in PEM
@@ -66,7 +68,9 @@ func (cfg *tlsOptions) toProtoConfig() *proto.TLSEndpoint {
 
 	opts.MutualTLSAtEdge = mutualTLSEndpointOption(cfg.MutualTLSCA).toProtoConfig()
 
-	if cfg.KeyPEM != nil && cfg.CertPEM != nil {
+	// When terminate-at-edge is set the TLSTermination must be sent even if the key and cert are nil,
+	// this will default to the ngrok edge's automatically provisioned keypair.
+	if cfg.terminateAtEdge || (cfg.KeyPEM != nil && cfg.CertPEM != nil) {
 		opts.TLSTermination = &pb.MiddlewareConfiguration_TLSTermination{
 			Key:  cfg.KeyPEM,
 			Cert: cfg.CertPEM,
