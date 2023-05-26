@@ -70,7 +70,7 @@ func (cfg *tlsOptions) toProtoConfig() *proto.TLSEndpoint {
 
 	// When terminate-at-edge is set the TLSTermination must be sent even if the key and cert are nil,
 	// this will default to the ngrok edge's automatically provisioned keypair.
-	if cfg.terminateAtEdge || (cfg.KeyPEM != nil && cfg.CertPEM != nil) {
+	if cfg.terminateAtEdge {
 		opts.TLSTermination = &pb.MiddlewareConfiguration_TLSTermination{
 			Key:  cfg.KeyPEM,
 			Cert: cfg.CertPEM,

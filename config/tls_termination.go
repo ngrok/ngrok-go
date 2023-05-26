@@ -57,6 +57,7 @@ func WithTLSTermination(opts ...TLSTerminationOption) TLSEndpointOption {
 // Deprecated: Use WithCustomEdgeTermination instead.
 func WithTermination(certPEM, keyPEM []byte) TLSEndpointOption {
 	return tlsOptionFunc(func(cfg *tlsOptions) {
+		cfg.terminateAtEdge = true
 		cfg.CertPEM = certPEM
 		cfg.KeyPEM = keyPEM
 	})
