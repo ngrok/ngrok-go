@@ -27,6 +27,7 @@ func (tt tlsTermination) ApplyTLS(cfg *tlsOptions) {
 		// TODO: implement this in the tunnel `Accept` call.
 		panic("automatic tls termination in-app is not yet supported")
 	case TLSAtEdge:
+		cfg.terminateAtEdge = true
 		cfg.KeyPEM = tt.key
 		cfg.CertPEM = tt.cert
 		return
@@ -56,6 +57,7 @@ func WithTLSTermination(opts ...TLSTerminationOption) TLSEndpointOption {
 // Deprecated: Use WithCustomEdgeTermination instead.
 func WithTermination(certPEM, keyPEM []byte) TLSEndpointOption {
 	return tlsOptionFunc(func(cfg *tlsOptions) {
+		cfg.terminateAtEdge = true
 		cfg.CertPEM = certPEM
 		cfg.KeyPEM = keyPEM
 	})

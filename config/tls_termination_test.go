@@ -38,6 +38,16 @@ func TestTLSTermination(t *testing.T) {
 			},
 		},
 		{
+			name: "with new nil termination",
+			opts: TLSEndpoint(WithTLSTermination(WithTLSTerminationKeyPair(nil, nil))),
+			expectOpts: func(t *testing.T, opts *proto.TLSEndpoint) {
+				actual := opts.TLSTermination
+				require.NotNil(t, actual)
+				require.Equal(t, []byte(nil), actual.Cert)
+				require.Equal(t, []byte(nil), actual.Key)
+			},
+		},
+		{
 			name: "with new custom termination",
 			opts: TLSEndpoint(WithTLSTermination(WithTLSTerminationKeyPair([]byte("cert"), []byte("key")))),
 			expectOpts: func(t *testing.T, opts *proto.TLSEndpoint) {
