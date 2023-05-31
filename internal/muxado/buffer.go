@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"io/ioutil"
+	"os"
 	"sync"
 	"time"
 )
@@ -25,8 +26,10 @@ type inboundBuffer struct {
 	cond sync.Cond
 	mu   sync.Mutex
 	bytes.Buffer
-	err     error
-	maxSize int
+	err      error
+	maxSize  int
+	deadline time.Time
+	timer    *time.Timer
 }
 
 func (b *inboundBuffer) Init(maxSize int) {
@@ -57,9 +60,47 @@ DONE:
 	return n, err
 }
 
+// Notify readers that the deadline has arrived.
+func (b *inboundBuffer) notifyDeadline() {
+	// It's important that the mutex is locked for this. It ensures that an
+	// in-flight timer can't broadcast before a reader gets to its condvar.Wait().
+	b.mu.Lock()
+	b.cond.Broadcast()
+	b.mu.Unlock()
+}
+
+// Start or reset the timer.
+// Must be called when the mutex is locked.
+func (b *inboundBuffer) startTimerLocked(timeout time.Duration) {
+	if b.timer == nil {
+		b.timer = time.AfterFunc(timeout, b.notifyDeadline)
+	} else {
+		b.timer.Reset(timeout)
+	}
+}
+
+// Stops a timer, if one is set.
+// Must be called while the mutex is locked.
+func (b *inboundBuffer) stopTimerLocked() {
+	if b.timer != nil {
+		b.timer.Stop()
+	}
+}
+
 func (b *inboundBuffer) Read(p []byte) (n int, err error) {
 	b.mu.Lock()
 	for {
+		// If the deadline is set, we need to take it into account
+		if !b.deadline.IsZero() {
+			// If the deadline is in the past, bail out.
+			// SetDeadline will ensure that we get woken back up if it expires.
+			if time.Until(b.deadline) < 0 {
+				n = 0
+				err = os.ErrDeadlineExceeded
+				break
+			}
+		}
+
 		if b.Len() != 0 {
 			n, err = b.Buffer.Read(p)
 			break
@@ -68,6 +109,7 @@ func (b *inboundBuffer) Read(p []byte) (n int, err error) {
 			err = b.err
 			break
 		}
+
 		b.cond.Wait()
 	}
 	b.mu.Unlock()
@@ -77,30 +119,29 @@ func (b *inboundBuffer) Read(p []byte) (n int, err error) {
 func (b *inboundBuffer) SetError(err error) {
 	b.mu.Lock()
 	b.err = err
-	b.mu.Unlock()
 	b.cond.Broadcast()
+	b.mu.Unlock()
 }
 
 func (b *inboundBuffer) SetDeadline(t time.Time) {
-	// XXX: implement
-	/*
-		b.L.Lock()
+	b.mu.Lock()
 
-		// set the deadline
-		b.deadline = t
+	// Set the deadline and notify any readers that they need to take heed.
+	// They'll figure out all of the timer management for us.
+	b.deadline = t
+	if timeout := time.Until(t); timeout > 0 {
+		b.startTimerLocked(timeout)
+	}
+	b.cond.Broadcast()
 
-		// how long until the deadline
-		delay := t.Sub(time.Now())
+	b.mu.Unlock()
+}
 
-		if b.timer != nil {
-			b.timer.Stop()
-		}
-
-		// after the delay, wake up waiters
-		b.timer = time.AfterFunc(delay, func() {
-			b.Broadcast()
-		})
-
-		b.L.Unlock()
-	*/
+func (b *inboundBuffer) Close() error {
+	b.mu.Lock()
+	b.stopTimerLocked()
+	b.err = io.EOF
+	b.cond.Broadcast()
+	b.mu.Unlock()
+	return nil
 }
