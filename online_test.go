@@ -1,6 +1,7 @@
 package ngrok
 
 import (
+	"bufio"
 	"compress/gzip"
 	"context"
 	"encoding/binary"
@@ -707,4 +708,40 @@ func TestNonExported(t *testing.T) {
 	sess := setupSession(ctx, t)
 
 	require.NotEmpty(t, sess.(interface{ Region() string }).Region())
+}
+
+func echo(ws *websocket.Conn) {
+	_, _ = io.Copy(ws, ws)
+}
+
+func TestWebsockets(t *testing.T) {
+	onlineTest(t)
+
+	ctx := context.Background()
+
+	srv := &http.ServeMux{}
+	srv.Handle("/", helloHandler)
+	srv.Handle("/ws", websocket.Handler(echo))
+
+	tun, errCh := serveHTTP(ctx, t, nil, config.HTTPEndpoint(config.WithScheme(config.SchemeHTTPS)), srv)
+
+	tunnelURL, err := url.Parse(tun.URL())
+	require.NoError(t, err)
+
+	conn, err := websocket.Dial(fmt.Sprintf("wss://%s/ws", tunnelURL.Hostname()), "", tunnelURL.String())
+	require.NoError(t, err)
+
+	go func() {
+		_, _ = fmt.Fprintln(conn, "Hello, world!")
+	}()
+
+	bufConn := bufio.NewReader(conn)
+	out, err := bufConn.ReadString('\n')
+	require.NoError(t, err)
+	require.Equal(t, "Hello, world!\n", out)
+
+	conn.Close()
+	tun.Close()
+
+	require.Error(t, <-errCh)
 }

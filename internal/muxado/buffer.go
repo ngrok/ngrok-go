@@ -5,7 +5,7 @@ import (
 	"errors"
 	"io"
 	"io/ioutil"
-	"sync"
+	"os"
 	"time"
 )
 
@@ -22,21 +22,24 @@ type buffer interface {
 }
 
 type inboundBuffer struct {
-	cond sync.Cond
-	mu   sync.Mutex
-	bytes.Buffer
-	err     error
 	maxSize int
+	lock    chan chan struct{}
+	bytes.Buffer
+	err      error
+	deadline time.Time
+	timer    *time.Timer
 }
 
 func (b *inboundBuffer) Init(maxSize int) {
-	b.cond.L = &b.mu
 	b.maxSize = maxSize
+	b.lock = make(chan chan struct{}, 1)
+	b.lock <- make(chan struct{})
 }
 
 func (b *inboundBuffer) ReadFrom(rd io.Reader) (n int64, err error) {
 	var n64 int64
-	b.mu.Lock()
+	cond := <-b.lock
+
 	if b.err != nil {
 		if _, err = ioutil.ReadAll(rd); err == nil {
 			err = bufferClosed
@@ -51,15 +54,22 @@ func (b *inboundBuffer) ReadFrom(rd io.Reader) (n int64, err error) {
 		b.err = bufferFull
 	}
 
-	b.cond.Broadcast()
+	close(cond)
+	cond = make(chan struct{})
+
 DONE:
-	b.mu.Unlock()
+	b.lock <- cond
 	return n, err
 }
 
 func (b *inboundBuffer) Read(p []byte) (n int, err error) {
-	b.mu.Lock()
+	cond := <-b.lock
 	for {
+		if !b.deadline.IsZero() && time.Now().After(b.deadline) {
+			err = os.ErrDeadlineExceeded
+			break
+		}
+
 		if b.Len() != 0 {
 			n, err = b.Buffer.Read(p)
 			break
@@ -68,39 +78,40 @@ func (b *inboundBuffer) Read(p []byte) (n int, err error) {
 			err = b.err
 			break
 		}
-		b.cond.Wait()
+
+		b.lock <- cond
+		<-cond
+		cond = <-b.lock
 	}
-	b.mu.Unlock()
+	b.lock <- cond
 	return
 }
 
 func (b *inboundBuffer) SetError(err error) {
-	b.mu.Lock()
+	cond := <-b.lock
 	b.err = err
-	b.mu.Unlock()
-	b.cond.Broadcast()
+	close(cond)
+	b.lock <- make(chan struct{})
+}
+
+func (b *inboundBuffer) deadlineReached() {
+	cond := <-b.lock
+	close(cond)
+	b.lock <- make(chan struct{})
 }
 
 func (b *inboundBuffer) SetDeadline(t time.Time) {
-	// XXX: implement
-	/*
-		b.L.Lock()
+	cond := <-b.lock
 
-		// set the deadline
-		b.deadline = t
+	close(cond)
+	if b.timer != nil {
+		b.timer.Stop()
+	}
 
-		// how long until the deadline
-		delay := t.Sub(time.Now())
+	b.deadline = t
+	if u := t.Sub(time.Now()); u > 0 {
+		b.timer = time.AfterFunc(u, b.deadlineReached)
+	}
 
-		if b.timer != nil {
-			b.timer.Stop()
-		}
-
-		// after the delay, wake up waiters
-		b.timer = time.AfterFunc(delay, func() {
-			b.Broadcast()
-		})
-
-		b.L.Unlock()
-	*/
+	b.lock <- make(chan struct{})
 }
