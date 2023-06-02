@@ -132,7 +132,12 @@ func (b *inboundBuffer) SetDeadline(t time.Time) {
 	if timeout := time.Until(t); timeout > 0 {
 		b.startTimerLocked(timeout)
 	}
-	b.cond.Broadcast()
+
+	if t.IsZero() {
+		b.stopTimerLocked()
+	} else {
+		b.cond.Broadcast()
+	}
 
 	b.mu.Unlock()
 }
