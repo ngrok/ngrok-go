@@ -106,6 +106,7 @@ func (s *stream) Read(buf []byte) (int, error) {
 // - If the stream receives another STREAM_DATA frame (except an empty one with a FIN)
 //   from the remote side, it will send a STREAM_RST with a CANCELED error code
 func (s *stream) Close() error {
+	s.bufImpl.Close()
 	s.CloseWrite()
 	s.closeWith(closeError)
 	return nil
