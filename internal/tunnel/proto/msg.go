@@ -132,7 +132,6 @@ func (avd *AgentVersionDeprecated) Error() string {
 		to = "to " + avd.NextMin + " or later "
 	}
 	return "Your agent is deprecated. Please update " + to + when
-
 }
 
 type AuthRespExtra struct {

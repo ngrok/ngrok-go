@@ -610,6 +610,21 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 			return errAuthFailed{remote, err}
 		}
 
+		if resp.Extra.DeprecationWarning != nil {
+			warning := resp.Extra.DeprecationWarning
+			vars := make([]any, 0, 3)
+			if warning.NextMin != "" {
+				vars = append(vars, "min_version", warning.NextMin)
+			}
+			if !warning.NextDate.IsZero() {
+				vars = append(vars, "deadline", warning.NextDate)
+			}
+			if warning.Msg != "" {
+				vars = append(vars, "extra", warning.Msg)
+			}
+			logger.Warn(warning.Error(), vars...)
+		}
+
 		session.setInner(&sessionInner{
 			Session:            sess,
 			Region:             resp.Extra.Region,
