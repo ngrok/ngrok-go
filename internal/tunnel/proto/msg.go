@@ -1,6 +1,8 @@
 package proto
 
 import (
+	"time"
+
 	"golang.ngrok.com/ngrok/internal/muxado"
 	"golang.ngrok.com/ngrok/internal/pb"
 )
@@ -114,6 +116,25 @@ type AuthResp struct {
 	Extra    AuthRespExtra
 }
 
+type AgentVersionDeprecated struct {
+	NextMin  string
+	NextDate time.Time
+	Msg      string
+}
+
+func (avd *AgentVersionDeprecated) Error() string {
+	when := "at your earliest convenience."
+	to := ""
+	if !avd.NextDate.IsZero() {
+		when = "by " + avd.NextDate.Format(time.DateOnly) + "."
+	}
+	if avd.NextMin != "" {
+		to = "to " + avd.NextMin + " or later "
+	}
+	return "Your agent is deprecated. Please update " + to + when
+
+}
+
 type AuthRespExtra struct {
 	Version string // server version
 	Region  string // server region
@@ -121,9 +142,10 @@ type AuthRespExtra struct {
 	Cookie      string
 	AccountName string
 	// Duration in seconds
-	SessionDuration int64
-	PlanName        string
-	Banner          string
+	SessionDuration    int64
+	PlanName           string
+	Banner             string
+	DeprecationWarning *AgentVersionDeprecated
 }
 
 // A client sends this message to the server over a new stream
