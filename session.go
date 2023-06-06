@@ -35,12 +35,21 @@ import (
 //go:embed VERSION
 var libraryAgentVersion string
 
+type AgentVersionDeprecated proto.AgentVersionDeprecated
+
+func (avd *AgentVersionDeprecated) Error() string {
+	return (*proto.AgentVersionDeprecated)(avd).Error()
+}
+
 // Session encapsulates an established session with the ngrok service. Sessions
 // recover from network failures by automatically reconnecting.
 type Session interface {
 	// Listen creates a new Tunnel which will listen for new inbound
 	// connections. The returned Tunnel object is a net.Listener.
 	Listen(ctx context.Context, cfg config.Tunnel) (Tunnel, error)
+
+	// Warnings returns a list of warnings generated for the session on connect/auth
+	Warnings() []error
 
 	// Close ends the ngrok session. All Tunnel objects created by Listen
 	// on this session will be closed.
@@ -601,16 +610,32 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 			return errAuthFailed{remote, err}
 		}
 
+		if resp.Extra.DeprecationWarning != nil {
+			warning := resp.Extra.DeprecationWarning
+			vars := make([]any, 0, 3)
+			if warning.NextMin != "" {
+				vars = append(vars, "min_version", warning.NextMin)
+			}
+			if !warning.NextDate.IsZero() {
+				vars = append(vars, "deadline", warning.NextDate)
+			}
+			if warning.Msg != "" {
+				vars = append(vars, "extra", warning.Msg)
+			}
+			logger.Warn(warning.Error(), vars...)
+		}
+
 		session.setInner(&sessionInner{
-			Session:         sess,
-			Region:          resp.Extra.Region,
-			ProtoVersion:    resp.Version,
-			ServerVersion:   resp.Extra.Version,
-			ClientID:        resp.Extra.Region,
-			AccountName:     resp.Extra.AccountName,
-			PlanName:        resp.Extra.PlanName,
-			Banner:          resp.Extra.Banner,
-			SessionDuration: resp.Extra.SessionDuration,
+			Session:            sess,
+			Region:             resp.Extra.Region,
+			ProtoVersion:       resp.Version,
+			ServerVersion:      resp.Extra.Version,
+			ClientID:           resp.Extra.Region,
+			AccountName:        resp.Extra.AccountName,
+			PlanName:           resp.Extra.PlanName,
+			Banner:             resp.Extra.Banner,
+			SessionDuration:    resp.Extra.SessionDuration,
+			DeprecationWarning: resp.Extra.DeprecationWarning,
 		})
 
 		if cfg.HeartbeatHandler != nil {
@@ -707,14 +732,15 @@ type sessionImpl struct {
 type sessionInner struct {
 	tunnel_client.Session
 
-	Region          string
-	ProtoVersion    string
-	ServerVersion   string
-	ClientID        string
-	AccountName     string
-	PlanName        string
-	Banner          string
-	SessionDuration int64
+	Region             string
+	ProtoVersion       string
+	ServerVersion      string
+	ClientID           string
+	AccountName        string
+	PlanName           string
+	Banner             string
+	SessionDuration    int64
+	DeprecationWarning *proto.AgentVersionDeprecated
 }
 
 func (s *sessionImpl) inner() *sessionInner {
@@ -772,6 +798,14 @@ func (s *sessionImpl) Listen(ctx context.Context, cfg config.Tunnel) (Tunnel, er
 	}
 
 	return t, nil
+}
+
+func (s *sessionImpl) Warnings() []error {
+	deprecated := s.inner().DeprecationWarning
+	if deprecated != nil {
+		return []error{(*AgentVersionDeprecated)(deprecated)}
+	}
+	return nil
 }
 
 // The rest of the `sessionImpl` methods are non-public, but can be
