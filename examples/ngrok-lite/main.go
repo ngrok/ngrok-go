@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 
@@ -30,9 +31,17 @@ func main() {
 }
 
 func run(ctx context.Context, dest string) error {
+	ctx, ca := context.WithCancel(ctx)
 	tun, err := ngrok.Listen(ctx,
 		config.HTTPEndpoint(),
 		ngrok.WithAuthtokenFromEnv(),
+		ngrok.WithStopHandler(func(ctx context.Context, sess ngrok.Session) error {
+			go func() {
+				time.Sleep(time.Millisecond * 10)
+				ca()
+			}()
+			return nil
+		}),
 	)
 	if err != nil {
 		return err
@@ -56,15 +65,19 @@ func run(ctx context.Context, dest string) error {
 }
 
 func handleConn(ctx context.Context, dest string, conn net.Conn) error {
+	defer conn.Close()
+
 	next, err := net.Dial("tcp", dest)
 	if err != nil {
 		return err
 	}
+	defer next.Close()
 
 	g, _ := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
 		_, err := io.Copy(next, conn)
+		next.(*net.TCPConn).CloseWrite()
 		return err
 	})
 	g.Go(func() error {
