@@ -3,7 +3,7 @@ package proto
 import (
 	"time"
 
-	"golang.ngrok.com/muxado"
+	"golang.ngrok.com/muxado/v2"
 	"golang.ngrok.com/ngrok/internal/pb"
 )
 
