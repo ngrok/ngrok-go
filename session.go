@@ -24,7 +24,7 @@ import (
 
 	"golang.ngrok.com/ngrok/config"
 
-	"golang.ngrok.com/muxado"
+	"golang.ngrok.com/muxado/v2"
 	tunnel_client "golang.ngrok.com/ngrok/internal/tunnel/client"
 	"golang.ngrok.com/ngrok/internal/tunnel/proto"
 	"golang.ngrok.com/ngrok/log"

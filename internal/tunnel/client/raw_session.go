@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"golang.ngrok.com/muxado"
+	"golang.ngrok.com/muxado/v2"
 	"golang.ngrok.com/ngrok/internal/tunnel/netx"
 	"golang.ngrok.com/ngrok/internal/tunnel/proto"
 
@@ -140,7 +140,7 @@ func (s *rawSession) SrvInfo() (resp proto.SrvInfoResp, err error) {
 }
 
 func (s *rawSession) Heartbeat() (time.Duration, error) {
-	if latency := s.mux.Beat(); latency == 0 {
+	if latency, ok := s.mux.Beat(); !ok {
 		return 0, errors.New("remote failed to reply to heatbeat")
 	} else {
 		return latency, nil
@@ -259,8 +259,8 @@ func (s *rawSession) rpc(reqtype proto.ReqType, req any, resp any) error {
 	return nil
 }
 
-func (s *rawSession) onHeartbeat(pingTime time.Duration) {
-	if pingTime == 0 {
+func (s *rawSession) onHeartbeat(pingTime time.Duration, timeout bool) {
+	if timeout {
 		s.Error("heartbeat timeout, terminating session")
 		s.Close()
 	} else {
