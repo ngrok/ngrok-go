@@ -1,5 +1,12 @@
 [![Go Reference](https://pkg.go.dev/badge/golang.ngrok.com/ngrok.svg)](https://pkg.go.dev/golang.ngrok.com/ngrok)
 [![Go](https://github.com/ngrok/ngrok-go/actions/workflows/buildandtest.yml/badge.svg)](https://github.com/ngrok/ngrok-go/actions/workflows/buildandtest.yml)
+
+<p>
+  <a href="https://ngrok.com">
+    <img src="assets/ngrok.png?raw=true" alt="ngrok Logo" width="300" url="https://ngrok.com" />
+  </a>
+</p>
+
 # ngrok-go
 
 ngrok is a simplified API-first ingress-as-a-service that adds connectivity, security, and observability to your apps.
@@ -19,9 +26,15 @@ The best way to install the ngrok agent SDK is through `go get`.
 ```sh
 go get golang.ngrok.com/ngrok
 ```
+
 ## Documentation
+
 A full API reference is included in the [ngrok go sdk documentation on pkg.go.dev](https://pkg.go.dev/golang.ngrok.com/ngrok). Check out the [ngrok Documentation](https://ngrok.com/docs) for more information about what you can do with ngrok.
+
+For additional information, be sure to also check out the [ngrok-go blog post](https://ngrok.com/blog-post/ngrok-go)!
+
 ## Quickstart
+
 For more examples of using ngrok-go, check out the [/examples](/examples) folder.
 
 The following example uses ngrok to start an http endpoint with a random url that will route traffic to the handler. The ngrok URL provided when running this example is accessible by anyone with an internet connection.
@@ -29,6 +42,7 @@ The following example uses ngrok to start an http endpoint with a random url tha
 The ngrok authtoken is pulled from the `NGROK_AUTHTOKEN` environment variable. You can find your authtoken by logging into the [ngrok dashboard](https://dashboard.ngrok.com/get-started/your-authtoken).
 
 You can run this example with the following command:
+
 ```sh
 NGROK_AUTHTOKEN=xxxx_xxxx go run examples/http/main.go
 ```
@@ -72,6 +86,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 ```
 
 ## Support
+
 The best place to get support using ngrok-go is through the [ngrok Slack Community](https://ngrok.com/slack). If you find bugs or would like to contribute code, please follow the instructions in the [contributing guide](/CONTRIBUTING.md).
 
 ## License
