@@ -1,6 +1,3 @@
-[![Go Reference](https://pkg.go.dev/badge/golang.ngrok.com/ngrok.svg)](https://pkg.go.dev/golang.ngrok.com/ngrok)
-[![Go](https://github.com/ngrok/ngrok-go/actions/workflows/buildandtest.yml/badge.svg)](https://github.com/ngrok/ngrok-go/actions/workflows/buildandtest.yml)
-
 <p>
   <a href="https://ngrok.com">
     <img src="assets/ngrok.png?raw=true" alt="ngrok Logo" width="300" url="https://ngrok.com" />
@@ -8,6 +5,11 @@
 </p>
 
 # ngrok-go
+
+[![Go Reference](https://pkg.go.dev/badge/golang.ngrok.com/ngrok.svg)](https://pkg.go.dev/golang.ngrok.com/ngrok)
+[![Go](https://github.com/ngrok/ngrok-go/actions/workflows/buildandtest.yml/badge.svg)](https://github.com/ngrok/ngrok-go/actions/workflows/buildandtest.yml)
+[![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/ngrok/ngrok-rust/blob/main/LICENSE-MIT)
+
 
 ngrok is a simplified API-first ingress-as-a-service that adds connectivity, security, and observability to your apps.
 
