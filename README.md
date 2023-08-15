@@ -1,9 +1,3 @@
-<p>
-  <a href="https://ngrok.com">
-    <img src="assets/ngrok.png?raw=true" alt="ngrok Logo" width="300" url="https://ngrok.com" />
-  </a>
-</p>
-
 # ngrok-go
 
 [![Go Reference](https://pkg.go.dev/badge/golang.ngrok.com/ngrok.svg)](https://pkg.go.dev/golang.ngrok.com/ngrok)
@@ -11,7 +5,7 @@
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/ngrok/ngrok-rust/blob/main/LICENSE-MIT)
 
 
-ngrok is a simplified API-first ingress-as-a-service that adds connectivity, security, and observability to your apps.
+[ngrok](https://ngrok.com) is a simplified API-first ingress-as-a-service that adds connectivity, security, and observability to your apps.
 
 ngrok-go is an open source and idiomatic library for embedding ngrok networking directly into Go applications. If you’ve used ngrok before, you can think of ngrok-go as the ngrok agent packaged as a Go library.
 
@@ -33,7 +27,7 @@ go get golang.ngrok.com/ngrok
 
 A full API reference is included in the [ngrok go sdk documentation on pkg.go.dev](https://pkg.go.dev/golang.ngrok.com/ngrok). Check out the [ngrok Documentation](https://ngrok.com/docs) for more information about what you can do with ngrok.
 
-For additional information, be sure to also check out the [ngrok-go blog post](https://ngrok.com/blog-post/ngrok-go)!
+For additional information, be sure to also check out the [ngrok-go launch announcement](https://ngrok.com/blog-post/ngrok-go)!
 
 ## Quickstart
 
