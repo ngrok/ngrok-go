@@ -173,7 +173,7 @@ func (e errSessionDial) Is(target error) bool {
 	return ok
 }
 
-func (e errSessionDial) ErrorCodb() string {
+func (e errSessionDial) ErrorCode() string {
 
 	errMsg := e.Inner.Error()
 
