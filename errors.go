@@ -174,7 +174,6 @@ func (e errSessionDial) Is(target error) bool {
 }
 
 func (e errSessionDial) ErrorCode() string {
-
 	errMsg := e.Inner.Error()
 
 	// Find the number in the format of ERR_NGROK_(\d+).
