@@ -7,11 +7,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var testError = errors.New("testing, 1 2 3!")
-
 // Sanity check for the appraoch to error construction/wrapping
 func TestErrorWrapping(t *testing.T) {
-	var accept error = errAcceptFailed{Inner: testError}
+	inner := errors.New("testing, 1 2 3")
+	var accept error = errAcceptFailed{Inner: inner}
 	var auth error = errAuthFailed{true, accept}
 
 	require.True(t, errors.Is(accept, errAcceptFailed{}))
@@ -27,4 +26,22 @@ func TestErrorWrapping(t *testing.T) {
 	require.True(t, errors.As(accept, &downcastAccept))
 
 	require.True(t, downcastAuth.Remote)
+}
+
+func TestNgrokErrorWrapping(t *testing.T) {
+	rootErr := errors.New("ngrok error ERR_NGROK_123")
+	nonNgrokRootErr := errors.New("generic non ngrok error")
+
+	ngrokErr := errAuthFailed{true, rootErr}
+	nonNgrokErr := errAuthFailed{true, nonNgrokRootErr}
+
+	var nerr ngrokError
+	require.True(t, errors.As(ngrokErr, &nerr))
+
+	require.Equal(t, nerr.Error(), "authentication failed: ngrok error ERR_NGROK_123")
+	require.Equal(t, nerr.ErrorCode(), "123")
+
+	errors.As(nonNgrokErr, &nerr)
+	require.Equal(t, nerr.Error(), "authentication failed: generic non ngrok error")
+	require.Equal(t, nerr.ErrorCode(), "")
 }

@@ -3,7 +3,13 @@ package ngrok
 import (
 	"fmt"
 	"net/url"
+	"regexp"
 )
+
+type ngrokError interface {
+	Error() string
+	ErrorCode() string
+}
 
 // Errors arising from authentication failure.
 type errAuthFailed struct {
@@ -34,6 +40,19 @@ func (e errAuthFailed) Is(target error) bool {
 	return ok
 }
 
+func (e errAuthFailed) ErrorCode() string {
+	errMsg := e.Inner.Error()
+
+	// Find the number in the format of ERR_NGROK_(\d+).
+	reg := regexp.MustCompile(`ERR_NGROK_(\d+)`)
+	matches := reg.FindStringSubmatch(errMsg)
+	if len(matches) == 2 {
+		return matches[1]
+	}
+
+	return ""
+}
+
 // The error returned by [Tunnel]'s [net.Listener.Accept] method.
 type errAcceptFailed struct {
 	// The underlying error.
@@ -53,6 +72,19 @@ func (e errAcceptFailed) Is(target error) bool {
 	return ok
 }
 
+func (e errAcceptFailed) ErrorCode() string {
+	errMsg := e.Inner.Error()
+
+	// Find the number in the format of ERR_NGROK_(\d+).
+	reg := regexp.MustCompile(`ERR_NGROK_(\d+)`)
+	matches := reg.FindStringSubmatch(errMsg)
+	if len(matches) == 2 {
+		return matches[1]
+	}
+
+	return ""
+}
+
 // Errors arising from a failure to start a tunnel.
 type errListen struct {
 	// The underlying error.
@@ -70,6 +102,20 @@ func (e errListen) Unwrap() error {
 func (e errListen) Is(target error) bool {
 	_, ok := target.(errListen)
 	return ok
+}
+
+
+func (e errListen) ErrorCode() string {
+	errMsg := e.Inner.Error()
+
+	// Find the number in the format of ERR_NGROK_(\d+).
+	reg := regexp.MustCompile(`ERR_NGROK_(\d+)`)
+	matches := reg.FindStringSubmatch(errMsg)
+	if len(matches) == 2 {
+		return matches[1]
+	}
+
+	return ""
 }
 
 // Errors arising from a failure to construct a [golang.org/x/net/proxy.Dialer] from a [url.URL].
@@ -93,6 +139,19 @@ func (e errProxyInit) Is(target error) bool {
 	return ok
 }
 
+func (e errProxyInit) ErrorCode() string {
+	errMsg := e.Inner.Error()
+
+	// Find the number in the format of ERR_NGROK_(\d+).
+	reg := regexp.MustCompile(`ERR_NGROK_(\d+)`)
+	matches := reg.FindStringSubmatch(errMsg)
+	if len(matches) == 2 {
+		return matches[1]
+	}
+
+	return ""
+}
+
 // Error arising from a failure to dial the ngrok server.
 type errSessionDial struct {
 	// The address to which a connection was attempted.
@@ -112,4 +171,18 @@ func (e errSessionDial) Unwrap() error {
 func (e errSessionDial) Is(target error) bool {
 	_, ok := target.(errSessionDial)
 	return ok
+}
+
+func (e errSessionDial) ErrorCodb() string {
+
+	errMsg := e.Inner.Error()
+
+	// Find the number in the format of ERR_NGROK_(\d+).
+	reg := regexp.MustCompile(`ERR_NGROK_(\d+)`)
+	matches := reg.FindStringSubmatch(errMsg)
+	if len(matches) == 2 {
+		return matches[1]
+	}
+
+	return ""
 }
