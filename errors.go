@@ -104,7 +104,6 @@ func (e errListen) Is(target error) bool {
 	return ok
 }
 
-
 func (e errListen) ErrorCode() string {
 	errMsg := e.Inner.Error()
 
