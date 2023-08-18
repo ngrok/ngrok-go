@@ -7,7 +7,7 @@ import (
 )
 
 // Match the error code in the format (ERR_NGROK_\d+).
-var	ngrokErrorCodeRegex = regexp.MustCompile(`(ERR_NGROK_\d+)`)
+var ngrokErrorCodeRegex = regexp.MustCompile(`(ERR_NGROK_\d+)`)
 
 type NgrokError interface {
 	Error() string
