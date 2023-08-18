@@ -6,7 +6,10 @@ import (
 	"regexp"
 )
 
-type ngrokError interface {
+// Match the error code in the format (ERR_NGROK_\d+).
+var	ngrokErrorCodeRegex = regexp.MustCompile(`(ERR_NGROK_\d+)`)
+
+type NgrokError interface {
 	Error() string
 	ErrorCode() string
 }
@@ -42,14 +45,10 @@ func (e errAuthFailed) Is(target error) bool {
 
 func (e errAuthFailed) ErrorCode() string {
 	errMsg := e.Inner.Error()
-
-	// Find the number in the format of ERR_NGROK_(\d+).
-	reg := regexp.MustCompile(`ERR_NGROK_(\d+)`)
-	matches := reg.FindStringSubmatch(errMsg)
+	matches := ngrokErrorCodeRegex.FindStringSubmatch(errMsg)
 	if len(matches) == 2 {
 		return matches[1]
 	}
-
 	return ""
 }
 
@@ -74,14 +73,10 @@ func (e errAcceptFailed) Is(target error) bool {
 
 func (e errAcceptFailed) ErrorCode() string {
 	errMsg := e.Inner.Error()
-
-	// Find the number in the format of ERR_NGROK_(\d+).
-	reg := regexp.MustCompile(`ERR_NGROK_(\d+)`)
-	matches := reg.FindStringSubmatch(errMsg)
+	matches := ngrokErrorCodeRegex.FindStringSubmatch(errMsg)
 	if len(matches) == 2 {
 		return matches[1]
 	}
-
 	return ""
 }
 
@@ -106,14 +101,10 @@ func (e errListen) Is(target error) bool {
 
 func (e errListen) ErrorCode() string {
 	errMsg := e.Inner.Error()
-
-	// Find the number in the format of ERR_NGROK_(\d+).
-	reg := regexp.MustCompile(`ERR_NGROK_(\d+)`)
-	matches := reg.FindStringSubmatch(errMsg)
+	matches := ngrokErrorCodeRegex.FindStringSubmatch(errMsg)
 	if len(matches) == 2 {
 		return matches[1]
 	}
-
 	return ""
 }
 
@@ -140,14 +131,10 @@ func (e errProxyInit) Is(target error) bool {
 
 func (e errProxyInit) ErrorCode() string {
 	errMsg := e.Inner.Error()
-
-	// Find the number in the format of ERR_NGROK_(\d+).
-	reg := regexp.MustCompile(`ERR_NGROK_(\d+)`)
-	matches := reg.FindStringSubmatch(errMsg)
+	matches := ngrokErrorCodeRegex.FindStringSubmatch(errMsg)
 	if len(matches) == 2 {
 		return matches[1]
 	}
-
 	return ""
 }
 
@@ -174,13 +161,9 @@ func (e errSessionDial) Is(target error) bool {
 
 func (e errSessionDial) ErrorCode() string {
 	errMsg := e.Inner.Error()
-
-	// Find the number in the format of ERR_NGROK_(\d+).
-	reg := regexp.MustCompile(`ERR_NGROK_(\d+)`)
-	matches := reg.FindStringSubmatch(errMsg)
+	matches := ngrokErrorCodeRegex.FindStringSubmatch(errMsg)
 	if len(matches) == 2 {
 		return matches[1]
 	}
-
 	return ""
 }

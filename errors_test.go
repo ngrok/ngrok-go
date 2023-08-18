@@ -35,11 +35,11 @@ func TestNgrokErrorWrapping(t *testing.T) {
 	ngrokErr := errAuthFailed{true, rootErr}
 	nonNgrokErr := errAuthFailed{true, nonNgrokRootErr}
 
-	var nerr ngrokError
+	var nerr NgrokError
 	require.True(t, errors.As(ngrokErr, &nerr))
 
 	require.Equal(t, nerr.Error(), "authentication failed: ngrok error ERR_NGROK_123")
-	require.Equal(t, nerr.ErrorCode(), "123")
+	require.Equal(t, nerr.ErrorCode(), "ERR_NGROK_123")
 
 	errors.As(nonNgrokErr, &nerr)
 	require.Equal(t, nerr.Error(), "authentication failed: generic non ngrok error")
