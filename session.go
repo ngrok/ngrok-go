@@ -604,7 +604,6 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 		if err != nil {
 			remote := false
 			if resp.Error != "" {
-				err = errors.New(resp.Error)
 				remote = true
 			}
 			return errAuthFailed{remote, err}
