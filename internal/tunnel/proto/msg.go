@@ -37,12 +37,6 @@ const Version = "2"
 // Match the error code in the format (ERR_NGROK_\d+).
 var ngrokErrorCodeRegex = regexp.MustCompile(`(ERR_NGROK_\d+)`)
 
-type Error interface {
-	error
-	Msg() string
-	ErrorCode() string
-}
-
 type ngrokError struct {
 	Inner error
 }
