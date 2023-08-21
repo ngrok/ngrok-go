@@ -1,6 +1,9 @@
 package proto
 
 import (
+	"errors"
+	"regexp"
+	"strings"
 	"time"
 
 	"golang.ngrok.com/muxado/v2"
@@ -30,6 +33,52 @@ const (
 )
 
 const Version = "2"
+
+// Match the error code in the format (ERR_NGROK_\d+).
+var ngrokErrorCodeRegex = regexp.MustCompile(`(ERR_NGROK_\d+)`)
+
+type ngrokError struct {
+	Inner error
+}
+
+func WrapError(err error) error {
+	return ngrokError{Inner: err}
+}
+
+func StringError(msg string) error {
+	return ngrokError{Inner: errors.New(msg)}
+}
+
+func (ne ngrokError) Error() string {
+	return ne.Inner.Error()
+}
+
+func (ne ngrokError) Unwrap() error {
+	return ne.Inner
+}
+
+func (ne ngrokError) Msg() string {
+	errMsg := ne.Inner.Error()
+	out := []string{}
+	lines := strings.Split(errMsg, "\n")
+	for _, line := range lines {
+		line = strings.Trim(line, " \t\n\r")
+		if line == "" || ngrokErrorCodeRegex.MatchString(line) {
+			continue
+		}
+		out = append(out, line)
+	}
+	return strings.Join(out, "\n")
+}
+
+func (ne ngrokError) ErrorCode() string {
+	errMsg := ne.Inner.Error()
+	matches := ngrokErrorCodeRegex.FindStringSubmatch(errMsg)
+	if len(matches) == 2 {
+		return matches[1]
+	}
+	return ""
+}
 
 // When a client opens a new control channel to the server it must start by
 // sending an Auth message.

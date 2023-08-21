@@ -3,7 +3,6 @@ package client
 import (
 	"encoding/binary"
 	"encoding/json"
-	"errors"
 	"io"
 	"net"
 	"strconv"
@@ -99,7 +98,7 @@ func (s *session) Auth(extra proto.AuthExtra) (resp proto.AuthResp, err error) {
 		return
 	}
 	if resp.Error != "" {
-		err = errors.New(resp.Error)
+		err = proto.StringError(resp.Error)
 		return
 	}
 	return
@@ -121,7 +120,7 @@ func (s *session) Listen(protocol string, opts any, extra proto.BindExtra, forwa
 
 	// process application-level error
 	if resp.Error != "" {
-		return nil, errors.New(resp.Error)
+		return nil, proto.StringError(resp.Error)
 	}
 
 	// make tunnel
@@ -141,7 +140,7 @@ func (s *session) ListenLabel(labels map[string]string, metadata string, forward
 
 	// process application-level error
 	if resp.Error != "" {
-		return nil, errors.New(resp.Error)
+		return nil, proto.StringError(resp.Error)
 	}
 
 	// make tunnel
@@ -252,7 +251,7 @@ func (s *session) unlisten(bindID string) error {
 	}
 
 	if resp.Error != "" {
-		err = errors.New(resp.Error)
+		err = proto.StringError(resp.Error)
 		s.Error("server failed to unlisten tunnel", "err", err)
 		return err
 	}
