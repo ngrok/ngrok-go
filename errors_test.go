@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"golang.ngrok.com/ngrok/internal/tunnel/proto"
 )
 
 // Sanity check for the appraoch to error construction/wrapping
@@ -29,19 +31,20 @@ func TestErrorWrapping(t *testing.T) {
 }
 
 func TestNgrokErrorWrapping(t *testing.T) {
-	rootErr := errors.New("ngrok error ERR_NGROK_123")
+	rootErr := proto.StringError("ngrok error\n\nERR_NGROK_123")
 	nonNgrokRootErr := errors.New("generic non ngrok error")
 
 	ngrokErr := errAuthFailed{true, rootErr}
 	nonNgrokErr := errAuthFailed{true, nonNgrokRootErr}
 
+	require.Equal(t, ngrokErr.Error(), "authentication failed: ngrok error\n\nERR_NGROK_123")
+
 	var nerr NgrokError
 	require.True(t, errors.As(ngrokErr, &nerr))
 
-	require.Equal(t, nerr.Error(), "authentication failed: ngrok error ERR_NGROK_123")
+	require.Equal(t, nerr.Error(), "ngrok error\n\nERR_NGROK_123")
+	require.Equal(t, nerr.Msg(), "ngrok error")
 	require.Equal(t, nerr.ErrorCode(), "ERR_NGROK_123")
 
-	errors.As(nonNgrokErr, &nerr)
-	require.Equal(t, nerr.Error(), "authentication failed: generic non ngrok error")
-	require.Equal(t, nerr.ErrorCode(), "")
+	require.False(t, errors.As(nonNgrokErr, &nerr))
 }

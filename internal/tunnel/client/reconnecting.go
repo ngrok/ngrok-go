@@ -187,7 +187,7 @@ func (s *reconnectingSession) Auth(extra proto.AuthExtra) (resp proto.AuthResp, 
 		return
 	}
 	if resp.Error != "" {
-		err = errors.New(resp.Error)
+		err = proto.StringError(resp.Error)
 		return
 	}
 	s.clientID = resp.ClientID
