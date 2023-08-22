@@ -5,9 +5,22 @@ import (
 	"net/url"
 )
 
-type NgrokError interface {
+// Error is an error enriched with a specific ErrorCode.
+// All ngrok error codes are documented at https://ngrok.com/docs/errors.
+//
+// An [Error] can be extracted from a generic error using [errors.As].
+//
+// Example:
+//
+//	var nerr ngrok.Error
+//	if errors.As(err, &nerr) {
+//	  fmt.Printf("%s: %s\n", nerr.ErrorCode(), nerr.Msg())
+//	}
+type Error interface {
 	error
+	// Msg returns the error string without the error code.
 	Msg() string
+	// ErrorCode returns the ngrok error code, if one exists.
 	ErrorCode() string
 }
 
