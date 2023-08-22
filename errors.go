@@ -12,10 +12,10 @@ import (
 //
 // Example:
 //
-//  var nerr ngrok.Error
-//  if errors.As(err, &nerr) {
-//    fmt.Printf("%s: %s\n", nerr.ErrorCode(), nerr.Msg())
-//  }
+//	var nerr ngrok.Error
+//	if errors.As(err, &nerr) {
+//	  fmt.Printf("%s: %s\n", nerr.ErrorCode(), nerr.Msg())
+//	}
 type Error interface {
 	error
 	// Msg returns the error string without the error code.
