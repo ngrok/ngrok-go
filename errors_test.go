@@ -39,7 +39,7 @@ func TestNgrokErrorWrapping(t *testing.T) {
 
 	require.Equal(t, ngrokErr.Error(), "authentication failed: ngrok error\n\nERR_NGROK_123")
 
-	var nerr NgrokError
+	var nerr Error
 	require.True(t, errors.As(ngrokErr, &nerr))
 
 	require.Equal(t, nerr.Error(), "ngrok error\n\nERR_NGROK_123")
