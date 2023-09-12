@@ -74,6 +74,9 @@ type httpOptions struct {
 	// WebhookVerification configuration.
 	// If nil, WebhookVerification is disabled.
 	WebhookVerification *webhookVerification
+	// UserAgentFilter configuration
+	// If nil, UserAgentFilter is disabled
+	UserAgentFilter *userAgentFilter
 }
 
 func (cfg *httpOptions) toProtoConfig() *proto.HTTPEndpoint {
@@ -113,6 +116,7 @@ func (cfg *httpOptions) toProtoConfig() *proto.HTTPEndpoint {
 	opts.OIDC = cfg.OIDC.toProtoConfig()
 	opts.WebhookVerification = cfg.WebhookVerification.toProtoConfig()
 	opts.IPRestriction = cfg.commonOpts.CIDRRestrictions.toProtoConfig()
+	opts.UserAgentFilter = cfg.UserAgentFilter.toProtoConfig()
 
 	return opts
 }

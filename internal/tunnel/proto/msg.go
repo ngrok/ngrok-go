@@ -287,6 +287,7 @@ type HTTPEndpoint struct {
 	RequestHeaders        *pb.MiddlewareConfiguration_Headers
 	ResponseHeaders       *pb.MiddlewareConfiguration_Headers
 	WebsocketTCPConverter *pb.MiddlewareConfiguration_WebsocketTCPConverter
+	UserAgentFilter       *pb.MiddlewareConfiguration_UserAgentFilter
 }
 
 type TCPEndpoint struct {
