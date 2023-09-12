@@ -44,8 +44,8 @@ func TestUserAgentFilter(t *testing.T) {
 			expectOpts: func(t *testing.T, opts *proto.HTTPEndpoint) {
 				actual := opts.UserAgentFilter
 				require.NotNil(t, actual)
-				require.Equal(t, []string{`(Pingdom\.com_bot_version_)(\d+)\.(\d+)`}, actual.Allow)
-				require.Equal(t, []string{`(_bot_version_)(\d+)\.(\d+)`}, actual.Deny)
+				require.Equal(t, []string{`(Pingdom\.com_bot_version_)(\d+)\.(\d+)`}, actual.Deny)
+				require.Equal(t, []string{`(_bot_version_)(\d+)\.(\d+)`}, actual.Allow)
 
 			},
 		},
