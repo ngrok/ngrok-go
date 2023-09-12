@@ -15,7 +15,7 @@ import (
 
 	log "github.com/inconshreveable/log15/v3"
 
-	"golang.ngrok.com/muxado"
+	"golang.ngrok.com/muxado/v2"
 )
 
 // Session is a higher-level client session interface. You will almost always prefer this over

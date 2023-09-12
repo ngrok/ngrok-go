@@ -72,6 +72,12 @@ message MiddlewareConfiguration {
     repeated string allow_domains = 6;
     repeated string scopes = 7;
   }
+
+  UserAgentFilter user_agent_filter = 13;
+  message UserAgentFilter {
+    repeated string allow = 1;
+    repeated string deny = 2;
+  }
 }
 
 message HTTPMiddleware {
@@ -86,6 +92,7 @@ message HTTPMiddleware {
   MiddlewareConfiguration.Headers request_headers = 9;
   MiddlewareConfiguration.Headers response_headers = 10;
   MiddlewareConfiguration.WebsocketTCPConverter websocket_tcp_converter = 11;
+  MiddlewareConfiguration.UserAgentFilter user_agent_filter = 12;
 }
 
 message TCPMiddleware {

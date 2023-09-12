@@ -24,7 +24,7 @@ import (
 
 	"golang.ngrok.com/ngrok/config"
 
-	"golang.ngrok.com/muxado"
+	"golang.ngrok.com/muxado/v2"
 	tunnel_client "golang.ngrok.com/ngrok/internal/tunnel/client"
 	"golang.ngrok.com/ngrok/internal/tunnel/proto"
 	"golang.ngrok.com/ngrok/log"
@@ -59,7 +59,7 @@ type Session interface {
 //go:embed assets/ngrok.ca.crt
 var defaultCACert []byte
 
-const defaultServer = "tunnel.ngrok.com:443"
+const defaultServer = "connect.ngrok-agent.com:443"
 
 // Dialer is the interface a custom connection dialer must implement for use
 // with the [WithDialer] option.
@@ -127,7 +127,7 @@ type connectConfig struct {
 	// Your ngrok Authtoken.
 	Authtoken proto.ObfuscatedString
 	// The address of the ngrok server to connect to.
-	// Defaults to `tunnel.ngrok.com:443`
+	// Defaults to `connect.ngrok-agent.com:443`
 	ServerAddr string
 	// The [tls.Config] used when connecting to the ngrok server
 	TLSConfigCustomizer func(*tls.Config)
@@ -255,7 +255,7 @@ func WithAuthtokenFromEnv() ConnectOption {
 func WithRegion(region string) ConnectOption {
 	return func(cfg *connectConfig) {
 		if region != "" {
-			cfg.ServerAddr = fmt.Sprintf("tunnel.%s.ngrok.com:443", region)
+			cfg.ServerAddr = fmt.Sprintf("connect.%s.ngrok-agent.com:443", region)
 		}
 	}
 }
