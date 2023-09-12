@@ -24,12 +24,10 @@ type userAgentFilter struct {
 // ERR_NGROK_3211 The server does not authorize requests from your user-agent
 // ERR_NGROK_9022 Your account is not authorized to use user agent filtering.
 func WithAllowUserAgentFilter(allow ...string) HTTPEndpointOption {
-	return httpOptionFunc(func(cfg *httpOptions) {
-		cfg.UserAgentFilter = &userAgentFilter{
-			// slice of regex strings for allowed user agents
-			Allow: allow,
-		}
-	})
+	return userAgentFilter{
+		// slice of regex strings for allowed user agents
+		Allow: allow,
+	}
 }
 
 // WithDenyUserAgentFilter adds user agent filtering to the endpoint.
@@ -44,12 +42,10 @@ func WithAllowUserAgentFilter(allow ...string) HTTPEndpointOption {
 // ERR_NGROK_3211 The server does not authorize requests from your user-agent
 // ERR_NGROK_9022 Your account is not authorized to use user agent filtering.
 func WithDenyUserAgentFilter(deny ...string) HTTPEndpointOption {
-	return httpOptionFunc(func(cfg *httpOptions) {
-		cfg.UserAgentFilter = &userAgentFilter{
-			// slice of regex strings for denied user agents
-			Deny: deny,
-		}
-	})
+	return userAgentFilter{
+		// slice of regex strings for denied user agents
+		Deny: deny,
+	}
 }
 
 func (b *userAgentFilter) toProtoConfig() *pb.MiddlewareConfiguration_UserAgentFilter {
