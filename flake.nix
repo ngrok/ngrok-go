@@ -13,6 +13,7 @@
         buildInputs = with pkgs; [
           go_1_20
           gotools
+          golint
           go-tools
           golangci-lint
           gnumake
