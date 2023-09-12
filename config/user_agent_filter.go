@@ -12,16 +12,6 @@ type userAgentFilter struct {
 	Deny []string
 }
 
-func (b *userAgentFilter) toProtoConfig() *pb.MiddlewareConfiguration_UserAgentFilter {
-	if b == nil {
-		return nil
-	}
-	return &pb.MiddlewareConfiguration_UserAgentFilter{
-		Allow: b.Allow,
-		Deny:  b.Deny,
-	}
-}
-
 // WithAllowUserAgentFilter adds user agent filtering to the endpoint.
 //
 // The allow argument is a regular expressions for the user-agent
@@ -60,19 +50,29 @@ func WithDenyUserAgentFilter(deny ...string) HTTPEndpointOption {
 			Deny: deny,
 		}
 	})
-
 }
-func (base *userAgentFilter) merge(set userAgentFilter) *userAgentFilter {
-	if base == nil {
-		base = &userAgentFilter{}
+
+func (b *userAgentFilter) toProtoConfig() *pb.MiddlewareConfiguration_UserAgentFilter {
+	if b == nil {
+		return nil
+	}
+	return &pb.MiddlewareConfiguration_UserAgentFilter{
+		Allow: b.Allow,
+		Deny:  b.Deny,
+	}
+}
+
+func (b *userAgentFilter) merge(set userAgentFilter) *userAgentFilter {
+	if b == nil {
+		b = &userAgentFilter{}
 	}
 
-	base.Allow = append(base.Allow, set.Allow...)
-	base.Deny = append(base.Deny, set.Deny...)
+	b.Allow = append(b.Allow, set.Allow...)
+	b.Deny = append(b.Deny, set.Deny...)
 
-	return base
+	return b
 }
 
-func (opt userAgentFilter) ApplyHTTP(opts *httpOptions) {
-	opts.UserAgentFilter = opts.UserAgentFilter.merge(opt)
+func (b userAgentFilter) ApplyHTTP(opts *httpOptions) {
+	opts.UserAgentFilter = opts.UserAgentFilter.merge(b)
 }
