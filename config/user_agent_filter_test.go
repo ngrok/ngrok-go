@@ -28,7 +28,7 @@ func testUserAgentFilter[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 		{
 			name: "test allow",
 			opts: optsFunc(
-				WithAllowUserAgentFilter(`(Pingdom\.com_bot_version_)(\d+)\.(\d+)`),
+				WithAllowUserAgent(`(Pingdom\.com_bot_version_)(\d+)\.(\d+)`),
 			),
 			expectOpts: func(t *testing.T, opts *O) {
 				actual := getUserAgentFilter(opts)
@@ -43,7 +43,7 @@ func testUserAgentFilter[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 		{
 			name: "test deny",
 			opts: optsFunc(
-				WithDenyUserAgentFilter(`(Pingdom\.com_bot_version_)(\d+)\.(\d+)`),
+				WithDenyUserAgent(`(Pingdom\.com_bot_version_)(\d+)\.(\d+)`),
 			),
 			expectOpts: func(t *testing.T, opts *O) {
 				actual := getUserAgentFilter(opts)
@@ -58,8 +58,8 @@ func testUserAgentFilter[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 		{
 			name: "test allow and deny",
 			opts: optsFunc(
-				WithAllowUserAgentFilter(`(Pingdom\.com_bot_version_)(\d+)\.(\d+)`),
-				WithDenyUserAgentFilter(`(Pingdom\.com_bot_version_)(\d+)\.(\d+)`),
+				WithAllowUserAgent(`(Pingdom\.com_bot_version_)(\d+)\.(\d+)`),
+				WithDenyUserAgent(`(Pingdom\.com_bot_version_)(\d+)\.(\d+)`),
 			),
 			expectOpts: func(t *testing.T, opts *O) {
 				actual := getUserAgentFilter(opts)
@@ -73,10 +73,10 @@ func testUserAgentFilter[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 		{
 			name: "test multiple",
 			opts: optsFunc(
-				WithAllowUserAgentFilter(`(Pingdom\.com_bot_version_)(\d+)\.(\d+)`),
-				WithDenyUserAgentFilter(`(Pingdom\.com_bot_version_)(\d+)\.(\d+)`),
-				WithAllowUserAgentFilter(`(Pingdom2\.com_bot_version_)(\d+)\.(\d+)`),
-				WithDenyUserAgentFilter(`(Pingdom2\.com_bot_version_)(\d+)\.(\d+)`),
+				WithAllowUserAgent(`(Pingdom\.com_bot_version_)(\d+)\.(\d+)`),
+				WithDenyUserAgent(`(Pingdom\.com_bot_version_)(\d+)\.(\d+)`),
+				WithAllowUserAgent(`(Pingdom2\.com_bot_version_)(\d+)\.(\d+)`),
+				WithDenyUserAgent(`(Pingdom2\.com_bot_version_)(\d+)\.(\d+)`),
 			),
 			expectOpts: func(t *testing.T, opts *O) {
 				actual := getUserAgentFilter(opts)
