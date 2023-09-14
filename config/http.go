@@ -45,6 +45,7 @@ type httpOptions struct {
 
 	// If non-nil, start a goroutine which runs this http server
 	// accepting connections from the http tunnel
+	// Deprecated: Pass HTTP server refs via session.ListenAndServeHTTP instead.
 	httpServer *http.Server
 
 	// Certificates to use for client authentication at the ngrok edge.

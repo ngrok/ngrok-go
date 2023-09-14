@@ -61,8 +61,8 @@ type testCase[T tunnelConfigPrivate, O any] struct {
 	expectProto       *string
 	expectExtra       *matchBindExtra
 	expectLabels      *map[string]*string
-	expectHTTPServer  **http.Server
-	expectHTTPHandler *http.Handler
+	expectHTTPServer  **http.Server // TODO: deprecate
+	expectHTTPHandler *http.Handler // TODO: deprecate
 	expectOpts        func(t *testing.T, opts *O)
 	expectNilOpts     bool
 }

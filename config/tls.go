@@ -52,6 +52,7 @@ type tlsOptions struct {
 	CertPEM []byte
 
 	// An HTTP Server to run traffic on
+	// Deprecated: Pass HTTP server refs via session.ListenAndServeHTTP instead.
 	httpServer *http.Server
 }
 

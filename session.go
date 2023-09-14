@@ -51,6 +51,15 @@ type Session interface {
 	// Warnings returns a list of warnings generated for the session on connect/auth
 	Warnings() []error
 
+	// ListenAndForward creates a new Tunnel which will listen for new inbound
+	// connections. Connections on this tunnel are automatically forwarded to
+	// the provided URL.
+	ListenAndForward(ctx context.Context, backend *url.URL, cfg config.Tunnel) (Forwarder, error)
+
+	// ListenAndServeHTTP creates a new Tunnel to serve as a backend for an HTTP server. Connections will be
+	// forwarded to the provided HTTP server.
+	ListenAndServeHTTP(ctx context.Context, cfg config.Tunnel, server *http.Server) (Tunnel, error)
+
 	// Close ends the ngrok session. All Tunnel objects created by Listen
 	// on this session will be closed.
 	Close() error
@@ -635,6 +644,7 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 			Banner:             resp.Extra.Banner,
 			SessionDuration:    resp.Extra.SessionDuration,
 			DeprecationWarning: resp.Extra.DeprecationWarning,
+			Logger:             logger,
 		})
 
 		if cfg.HeartbeatHandler != nil {
@@ -740,6 +750,8 @@ type sessionInner struct {
 	Banner             string
 	SessionDuration    int64
 	DeprecationWarning *proto.AgentVersionDeprecated
+
+	Logger log15.Logger
 }
 
 func (s *sessionImpl) inner() *sessionInner {
@@ -763,14 +775,12 @@ func (s *sessionImpl) Listen(ctx context.Context, cfg config.Tunnel) (Tunnel, er
 		tunnel tunnel_client.Tunnel
 		err    error
 	)
-
 	tunnelCfg, ok := cfg.(tunnelConfigPrivate)
 	if !ok {
 		return nil, errors.New("invalid tunnel config")
 	}
 
 	extra := tunnelCfg.Extra()
-
 	if tunnelCfg.Proto() != "" {
 		tunnel, err = s.inner().Listen(tunnelCfg.Proto(), tunnelCfg.Opts(), extra, tunnelCfg.ForwardsTo())
 	} else {
@@ -779,24 +789,12 @@ func (s *sessionImpl) Listen(ctx context.Context, cfg config.Tunnel) (Tunnel, er
 
 	if err != nil {
 		return nil, errListen{err}
+	} else {
+		return &tunnelImpl{
+			Sess:   s,
+			Tunnel: tunnel,
+		}, nil
 	}
-
-	t := &tunnelImpl{
-		Sess:   s,
-		Tunnel: tunnel,
-	}
-
-	if httpServerCfg, ok := cfg.(interface {
-		HTTPServer() *http.Server
-	}); ok {
-		if srv := httpServerCfg.HTTPServer(); srv != nil {
-			go func() {
-				_ = srv.Serve(t)
-			}()
-		}
-	}
-
-	return t, nil
 }
 
 func (s *sessionImpl) Warnings() []error {
@@ -805,6 +803,43 @@ func (s *sessionImpl) Warnings() []error {
 		return []error{(*AgentVersionDeprecated)(deprecated)}
 	}
 	return nil
+
+}
+
+func (s *sessionImpl) ListenAndForward(ctx context.Context, url *url.URL, cfg config.Tunnel) (Forwarder, error) {
+	tun, err := s.Listen(ctx, cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	return forwardTunnel(ctx, tun, url), nil
+}
+
+func (s *sessionImpl) ListenAndServeHTTP(ctx context.Context, cfg config.Tunnel, server *http.Server) (Tunnel, error) {
+	tun, err := s.Listen(ctx, cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	// Legacy support for passing HTTP server via config options.
+	// TODO: Remove this after we feel HTTP options via config have been deprecated.
+	if server == nil {
+		if serverCfg, ok := cfg.(interface{ HTTPServer() *http.Server }); ok {
+			server = serverCfg.HTTPServer()
+		}
+	}
+
+	if server != nil {
+		// Store server ref to close when tunnel closes
+		impl, _ := tun.(*tunnelImpl)
+		impl.server = server
+
+		go func() {
+			_ = server.Serve(tun)
+		}()
+	}
+
+	return tun, nil
 }
 
 // The rest of the `sessionImpl` methods are non-public, but can be

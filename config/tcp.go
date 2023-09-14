@@ -32,6 +32,7 @@ type tcpOptions struct {
 	// The TCP address to request for this edge.
 	RemoteAddr string
 	// An HTTP Server to run traffic on
+	// Deprecated: Pass HTTP server refs via session.ListenAndServeHTTP instead.
 	httpServer *http.Server
 }
 

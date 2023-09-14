@@ -9,6 +9,7 @@ require (
 	go.uber.org/multierr v1.10.0
 	golang.ngrok.com/muxado/v2 v2.0.0
 	golang.org/x/net v0.10.0
+	golang.org/x/sync v0.3.0
 	google.golang.org/protobuf v1.28.1
 )
 
