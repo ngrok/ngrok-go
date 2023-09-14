@@ -12,7 +12,7 @@ type userAgentFilter struct {
 	Deny []string
 }
 
-// WithAllowUserAgentFilter adds user agent filtering to the endpoint.
+// WithAllowUserAgent adds user agent filtering to the endpoint.
 //
 // The allow argument is a regular expressions for the user-agent
 // header to allow
@@ -23,14 +23,14 @@ type userAgentFilter struct {
 // ERR_NGROK_2090 for invalid allow/deny on connect.
 // ERR_NGROK_3211 The server does not authorize requests from your user-agent
 // ERR_NGROK_9022 Your account is not authorized to use user agent filtering.
-func WithAllowUserAgentFilter(allow ...string) HTTPEndpointOption {
-	return userAgentFilter{
+func WithAllowUserAgent(allow ...string) HTTPEndpointOption {
+	return &userAgentFilter{
 		// slice of regex strings for allowed user agents
 		Allow: allow,
 	}
 }
 
-// WithDenyUserAgentFilter adds user agent filtering to the endpoint.
+// WithDenyUserAgent adds user agent filtering to the endpoint.
 //
 // The deny argument is a regular expressions to
 // deny, with allows taking precedence over denies.
@@ -41,8 +41,8 @@ func WithAllowUserAgentFilter(allow ...string) HTTPEndpointOption {
 // ERR_NGROK_2090 for invalid allow/deny on connect.
 // ERR_NGROK_3211 The server does not authorize requests from your user-agent
 // ERR_NGROK_9022 Your account is not authorized to use user agent filtering.
-func WithDenyUserAgentFilter(deny ...string) HTTPEndpointOption {
-	return userAgentFilter{
+func WithDenyUserAgent(deny ...string) HTTPEndpointOption {
+	return &userAgentFilter{
 		// slice of regex strings for denied user agents
 		Deny: deny,
 	}
