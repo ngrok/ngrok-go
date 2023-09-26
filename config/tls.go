@@ -52,6 +52,7 @@ type tlsOptions struct {
 	CertPEM []byte
 
 	// An HTTP Server to run traffic on
+	// Deprecated: Pass HTTP server refs via session.ListenAndServeHTTP instead.
 	httpServer *http.Server
 }
 
@@ -80,25 +81,32 @@ func (cfg *tlsOptions) toProtoConfig() *proto.TLSEndpoint {
 	return opts
 }
 
-func (cfg tlsOptions) tunnelOptions() {}
-
 func (cfg tlsOptions) ForwardsTo() string {
 	return cfg.commonOpts.getForwardsTo()
 }
+
+func (cfg tlsOptions) WithForwardsTo(hostname string) {
+	cfg.commonOpts.ForwardsTo = hostname
+}
+
 func (cfg tlsOptions) Extra() proto.BindExtra {
 	return proto.BindExtra{
 		Metadata: cfg.Metadata,
 	}
 }
+
 func (cfg tlsOptions) Proto() string {
 	return "tls"
 }
+
 func (cfg tlsOptions) Opts() any {
 	return cfg.toProtoConfig()
 }
+
 func (cfg tlsOptions) Labels() map[string]string {
 	return nil
 }
+
 func (cfg tlsOptions) HTTPServer() *http.Server {
 	return cfg.httpServer
 }

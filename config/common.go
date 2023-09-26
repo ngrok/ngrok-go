@@ -14,9 +14,21 @@ type commonOpts struct {
 	ForwardsTo string
 }
 
+type CommonOptionsFunc func(cfg *commonOpts)
+
+type CommonOption interface {
+	ApplyCommon(cfg *commonOpts)
+}
+
+func (of CommonOptionsFunc) ApplyCommon(cfg *commonOpts) {
+	of(cfg)
+}
+
 func (cfg *commonOpts) getForwardsTo() string {
 	if cfg.ForwardsTo == "" {
 		return defaultForwardsTo()
 	}
 	return cfg.ForwardsTo
 }
+
+func (cfg commonOpts) tunnelOptions() {}

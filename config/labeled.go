@@ -34,6 +34,7 @@ type labeledOptions struct {
 	labels map[string]string
 
 	// An HTTP Server to run traffic on
+	// Deprecated: Pass HTTP server refs via session.ListenAndServeHTTP instead.
 	httpServer *http.Server
 }
 
@@ -48,22 +49,28 @@ func WithLabel(label, value string) LabeledTunnelOption {
 	})
 }
 
-func (cfg labeledOptions) tunnelOptions() {}
-
 func (cfg labeledOptions) ForwardsTo() string {
 	return cfg.commonOpts.getForwardsTo()
 }
+
+func (cfg labeledOptions) WithForwardsTo(hostname string) {
+	cfg.commonOpts.ForwardsTo = hostname
+}
+
 func (cfg labeledOptions) Extra() proto.BindExtra {
 	return proto.BindExtra{
 		Metadata: cfg.Metadata,
 	}
 }
+
 func (cfg labeledOptions) Proto() string {
 	return ""
 }
+
 func (cfg labeledOptions) Opts() any {
 	return nil
 }
+
 func (cfg labeledOptions) Labels() map[string]string {
 	return cfg.labels
 }

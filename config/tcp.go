@@ -32,6 +32,7 @@ type tcpOptions struct {
 	// The TCP address to request for this edge.
 	RemoteAddr string
 	// An HTTP Server to run traffic on
+	// Deprecated: Pass HTTP server refs via session.ListenAndServeHTTP instead.
 	httpServer *http.Server
 }
 
@@ -50,22 +51,28 @@ func (cfg *tcpOptions) toProtoConfig() *proto.TCPEndpoint {
 	}
 }
 
-func (cfg tcpOptions) tunnelOptions() {}
-
 func (cfg tcpOptions) ForwardsTo() string {
 	return cfg.commonOpts.getForwardsTo()
 }
+
+func (cfg tcpOptions) WithForwardsTo(hostname string) {
+	cfg.commonOpts.ForwardsTo = hostname
+}
+
 func (cfg tcpOptions) Extra() proto.BindExtra {
 	return proto.BindExtra{
 		Metadata: cfg.Metadata,
 	}
 }
+
 func (cfg tcpOptions) Proto() string {
 	return "tcp"
 }
+
 func (cfg tcpOptions) Opts() any {
 	return cfg.toProtoConfig()
 }
+
 func (cfg tcpOptions) Labels() map[string]string {
 	return nil
 }

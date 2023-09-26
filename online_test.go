@@ -122,13 +122,10 @@ func TestTunnelConnMetadata(t *testing.T) {
 
 func TestWithHTTPHandler(t *testing.T) {
 	ctx := context.Background()
-	sess := setupSession(ctx, t)
-
-	tun := startTunnel(ctx, t, sess, config.HTTPEndpoint(
+	tun, _ := serveHTTP(ctx, t, nil, config.HTTPEndpoint(
 		config.WithMetadata("Hello, world!"),
 		config.WithForwardsTo("some application"),
-		config.WithHTTPHandler(helloHandler),
-	))
+	), helloHandler)
 
 	resp, err := http.Get(tun.URL())
 	require.NoError(t, err, "GET tunnel url")
@@ -595,13 +592,13 @@ func TestConnectionCallbacks(t *testing.T) {
 	disconnectNils := 0
 	sess := setupSession(ctx, t,
 		WithConnectHandler(func(ctx context.Context, sess Session) {
-			connects += 1
+			connects++
 		}),
 		WithDisconnectHandler(func(ctx context.Context, sess Session, err error) {
 			if err == nil {
-				disconnectNils += 1
+				disconnectNils++
 			} else {
-				disconnectErrs += 1
+				disconnectErrs++
 			}
 		}),
 		WithDialer(&sketchyDialer{1 * time.Second}))
@@ -642,7 +639,7 @@ func TestHeartbeatCallback(t *testing.T) {
 	heartbeats := 0
 	sess := setupSession(ctx, t,
 		WithHeartbeatHandler(func(ctx context.Context, sess Session, latency time.Duration) {
-			heartbeats += 1
+			heartbeats++
 		}),
 		WithHeartbeatInterval(10*time.Second))
 

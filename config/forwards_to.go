@@ -6,33 +6,32 @@ import (
 	"path/filepath"
 )
 
+type forwardsToOption string
+
 // WithForwardsTo sets the ForwardsTo string for this tunnel.
 // This can be veiwed via the API or dashboard.
-func WithForwardsTo(meta string) interface {
-	HTTPEndpointOption
-	LabeledTunnelOption
-	TCPEndpointOption
-	TLSEndpointOption
-} {
+func WithForwardsTo(meta string) Options {
 	return forwardsToOption(meta)
 }
 
-type forwardsToOption string
+func (fwd forwardsToOption) ApplyCommon(cfg *commonOpts) {
+	cfg.ForwardsTo = string(fwd)
+}
 
 func (fwd forwardsToOption) ApplyHTTP(cfg *httpOptions) {
-	cfg.commonOpts.ForwardsTo = string(fwd)
+	fwd.ApplyCommon(&cfg.commonOpts)
 }
 
 func (fwd forwardsToOption) ApplyTCP(cfg *tcpOptions) {
-	cfg.commonOpts.ForwardsTo = string(fwd)
+	fwd.ApplyCommon(&cfg.commonOpts)
 }
 
 func (fwd forwardsToOption) ApplyTLS(cfg *tlsOptions) {
-	cfg.commonOpts.ForwardsTo = string(fwd)
+	fwd.ApplyCommon(&cfg.commonOpts)
 }
 
 func (fwd forwardsToOption) ApplyLabeled(cfg *labeledOptions) {
-	cfg.commonOpts.ForwardsTo = string(fwd)
+	fwd.ApplyCommon(&cfg.commonOpts)
 }
 
 func defaultForwardsTo() string {

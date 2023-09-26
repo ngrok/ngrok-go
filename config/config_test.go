@@ -1,7 +1,6 @@
 package config
 
 import (
-	"net/http"
 	"reflect"
 	"testing"
 
@@ -18,14 +17,6 @@ func assertSlice[T any](opts []any) []T {
 		out = append(out, opt.(T))
 	}
 	return out
-}
-
-func handlerPtr(h http.Handler) *http.Handler {
-	return &h
-}
-
-func serverPtr(srv *http.Server) **http.Server {
-	return &srv
 }
 
 func labelPtr(labels map[string]*string) *map[string]*string {
@@ -55,16 +46,14 @@ func (m matchBindExtra) RequireMatches(t *testing.T, actual proto.BindExtra) {
 }
 
 type testCase[T tunnelConfigPrivate, O any] struct {
-	name              string
-	opts              Tunnel
-	expectForwardsTo  *string
-	expectProto       *string
-	expectExtra       *matchBindExtra
-	expectLabels      *map[string]*string
-	expectHTTPServer  **http.Server
-	expectHTTPHandler *http.Handler
-	expectOpts        func(t *testing.T, opts *O)
-	expectNilOpts     bool
+	name             string
+	opts             Tunnel
+	expectForwardsTo *string
+	expectProto      *string
+	expectExtra      *matchBindExtra
+	expectLabels     *map[string]*string
+	expectOpts       func(t *testing.T, opts *O)
+	expectNilOpts    bool
 }
 
 type testCases[T tunnelConfigPrivate, O any] []testCase[T, O]
@@ -100,37 +89,6 @@ func (tc testCase[T, O]) Run(t *testing.T) {
 			opts, ok := actualOpts.Opts().(*O)
 			require.Truef(t, ok, "Opts has the type %v", reflect.TypeOf((*O)(nil)))
 			tc.expectOpts(t, opts)
-		}
-
-		if tc.expectHTTPServer != nil {
-			withHTTPServer, ok := tc.opts.(interface {
-				HTTPServer() *http.Server
-			})
-			if *tc.expectHTTPServer != nil {
-				require.True(t, ok, "opts should have the HTTPServer method")
-				actual := withHTTPServer.HTTPServer()
-				require.Equal(t, *tc.expectHTTPServer, actual)
-			} else if ok {
-				require.Nil(t, withHTTPServer.HTTPServer())
-			}
-		}
-
-		if tc.expectHTTPHandler != nil {
-			withHTTPServer, ok := tc.opts.(interface {
-				HTTPServer() *http.Server
-			})
-			if *tc.expectHTTPHandler != nil {
-				require.True(t, ok, "opts should have the HTTPServer method")
-				actualServer := withHTTPServer.HTTPServer()
-				require.NotNil(t, actualServer)
-				actual := actualServer.Handler
-				require.Equal(t, *tc.expectHTTPHandler, actual)
-			} else if ok {
-				actualServer := withHTTPServer.HTTPServer()
-				if actualServer != nil {
-					require.Nil(t, actualServer.Handler)
-				}
-			}
 		}
 	})
 }
