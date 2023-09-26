@@ -1,3 +1,4 @@
 .direnv
 *.swp
 cover.out
+.idea/*
