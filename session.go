@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	_ "embed"
+	_ "embed" // nolint
 	"errors"
 	"fmt"
 	"net"
@@ -21,6 +21,7 @@ import (
 	"github.com/inconshreveable/log15/v3"
 	"go.uber.org/multierr"
 	"golang.org/x/net/proxy"
+	"golang.org/x/sync/errgroup"
 
 	"golang.ngrok.com/ngrok/config"
 
@@ -35,6 +36,7 @@ import (
 //go:embed VERSION
 var libraryAgentVersion string
 
+// AgentVersionDeprecated is a type wrapper for [proto.AgentVersionDeprecated]
 type AgentVersionDeprecated proto.AgentVersionDeprecated
 
 func (avd *AgentVersionDeprecated) Error() string {
@@ -50,6 +52,19 @@ type Session interface {
 
 	// Warnings returns a list of warnings generated for the session on connect/auth
 	Warnings() []error
+
+	// ListenAndForward creates a new Tunnel which will listen for new inbound
+	// connections. Connections on this tunnel are automatically forwarded to
+	// the provided URL.
+	ListenAndForward(ctx context.Context, backend *url.URL, cfg config.Tunnel) (Forwarder, error)
+
+	// ListenAndServeHTTP creates a new Tunnel to serve as a backend for an HTTP server. Connections will be
+	// forwarded to the provided HTTP server.
+	ListenAndServeHTTP(ctx context.Context, cfg config.Tunnel, server *http.Server) (Forwarder, error)
+
+	// ListenAndHandleHTTP creates a new Tunnel to serve as a backend for an HTTP handler. Connections will be
+	// forwarded to a new HTTP server and handled by the provided HTTP handler.
+	ListenAndHandleHTTP(ctx context.Context, cfg config.Tunnel, handler *http.Handler) (Forwarder, error)
 
 	// Close ends the ngrok session. All Tunnel objects created by Listen
 	// on this session will be closed.
@@ -78,14 +93,13 @@ type SessionConnectHandler func(ctx context.Context, sess Session)
 // SessionDisconnectHandler is the callback type for [WithDisconnectHandler]
 type SessionDisconnectHandler func(ctx context.Context, sess Session, err error)
 
-// SessionHearbeatHandler is the callback type for [WithHearbeatHandler]
+// SessionHeartbeatHandler is the callback type for [WithHearbeatHandler]
 type SessionHeartbeatHandler func(ctx context.Context, sess Session, latency time.Duration)
 
 // ServerCommandHandler is the callback type for [WithStopHandler]
 type ServerCommandHandler func(ctx context.Context, sess Session) error
 
-// ConnectOptions are passed to [Connect] to customize session connection and
-// establishment.
+// ConnectOption is passed to [Connect] to customize session connection and establishment.
 type ConnectOption func(*connectConfig)
 
 type clientInfo struct {
@@ -176,7 +190,7 @@ type connectConfig struct {
 	Logger log.Logger
 }
 
-// WithMetdata configures the opaque, machine-readable metadata string for this
+// WithMetadata configures the opaque, machine-readable metadata string for this
 // session. Metadata is made available to you in the ngrok dashboard and the
 // Agents API resource. It is a useful way to allow you to uniquely identify
 // sessions. We suggest encoding the value in a structured format like JSON.
@@ -635,6 +649,7 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 			Banner:             resp.Extra.Banner,
 			SessionDuration:    resp.Extra.SessionDuration,
 			DeprecationWarning: resp.Extra.DeprecationWarning,
+			Logger:             logger,
 		})
 
 		if cfg.HeartbeatHandler != nil {
@@ -740,6 +755,8 @@ type sessionInner struct {
 	Banner             string
 	SessionDuration    int64
 	DeprecationWarning *proto.AgentVersionDeprecated
+
+	Logger log15.Logger
 }
 
 func (s *sessionImpl) inner() *sessionInner {
@@ -758,53 +775,100 @@ func (s *sessionImpl) Close() error {
 	return s.inner().Close()
 }
 
-func (s *sessionImpl) Listen(ctx context.Context, cfg config.Tunnel) (Tunnel, error) {
-	var (
-		tunnel tunnel_client.Tunnel
-		err    error
-	)
-
-	tunnelCfg, ok := cfg.(tunnelConfigPrivate)
-	if !ok {
-		return nil, errors.New("invalid tunnel config")
-	}
-
-	extra := tunnelCfg.Extra()
-
-	if tunnelCfg.Proto() != "" {
-		tunnel, err = s.inner().Listen(tunnelCfg.Proto(), tunnelCfg.Opts(), extra, tunnelCfg.ForwardsTo())
-	} else {
-		tunnel, err = s.inner().ListenLabel(tunnelCfg.Labels(), extra.Metadata, tunnelCfg.ForwardsTo())
-	}
-
-	if err != nil {
-		return nil, errListen{err}
-	}
-
-	t := &tunnelImpl{
-		Sess:   s,
-		Tunnel: tunnel,
-	}
-
-	if httpServerCfg, ok := cfg.(interface {
-		HTTPServer() *http.Server
-	}); ok {
-		if srv := httpServerCfg.HTTPServer(); srv != nil {
-			go func() {
-				_ = srv.Serve(t)
-			}()
-		}
-	}
-
-	return t, nil
-}
-
 func (s *sessionImpl) Warnings() []error {
 	deprecated := s.inner().DeprecationWarning
 	if deprecated != nil {
 		return []error{(*AgentVersionDeprecated)(deprecated)}
 	}
 	return nil
+
+}
+
+func (s *sessionImpl) Listen(ctx context.Context, cfg config.Tunnel) (Tunnel, error) {
+	var (
+		tunnel tunnel_client.Tunnel
+		err    error
+	)
+	tunnelCfg, ok := cfg.(tunnelConfigPrivate)
+	if !ok {
+		return nil, errors.New("invalid tunnel config")
+	}
+
+	extra := tunnelCfg.Extra()
+	if tunnelCfg.Proto() != "" {
+		tunnel, err = s.inner().Listen(tunnelCfg.Proto(), tunnelCfg.Opts(), extra, tunnelCfg.ForwardsTo())
+	} else {
+		tunnel, err = s.inner().ListenLabel(tunnelCfg.Labels(), extra.Metadata, tunnelCfg.ForwardsTo())
+	}
+
+	impl := &tunnelImpl{
+		Sess:   s,
+		Tunnel: tunnel,
+	}
+
+	// Legacy support for passing HTTP server via config options.
+	// TODO: Remove this after we feel HTTP options via config have been deprecated.
+	if serverCfg, ok := cfg.(interface{ HTTPServer() *http.Server }); ok {
+		server := serverCfg.HTTPServer()
+		if server != nil {
+			go func() { _ = server.Serve(impl) }()
+			impl.server = server
+		}
+	}
+
+	if err == nil {
+		return impl, nil
+	}
+	return nil, errListen{err}
+}
+
+func (s *sessionImpl) ListenAndForward(ctx context.Context, url *url.URL, cfg config.Tunnel) (Forwarder, error) {
+	tunnelCfg, ok := cfg.(tunnelConfigPrivate)
+	if !ok {
+		return nil, errors.New("invalid tunnel config")
+	}
+
+	// Set 'Forwards To'
+	tunnelCfg.WithForwardsTo(url.Host)
+
+	tun, err := s.Listen(ctx, cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	return forwardTunnel(ctx, tun, url), nil
+}
+
+func (s *sessionImpl) ListenAndServeHTTP(ctx context.Context, cfg config.Tunnel, server *http.Server) (Forwarder, error) {
+	tun, err := s.Listen(ctx, cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	mainGroup, _ := errgroup.WithContext(ctx)
+	if server != nil {
+		// Store server ref to close when tunnel closes
+		impl, _ := tun.(*tunnelImpl)
+
+		// Check if tunnel is already serving an HTTP server
+		// TODO: Remove this once we feel HTTP options via config have been deprecated.
+		if impl.server == nil {
+			mainGroup.Go(func() error { return server.Serve(tun) })
+			impl.server = server
+		} else {
+			// Inform end user that they're using a deprecated option.
+			fmt.Println("Tunnel is serving an HTTP server via HTTP options. This has been deprecated. Please use Session.ListenAndServeHTTP instead.")
+		}
+	}
+
+	return &forwarder{
+		Tunnel:    tun,
+		mainGroup: mainGroup,
+	}, nil
+}
+
+func (s *sessionImpl) ListenAndHandleHTTP(ctx context.Context, cfg config.Tunnel, handler *http.Handler) (Forwarder, error) {
+	return s.ListenAndServeHTTP(ctx, cfg, &http.Server{Handler: *handler})
 }
 
 // The rest of the `sessionImpl` methods are non-public, but can be

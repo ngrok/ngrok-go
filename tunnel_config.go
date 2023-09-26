@@ -13,4 +13,5 @@ type tunnelConfigPrivate interface {
 	Proto() string
 	Opts() any
 	Labels() map[string]string
+	WithForwardsTo(string)
 }

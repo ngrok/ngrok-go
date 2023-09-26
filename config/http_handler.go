@@ -8,6 +8,18 @@ type httpServerOption struct {
 	Server *http.Server
 }
 
+type Options interface {
+	HTTPEndpointOption
+	TLSEndpointOption
+	TCPEndpointOption
+	LabeledTunnelOption
+	CommonOption
+}
+
+func (opt *httpServerOption) ApplyCommon(cfg *commonOpts) {
+
+}
+
 func (opt *httpServerOption) ApplyHTTP(cfg *httpOptions) {
 	cfg.httpServer = opt.Server
 }
@@ -26,22 +38,14 @@ func (opt *httpServerOption) ApplyLabeled(cfg *labeledOptions) {
 
 // WithHTTPHandler adds the provided credentials to the list of basic
 // authentication credentials.
-func WithHTTPHandler(h http.Handler) interface {
-	HTTPEndpointOption
-	TLSEndpointOption
-	TCPEndpointOption
-	LabeledTunnelOption
-} {
+// Deprecated: Use session.ListenAndHandleHTTP instead.
+func WithHTTPHandler(h http.Handler) Options {
 	return WithHTTPServer(&http.Server{Handler: h})
 }
 
 // WithHTTPServer adds the provided credentials to the list of basic
 // authentication credentials.
-func WithHTTPServer(srv *http.Server) interface {
-	HTTPEndpointOption
-	TLSEndpointOption
-	TCPEndpointOption
-	LabeledTunnelOption
-} {
+// Deprecated: Use session.ListenAndServeHTTP instead.
+func WithHTTPServer(srv *http.Server) Options {
 	return &httpServerOption{Server: srv}
 }

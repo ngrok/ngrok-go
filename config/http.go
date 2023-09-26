@@ -45,6 +45,7 @@ type httpOptions struct {
 
 	// If non-nil, start a goroutine which runs this http server
 	// accepting connections from the http tunnel
+	// Deprecated: Pass HTTP server refs via session.ListenAndServeHTTP instead.
 	httpServer *http.Server
 
 	// Certificates to use for client authentication at the ngrok edge.
@@ -121,22 +122,27 @@ func (cfg *httpOptions) toProtoConfig() *proto.HTTPEndpoint {
 	return opts
 }
 
-func (cfg httpOptions) tunnelOptions() {}
-
 func (cfg httpOptions) ForwardsTo() string {
 	return cfg.commonOpts.getForwardsTo()
 }
+
+func (cfg httpOptions) WithForwardsTo(hostname string) {
+	cfg.commonOpts.ForwardsTo = hostname
+}
+
 func (cfg httpOptions) Extra() proto.BindExtra {
 	return proto.BindExtra{
 		Metadata: cfg.Metadata,
 	}
 }
+
 func (cfg httpOptions) Proto() string {
 	if cfg.Scheme == "" {
 		return string(SchemeHTTPS)
 	}
 	return string(cfg.Scheme)
 }
+
 func (cfg httpOptions) Opts() any {
 	return cfg.toProtoConfig()
 }

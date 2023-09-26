@@ -1,3 +1,8 @@
+## 1.5.0
+
+- Added new forwarding API. See `[Session].ListenAndForward` and `[Session].ListenAndServeHTTP`. 
+- Deprecates `WithHTTPServer` and `WithHTTPHandler`. Use `[Session].ListenAndServeHTTP` instead.
+
 ## 1.4.0
 
 - Switch to `connect.ngrok-agent.com:443` as the default server address
