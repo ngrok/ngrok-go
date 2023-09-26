@@ -23,7 +23,7 @@ func (wv *webhookVerification) toProtoConfig() *pb.MiddlewareConfiguration_Webho
 	}
 }
 
-// WithWebhookVerification configures webhook vericiation for this edge.
+// WithWebhookVerification configures webhook verification for this edge.
 func WithWebhookVerification(provider string, secret string) HTTPEndpointOption {
 	return httpOptionFunc(func(cfg *httpOptions) {
 		cfg.WebhookVerification = &webhookVerification{

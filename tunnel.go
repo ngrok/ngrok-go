@@ -50,7 +50,7 @@ type TunnelInfo interface {
 	// Labels returns the labels set by config.WithLabel if this is a
 	// labeled tunnel. Non-labeled tunnels will return an empty map.
 	Labels() map[string]string
-	// Metadata returns the arbitraray metadata string for this tunnel.
+	// Metadata returns the arbitrary metadata string for this tunnel.
 	Metadata() string
 	// Proto returns the protocol of the tunnel's endpoint.
 	// Labeled tunnels will return the empty string.
@@ -66,7 +66,7 @@ type TunnelInfo interface {
 // Access to the underlying [Session] that was started automatically can be
 // accessed via [Tunnel].Session.
 //
-// If an error is encoutered during [Session].Listen, the [Session] object that
+// If an error is encountered during [Session].Listen, the [Session] object that
 // was created will be closed automatically.
 func Listen(ctx context.Context, tunnelConfig config.Tunnel, connectOpts ...ConnectOption) (Tunnel, error) {
 	sess, err := Connect(ctx, connectOpts...)

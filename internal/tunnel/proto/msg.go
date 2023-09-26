@@ -115,7 +115,7 @@ type AuthExtra struct {
 	// client is capable of executing that operation. each capability
 	// is transmitted as a pointer to string, with the following meanings:
 	//
-	// null ->               operation disallow beause the ngrok agent version is too old.
+	// null ->               operation disallow because the ngrok agent version is too old.
 	//                       this is true because older clients will never set this value
 	//
 	// "" (empty string)  -> the operation is supported
