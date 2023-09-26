@@ -1,6 +1,6 @@
 package main
 
-// This example demonstrates how to create a HTTP tunnel with all
+// This example demonstrates how to create a secure HTTPS connection with all
 // available configuration options illustrated.
 
 import (
@@ -21,8 +21,8 @@ func main() {
 }
 
 func run(ctx context.Context) error {
-	tun, err := ngrok.Listen(ctx,
-		// tunnel configuration
+	secureConnection, err := ngrok.Listen(ctx,
+		// secure connection configuration
 		config.HTTPEndpoint(
 			config.WithAllowCIDRString("0.0.0.0/0"),
 			config.WithAllowUserAgent("Mozilla/5.0.*"),
@@ -32,7 +32,7 @@ func run(ctx context.Context) error {
 			config.WithDenyCIDRString("10.1.1.1/32"),
 			config.WithDenyUserAgent("EvilCorp.*"),
 			// config.WithDomain("<somedomain>.ngrok.io"),
-			config.WithMetadata("example tunnel metadata from golang"),
+			config.WithMetadata("example secure connection metadata from golang"),
 			// config.WithMutualTLSCA(<cert>),
 			// config.WithOAuth("google",
 			// 	config.WithAllowOAuthEmail("<user>@<domain>"),
@@ -82,9 +82,9 @@ func run(ctx context.Context) error {
 		return err
 	}
 
-	log.Println("tunnel created:", tun.URL())
+	log.Println("secure connection created:", secureConnection.URL())
 
-	return http.Serve(tun, http.HandlerFunc(handler))
+	return http.Serve(secureConnection, http.HandlerFunc(handler))
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
