@@ -18,7 +18,7 @@ func TestLabeled(t *testing.T) {
 			expectNilOpts: true,
 		},
 		{
-			name: "mulitple",
+			name: "multiple",
 			opts: LabeledTunnel(
 				WithLabel("foo", "bar"),
 				WithLabel("spam", "eggs"),

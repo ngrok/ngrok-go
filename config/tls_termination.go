@@ -9,7 +9,7 @@ const (
 	// Terminate TLS in the ngrok library. The library will receive the
 	// handshake and perform TLS termination, and the backend will receive the
 	// plaintext stream.
-	// TODO: export this once implmented
+	// TODO: export this once implemented
 	tlsAtLibrary
 )
 

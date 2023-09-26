@@ -9,7 +9,7 @@ import (
 	"golang.ngrok.com/ngrok/internal/tunnel/proto"
 )
 
-// Sanity check for the appraoch to error construction/wrapping
+// Sanity check for the approach to error construction/wrapping
 func TestErrorWrapping(t *testing.T) {
 	inner := errors.New("testing, 1 2 3")
 	var accept error = errAcceptFailed{Inner: inner}

@@ -13,7 +13,7 @@ import (
 // the protocol will be deserialized into a map[string]interface{}.
 // So in order to get them in the form we want, we write them out
 // as JSON again and then read them back in with the now-known
-// proper type for deserializion
+// proper type for deserialization
 func Unpack(packed, unpacked any) error {
 	bytes, err := json.Marshal(packed)
 	if err != nil {

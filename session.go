@@ -195,9 +195,9 @@ type connectConfig struct {
 // Agents API resource. It is a useful way to allow you to uniquely identify
 // sessions. We suggest encoding the value in a structured format like JSON.
 //
-// See the [metdata parameter in the ngrok docs] for additional details.
+// See the [metadata parameter in the ngrok docs] for additional details.
 //
-// [metdata parameter in the ngrok docs]: https://ngrok.com/docs/ngrok-agent/config#metadata
+// [metadata parameter in the ngrok docs]: https://ngrok.com/docs/ngrok-agent/config#metadata
 func WithMetadata(meta string) ConnectOption {
 	return func(cfg *connectConfig) {
 		cfg.Metadata = meta
@@ -229,16 +229,16 @@ func WithDialer(dialer Dialer) ConnectOption {
 // HTTP or SOCKS5 proxy. This parameter is ignored if you override the dialer
 // with [WithDialer].
 //
-// See the [proxy url paramter in the ngrok docs] for additional details.
+// See the [proxy url parameter in the ngrok docs] for additional details.
 //
-// [proxy url paramter in the ngrok docs]: https://ngrok.com/docs/ngrok-agent/config#proxy_url
+// [proxy url parameter in the ngrok docs]: https://ngrok.com/docs/ngrok-agent/config#proxy_url
 func WithProxyURL(url *url.URL) ConnectOption {
 	return func(cfg *connectConfig) {
 		cfg.ProxyURL = url
 	}
 }
 
-// WithAuthtoken configures the sesssion to authenticate with the provided
+// WithAuthtoken configures the session to authenticate with the provided
 // authtoken. You can [find your existing authtoken] or [create a new one] in the ngrok dashboard.
 //
 // See the [authtoken parameter in the ngrok docs] for additional details.
@@ -334,7 +334,7 @@ func WithHeartbeatInterval(interval time.Duration) ConnectOption {
 	}
 }
 
-// WithLogger configures a logger to recieve log messages from the [Session]. The
+// WithLogger configures a logger to receive log messages from the [Session]. The
 // log subpackage contains adapters for both [logrus] and [zap].
 //
 // [logrus]: https://pkg.go.dev/github.com/sirupsen/logrus

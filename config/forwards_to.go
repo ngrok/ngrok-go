@@ -9,7 +9,7 @@ import (
 type forwardsToOption string
 
 // WithForwardsTo sets the ForwardsTo string for this tunnel.
-// This can be veiwed via the API or dashboard.
+// This can be viewed via the API or dashboard.
 func WithForwardsTo(meta string) Options {
 	return forwardsToOption(meta)
 }
