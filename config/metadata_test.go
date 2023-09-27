@@ -16,14 +16,14 @@ func testMetadata[T tunnelConfigPrivate, OT any](t *testing.T,
 			name: "absent",
 			opts: optsFunc(),
 			expectExtra: &matchBindExtra{
-				Metadata: stringPtr(""),
+				Metadata: ptr(""),
 			},
 		},
 		{
 			name: "with metadata",
 			opts: optsFunc(WithMetadata("Hello, world!")),
 			expectExtra: &matchBindExtra{
-				Metadata: stringPtr("Hello, world!"),
+				Metadata: ptr("Hello, world!"),
 			},
 		},
 	}

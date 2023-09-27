@@ -11,17 +11,17 @@ func TestScheme(t *testing.T) {
 		{
 			name:        "default",
 			opts:        HTTPEndpoint(),
-			expectProto: stringPtr(string(SchemeHTTPS)),
+			expectProto: ptr(string(SchemeHTTPS)),
 		},
 		{
 			name:        "set https",
 			opts:        HTTPEndpoint(WithScheme(SchemeHTTPS)),
-			expectProto: stringPtr(string(SchemeHTTPS)),
+			expectProto: ptr(string(SchemeHTTPS)),
 		},
 		{
 			name:        "force http",
 			opts:        HTTPEndpoint(WithScheme(SchemeHTTP)),
-			expectProto: stringPtr(string(SchemeHTTP)),
+			expectProto: ptr(string(SchemeHTTP)),
 		},
 	}
 

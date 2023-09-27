@@ -13,8 +13,8 @@ func TestTCP(t *testing.T) {
 		{
 			name:         "empty",
 			opts:         TCPEndpoint(),
-			expectProto:  stringPtr("tcp"),
-			expectLabels: labelPtr(nil),
+			expectProto:  ptr("tcp"),
+			expectLabels: nil,
 			expectOpts: func(t *testing.T, opts *proto.TCPEndpoint) {
 				require.NotNil(t, opts)
 				require.Empty(t, opts.Addr)
@@ -23,8 +23,8 @@ func TestTCP(t *testing.T) {
 		{
 			name:         "remote addr",
 			opts:         TCPEndpoint(WithRemoteAddr("0.tcp.ngrok.io:1234")),
-			expectProto:  stringPtr("tcp"),
-			expectLabels: labelPtr(nil),
+			expectProto:  ptr("tcp"),
+			expectLabels: nil,
 			expectOpts: func(t *testing.T, opts *proto.TCPEndpoint) {
 				require.NotNil(t, opts)
 				require.Equal(t, "0.tcp.ngrok.io:1234", opts.Addr)

@@ -15,12 +15,12 @@ func testForwardsTo[T tunnelConfigPrivate, OT any](t *testing.T,
 		{
 			name:             "absent",
 			opts:             optsFunc(),
-			expectForwardsTo: stringPtr(defaultForwardsTo()),
+			expectForwardsTo: ptr(defaultForwardsTo()),
 		},
 		{
 			name:             "with forwardsTo",
 			opts:             optsFunc(WithForwardsTo("localhost:8080")),
-			expectForwardsTo: stringPtr("localhost:8080"),
+			expectForwardsTo: ptr("localhost:8080"),
 		},
 	}
 

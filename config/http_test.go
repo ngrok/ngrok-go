@@ -13,8 +13,8 @@ func TestHTTP(t *testing.T) {
 		{
 			name:         "empty",
 			opts:         HTTPEndpoint(),
-			expectProto:  stringPtr("https"),
-			expectLabels: labelPtr(nil),
+			expectProto:  ptr("https"),
+			expectLabels: nil,
 			expectOpts: func(t *testing.T, opts *proto.HTTPEndpoint) {
 				require.NotNil(t, opts)
 			},

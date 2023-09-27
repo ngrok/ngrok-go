@@ -19,12 +19,8 @@ func assertSlice[T any](opts []any) []T {
 	return out
 }
 
-func labelPtr(labels map[string]*string) *map[string]*string {
-	return &labels
-}
-
-func stringPtr(s string) *string {
-	return &s
+func ptr[T any](val T) *T {
+	return &val
 }
 
 type matchBindExtra struct {
