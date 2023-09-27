@@ -11,8 +11,8 @@ func TestTLS(t *testing.T) {
 		{
 			name:         "basic",
 			opts:         TLSEndpoint(),
-			expectProto:  stringPtr("tls"),
-			expectLabels: labelPtr(nil),
+			expectProto:  ptr("tls"),
+			expectLabels: nil,
 		},
 	}
 

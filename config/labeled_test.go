@@ -11,10 +11,10 @@ func TestLabeled(t *testing.T) {
 		{
 			name: "simple",
 			opts: LabeledTunnel(WithLabel("foo", "bar")),
-			expectLabels: labelPtr(map[string]*string{
-				"foo": stringPtr("bar"),
+			expectLabels: ptr(map[string]*string{
+				"foo": ptr("bar"),
 			}),
-			expectProto:   stringPtr(""),
+			expectProto:   ptr(""),
 			expectNilOpts: true,
 		},
 		{
@@ -23,33 +23,33 @@ func TestLabeled(t *testing.T) {
 				WithLabel("foo", "bar"),
 				WithLabel("spam", "eggs"),
 			),
-			expectProto: stringPtr(""),
-			expectLabels: labelPtr(map[string]*string{
-				"foo":  stringPtr("bar"),
-				"spam": stringPtr("eggs"),
+			expectProto: ptr(""),
+			expectLabels: ptr(map[string]*string{
+				"foo":  ptr("bar"),
+				"spam": ptr("eggs"),
 			}),
 			expectNilOpts: true,
 		},
 		{
 			name: "withForwardsTo",
 			opts: LabeledTunnel(WithLabel("foo", "bar"), WithForwardsTo("localhost:8080")),
-			expectLabels: labelPtr(map[string]*string{
-				"foo": stringPtr("bar"),
+			expectLabels: ptr(map[string]*string{
+				"foo": ptr("bar"),
 			}),
-			expectForwardsTo: stringPtr("localhost:8080"),
-			expectProto:      stringPtr(""),
+			expectForwardsTo: ptr("localhost:8080"),
+			expectProto:      ptr(""),
 			expectNilOpts:    true,
 		},
 		{
 			name: "withMetadata",
 			opts: LabeledTunnel(WithLabel("foo", "bar"), WithMetadata("choochoo")),
-			expectLabels: labelPtr(map[string]*string{
-				"foo": stringPtr("bar"),
+			expectLabels: ptr(map[string]*string{
+				"foo": ptr("bar"),
 			}),
 			expectExtra: &matchBindExtra{
-				Metadata: stringPtr("choochoo"),
+				Metadata: ptr("choochoo"),
 			},
-			expectProto:   stringPtr(""),
+			expectProto:   ptr(""),
 			expectNilOpts: true,
 		},
 	}
