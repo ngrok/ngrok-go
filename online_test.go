@@ -107,7 +107,10 @@ func TestTunnelConnMetadata(t *testing.T) {
 	tun := startTunnel(ctx, t, sess, config.HTTPEndpoint())
 
 	go func() {
-		_, _ = http.Get(tun.URL())
+		resp, err := http.Get(tun.URL())
+		if err != nil {
+			_ = resp.Body.Close()
+		}
 	}()
 
 	conn, err := tun.Accept()
@@ -129,6 +132,7 @@ func TestWithHTTPHandler(t *testing.T) {
 
 	resp, err := http.Get(tun.URL())
 	require.NoError(t, err, "GET tunnel url")
+	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err, "Read response body")
@@ -150,6 +154,7 @@ func TestHTTPS(t *testing.T) {
 
 	resp, err := http.Get(tun.URL())
 	require.NoError(t, err, "GET tunnel url")
+	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err, "Read response body")
@@ -175,6 +180,7 @@ func TestHTTP(t *testing.T) {
 
 	resp, err := http.Get(tun.URL())
 	require.NoError(t, err, "GET tunnel url")
+	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err, "Read response body")
@@ -202,6 +208,7 @@ func TestHTTPCompression(t *testing.T) {
 
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err, "GET tunnel url")
+	defer resp.Body.Close()
 
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -259,6 +266,7 @@ func TestHTTPHeaders(t *testing.T) {
 
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err, "GET tunnel url")
+	defer resp.Body.Close()
 
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -286,15 +294,19 @@ func TestBasicAuth(t *testing.T) {
 	req, err := http.NewRequest(http.MethodGet, tun.URL(), nil)
 	require.NoError(t, err, "Create request")
 
-	resp, err := http.DefaultClient.Do(req)
-	require.NoError(t, err, "GET tunnel url")
+	func() {
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err, "GET tunnel url")
+		defer resp.Body.Close()
 
-	require.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+		require.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+	}()
 
 	req.SetBasicAuth("user", "foobarbaz")
 
-	resp, err = http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err, "GET tunnel url")
+	defer resp.Body.Close()
 
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -329,6 +341,7 @@ func TestCircuitBreaker(t *testing.T) {
 	for i := 0; i < 50; i++ {
 		resp, err = http.Get(tun.URL())
 		require.NoError(t, err)
+		_ = resp.Body.Close()
 	}
 
 	// Should see fewer than 50 requests come through.
@@ -374,7 +387,10 @@ func TestProxyProto(t *testing.T) {
 					return config.HTTPEndpoint(config.WithProxyProto(v))
 				},
 				reqFunc: func(t *testing.T, url string) {
-					_, _ = http.Get(url)
+					resp, err := http.Get(url)
+					if err != nil {
+						_ = resp.Body.Close()
+					}
 				},
 				version:       c.version,
 				shouldContain: c.shouldContain,
@@ -436,6 +452,7 @@ func TestSubdomain(t *testing.T) {
 
 	resp, err := http.Get(tun.URL())
 	require.NoError(t, err)
+	defer resp.Body.Close()
 
 	content, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
@@ -455,6 +472,7 @@ func TestOAuth(t *testing.T) {
 
 	resp, err := http.Get(tun.URL())
 	require.NoError(t, err, "GET tunnel url")
+	defer resp.Body.Close()
 
 	content, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
@@ -479,6 +497,7 @@ func TestHTTPIPRestriction(t *testing.T) {
 
 	resp, err := http.Get(tun.URL())
 	require.NoError(t, err, "GET tunnel url")
+	defer resp.Body.Close()
 
 	require.Equal(t, http.StatusForbidden, resp.StatusCode)
 
@@ -500,6 +519,7 @@ func TestTCP(t *testing.T) {
 	url.Scheme = "http"
 	resp, err := http.Get(url.String())
 	require.NoError(t, err, "GET tunnel url")
+	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err, "Read response body")
@@ -528,6 +548,11 @@ func TestTCPIPRestriction(t *testing.T) {
 	require.NoError(t, err)
 	url.Scheme = "http"
 	resp, err := http.Get(url.String())
+	defer func() {
+		if resp != nil {
+			_ = resp.Body.Close()
+		}
+	}()
 
 	// Rather than layer-7 error, we should see it at the connection level
 	require.Nil(t, resp)
@@ -552,10 +577,13 @@ func TestWebsocketConversion(t *testing.T) {
 		exited <- http.Serve(tun, helloHandler)
 	}()
 
-	resp, err := http.Get(tun.URL())
-	require.NoError(t, err)
+	func() {
+		resp, err := http.Get(tun.URL())
+		require.NoError(t, err)
+		defer resp.Body.Close()
 
-	require.Equal(t, http.StatusBadRequest, resp.StatusCode, "Normal http should be rejected")
+		require.Equal(t, http.StatusBadRequest, resp.StatusCode, "Normal http should be rejected")
+	}()
 
 	url, err := url.Parse(tun.URL())
 	require.NoError(t, err)
@@ -570,8 +598,9 @@ func TestWebsocketConversion(t *testing.T) {
 		},
 	}
 
-	resp, err = client.Get("http://example.com")
+	resp, err := client.Get("http://example.com")
 	require.NoError(t, err)
+	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err, "Read response body")
