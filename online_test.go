@@ -107,8 +107,8 @@ func TestTunnelConnMetadata(t *testing.T) {
 	tun := startTunnel(ctx, t, sess, config.HTTPEndpoint())
 
 	go func() {
-		resp, err := http.Get(tun.URL())
-		if err != nil {
+		resp, _ := http.Get(tun.URL())
+		if resp != nil {
 			_ = resp.Body.Close()
 		}
 	}()
@@ -294,17 +294,15 @@ func TestBasicAuth(t *testing.T) {
 	req, err := http.NewRequest(http.MethodGet, tun.URL(), nil)
 	require.NoError(t, err, "Create request")
 
-	func() {
-		resp, err := http.DefaultClient.Do(req)
-		require.NoError(t, err, "GET tunnel url")
-		defer resp.Body.Close()
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err, "GET tunnel url")
 
-		require.Equal(t, http.StatusUnauthorized, resp.StatusCode)
-	}()
+	require.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+	_ = resp.Body.Close()
 
 	req.SetBasicAuth("user", "foobarbaz")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err = http.DefaultClient.Do(req)
 	require.NoError(t, err, "GET tunnel url")
 	defer resp.Body.Close()
 
@@ -387,8 +385,8 @@ func TestProxyProto(t *testing.T) {
 					return config.HTTPEndpoint(config.WithProxyProto(v))
 				},
 				reqFunc: func(t *testing.T, url string) {
-					resp, err := http.Get(url)
-					if err != nil {
+					resp, _ := http.Get(url)
+					if resp != nil {
 						_ = resp.Body.Close()
 					}
 				},
@@ -547,12 +545,7 @@ func TestTCPIPRestriction(t *testing.T) {
 	url, err := url.Parse(tun.URL())
 	require.NoError(t, err)
 	url.Scheme = "http"
-	resp, err := http.Get(url.String())
-	defer func() {
-		if resp != nil {
-			_ = resp.Body.Close()
-		}
-	}()
+	resp, err := http.Get(url.String()) //nolint:bodyclose // resp is expected to be nil
 
 	// Rather than layer-7 error, we should see it at the connection level
 	require.Nil(t, resp)
@@ -577,13 +570,11 @@ func TestWebsocketConversion(t *testing.T) {
 		exited <- http.Serve(tun, helloHandler)
 	}()
 
-	func() {
-		resp, err := http.Get(tun.URL())
-		require.NoError(t, err)
-		defer resp.Body.Close()
+	resp, err := http.Get(tun.URL())
+	require.NoError(t, err)
 
-		require.Equal(t, http.StatusBadRequest, resp.StatusCode, "Normal http should be rejected")
-	}()
+	require.Equal(t, http.StatusBadRequest, resp.StatusCode, "Normal http should be rejected")
+	_ = resp.Body.Close()
 
 	url, err := url.Parse(tun.URL())
 	require.NoError(t, err)
@@ -598,7 +589,7 @@ func TestWebsocketConversion(t *testing.T) {
 		},
 	}
 
-	resp, err := client.Get("http://example.com")
+	resp, err = client.Get("http://example.com")
 	require.NoError(t, err)
 	defer resp.Body.Close()
 
