@@ -34,8 +34,8 @@ func TestHTTPHeaders(t *testing.T) {
 				require.NotNil(t, req)
 				require.Nil(t, resp)
 
-				require.Contains(t, req.Add, "foo:bar baz")
-				require.Contains(t, req.Remove, "baz")
+				require.Equal(t, []string{"foo:bar baz"}, req.Add)
+				require.Equal(t, []string{"baz"}, req.Remove)
 			},
 		},
 		{
@@ -54,10 +54,8 @@ func TestHTTPHeaders(t *testing.T) {
 				require.NotNil(t, req)
 				require.Nil(t, resp)
 
-				require.Contains(t, req.Add, "foo:bar;baz")
-				require.Contains(t, req.Add, "spam:eggs")
-				require.Contains(t, req.Remove, "qas")
-				require.Contains(t, req.Remove, "wex")
+				require.ElementsMatch(t, []string{"foo:bar;baz", "spam:eggs"}, req.Add)
+				require.ElementsMatch(t, []string{"qas", "wex"}, req.Remove)
 			},
 		},
 		{
@@ -73,8 +71,8 @@ func TestHTTPHeaders(t *testing.T) {
 				require.Nil(t, req)
 				require.NotNil(t, resp)
 
-				require.Contains(t, resp.Add, "foo:bar baz")
-				require.Contains(t, resp.Remove, "baz")
+				require.Equal(t, []string{"foo:bar baz"}, resp.Add)
+				require.Equal(t, []string{"baz"}, resp.Remove)
 			},
 		},
 		{
@@ -92,10 +90,8 @@ func TestHTTPHeaders(t *testing.T) {
 				require.Nil(t, req)
 				require.NotNil(t, resp)
 
-				require.Contains(t, resp.Add, "foo:bar baz")
-				require.Contains(t, resp.Add, "spam:eggs")
-				require.Contains(t, resp.Remove, "qas")
-				require.Contains(t, resp.Remove, "wex")
+				require.ElementsMatch(t, []string{"foo:bar baz", "spam:eggs"}, resp.Add)
+				require.ElementsMatch(t, []string{"qas", "wex"}, resp.Remove)
 			},
 		},
 		{
@@ -117,14 +113,8 @@ func TestHTTPHeaders(t *testing.T) {
 				require.NotNil(t, req)
 				require.NotNil(t, resp)
 
-				require.Contains(t, req.Add, "foo:bar baz")
-				require.Contains(t, req.Add, "spam:eggs")
-				require.Contains(t, req.Remove, "qas")
-				require.Contains(t, req.Remove, "wex")
-				require.Contains(t, resp.Add, "foo:bar baz")
-				require.Contains(t, resp.Add, "spam:eggs")
-				require.Contains(t, resp.Remove, "wex")
-				require.Contains(t, resp.Remove, "qas")
+				require.ElementsMatch(t, []string{"spam:eggs", "foo:bar baz"}, resp.Add)
+				require.ElementsMatch(t, []string{"qas", "wex"}, resp.Remove)
 			},
 		},
 	}

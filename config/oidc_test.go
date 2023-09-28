@@ -44,18 +44,9 @@ func TestOIDC(t *testing.T) {
 			expectOpts: func(t *testing.T, opts *proto.HTTPEndpoint) {
 				actual := opts.OIDC
 				require.NotNil(t, actual)
-				require.Len(t, actual.Scopes, 3)
-				require.Contains(t, actual.Scopes, "foo")
-				require.Contains(t, actual.Scopes, "bar")
-				require.Contains(t, actual.Scopes, "baz")
-				require.Len(t, actual.AllowEmails, 3)
-				require.Contains(t, actual.AllowEmails, "user1@gmail.com")
-				require.Contains(t, actual.AllowEmails, "user2@gmail.com")
-				require.Contains(t, actual.AllowEmails, "user3@gmail.com")
-				require.Len(t, actual.AllowDomains, 3)
-				require.Contains(t, actual.AllowDomains, "ngrok.com")
-				require.Contains(t, actual.AllowDomains, "google.com")
-				require.Contains(t, actual.AllowDomains, "github.com")
+				require.ElementsMatch(t, []string{"foo", "bar", "baz"}, actual.Scopes)
+				require.ElementsMatch(t, []string{"user1@gmail.com", "user2@gmail.com", "user3@gmail.com"}, actual.AllowEmails)
+				require.ElementsMatch(t, []string{"ngrok.com", "google.com", "github.com"}, actual.AllowDomains)
 			},
 		},
 	}

@@ -32,8 +32,7 @@ func testCIDRRestrictions[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 			expectOpts: func(t *testing.T, opts *O) {
 				actual := getRestrictions(opts)
 				require.NotNil(t, actual)
-				require.Len(t, actual.AllowCidrs, 1)
-				require.Contains(t, actual.AllowCidrs, "127.0.0.0/8")
+				require.Equal(t, []string{"127.0.0.0/8"}, actual.AllowCidrs)
 			},
 		},
 		{
@@ -42,8 +41,7 @@ func testCIDRRestrictions[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 			expectOpts: func(t *testing.T, opts *O) {
 				actual := getRestrictions(opts)
 				require.NotNil(t, actual)
-				require.Len(t, actual.DenyCidrs, 1)
-				require.Contains(t, actual.DenyCidrs, "127.0.0.0/8")
+				require.Equal(t, []string{"127.0.0.0/8"}, actual.DenyCidrs)
 			},
 		},
 		{
@@ -52,8 +50,7 @@ func testCIDRRestrictions[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 			expectOpts: func(t *testing.T, opts *O) {
 				actual := getRestrictions(opts)
 				require.NotNil(t, actual)
-				require.Len(t, actual.AllowCidrs, 1)
-				require.Contains(t, actual.AllowCidrs, "127.0.0.0/8")
+				require.Equal(t, []string{"127.0.0.0/8"}, actual.AllowCidrs)
 			},
 		},
 		{
@@ -62,8 +59,7 @@ func testCIDRRestrictions[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 			expectOpts: func(t *testing.T, opts *O) {
 				actual := getRestrictions(opts)
 				require.NotNil(t, actual)
-				require.Len(t, actual.DenyCidrs, 1)
-				require.Contains(t, actual.DenyCidrs, "127.0.0.0/8")
+				require.Equal(t, []string{"127.0.0.0/8"}, actual.DenyCidrs)
 			},
 		},
 		{
@@ -75,9 +71,7 @@ func testCIDRRestrictions[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 			expectOpts: func(t *testing.T, opts *O) {
 				actual := getRestrictions(opts)
 				require.NotNil(t, actual)
-				require.Len(t, actual.AllowCidrs, 2)
-				require.Contains(t, actual.AllowCidrs, "127.0.0.0/8")
-				require.Contains(t, actual.AllowCidrs, "10.0.0.0/8")
+				require.ElementsMatch(t, []string{"127.0.0.0/8", "10.0.0.0/8"}, actual.AllowCidrs)
 			},
 		},
 		{
@@ -89,9 +83,7 @@ func testCIDRRestrictions[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 			expectOpts: func(t *testing.T, opts *O) {
 				actual := getRestrictions(opts)
 				require.NotNil(t, actual)
-				require.Len(t, actual.DenyCidrs, 2)
-				require.Contains(t, actual.DenyCidrs, "127.0.0.0/8")
-				require.Contains(t, actual.DenyCidrs, "10.0.0.0/8")
+				require.ElementsMatch(t, []string{"127.0.0.0/8", "10.0.0.0/8"}, actual.DenyCidrs)
 			},
 		},
 		{
@@ -105,12 +97,8 @@ func testCIDRRestrictions[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 			expectOpts: func(t *testing.T, opts *O) {
 				actual := getRestrictions(opts)
 				require.NotNil(t, actual)
-				require.Len(t, actual.DenyCidrs, 2)
-				require.Contains(t, actual.DenyCidrs, "192.0.0.0/8")
-				require.Contains(t, actual.DenyCidrs, "172.0.0.0/8")
-				require.Len(t, actual.AllowCidrs, 2)
-				require.Contains(t, actual.AllowCidrs, "127.0.0.0/8")
-				require.Contains(t, actual.AllowCidrs, "10.0.0.0/8")
+				require.ElementsMatch(t, []string{"192.0.0.0/8", "172.0.0.0/8"}, actual.DenyCidrs)
+				require.ElementsMatch(t, []string{"127.0.0.0/8", "10.0.0.0/8"}, actual.AllowCidrs)
 			},
 		},
 		{
@@ -124,12 +112,8 @@ func testCIDRRestrictions[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 			expectOpts: func(t *testing.T, opts *O) {
 				actual := getRestrictions(opts)
 				require.NotNil(t, actual)
-				require.Len(t, actual.DenyCidrs, 2)
-				require.Contains(t, actual.DenyCidrs, "192.0.0.0/8")
-				require.Contains(t, actual.DenyCidrs, "172.0.0.0/8")
-				require.Len(t, actual.AllowCidrs, 2)
-				require.Contains(t, actual.AllowCidrs, "127.0.0.0/8")
-				require.Contains(t, actual.AllowCidrs, "10.0.0.0/8")
+				require.ElementsMatch(t, []string{"192.0.0.0/8", "172.0.0.0/8"}, actual.DenyCidrs)
+				require.ElementsMatch(t, []string{"127.0.0.0/8", "10.0.0.0/8"}, actual.AllowCidrs)
 			},
 		},
 	}

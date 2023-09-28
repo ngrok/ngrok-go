@@ -43,19 +43,9 @@ func TestOAuth(t *testing.T) {
 				actual := opts.OAuth
 				require.NotNil(t, actual)
 				require.Equal(t, "google", actual.Provider)
-				require.Len(t, actual.Scopes, 3)
-				require.Contains(t, actual.Scopes, "foo")
-				require.Contains(t, actual.Scopes, "bar")
-				require.Contains(t, actual.Scopes, "baz")
-				require.Len(t, actual.AllowEmails, 3)
-				require.Contains(t, actual.AllowEmails, "user1@gmail.com")
-				require.Contains(t, actual.AllowEmails, "user2@gmail.com")
-				require.Contains(t, actual.AllowEmails, "user3@gmail.com")
-				require.Len(t, actual.AllowDomains, 4)
-				require.Contains(t, actual.AllowDomains, "ngrok.com")
-				require.Contains(t, actual.AllowDomains, "google.com")
-				require.Contains(t, actual.AllowDomains, "facebook.com")
-				require.Contains(t, actual.AllowDomains, "github.com")
+				require.ElementsMatch(t, []string{"foo", "bar", "baz"}, actual.Scopes)
+				require.ElementsMatch(t, []string{"user1@gmail.com", "user2@gmail.com", "user3@gmail.com"}, actual.AllowEmails)
+				require.ElementsMatch(t, []string{"ngrok.com", "google.com", "github.com", "facebook.com"}, actual.AllowDomains)
 			},
 		},
 	}

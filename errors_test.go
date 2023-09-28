@@ -12,20 +12,20 @@ import (
 // Sanity check for the approach to error construction/wrapping
 func TestErrorWrapping(t *testing.T) {
 	inner := errors.New("testing, 1 2 3")
-	var accept error = errAcceptFailed{Inner: inner}
-	var auth error = errAuthFailed{true, accept}
+	accept := errAcceptFailed{Inner: inner}
+	auth := errAuthFailed{true, accept}
 
-	require.True(t, errors.Is(accept, errAcceptFailed{}))
-	require.True(t, errors.Is(auth, errAuthFailed{}))
-	require.True(t, errors.Is(auth, errAcceptFailed{}))
+	require.ErrorIs(t, accept, errAcceptFailed{})
+	require.ErrorIs(t, auth, errAuthFailed{})
+	require.ErrorIs(t, auth, errAcceptFailed{})
 
 	var downcastAuth errAuthFailed
 	var downcastAccept errAcceptFailed
 
-	require.True(t, errors.As(auth, &downcastAuth))
-	require.True(t, errors.As(auth, &downcastAccept))
+	require.ErrorAs(t, auth, &downcastAuth)
+	require.ErrorAs(t, auth, &downcastAccept)
 
-	require.True(t, errors.As(accept, &downcastAccept))
+	require.ErrorAs(t, accept, &downcastAccept)
 
 	require.True(t, downcastAuth.Remote)
 }
@@ -37,14 +37,14 @@ func TestNgrokErrorWrapping(t *testing.T) {
 	ngrokErr := errAuthFailed{true, rootErr}
 	nonNgrokErr := errAuthFailed{true, nonNgrokRootErr}
 
-	require.Equal(t, ngrokErr.Error(), "authentication failed: ngrok error\n\nERR_NGROK_123")
+	require.EqualError(t, ngrokErr, "authentication failed: ngrok error\n\nERR_NGROK_123")
 
 	var nerr Error
-	require.True(t, errors.As(ngrokErr, &nerr))
+	require.ErrorAs(t, ngrokErr, &nerr)
 
-	require.Equal(t, nerr.Error(), "ngrok error\n\nERR_NGROK_123")
-	require.Equal(t, nerr.Msg(), "ngrok error")
-	require.Equal(t, nerr.ErrorCode(), "ERR_NGROK_123")
+	require.EqualError(t, nerr, "ngrok error\n\nERR_NGROK_123")
+	require.Equal(t, "ngrok error", nerr.Msg())
+	require.Equal(t, "ERR_NGROK_123", nerr.ErrorCode())
 
 	require.False(t, errors.As(nonNgrokErr, &nerr))
 }
