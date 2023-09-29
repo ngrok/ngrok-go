@@ -34,10 +34,8 @@ func testUserAgentFilter[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 				actual := getUserAgentFilter(opts)
 				require.NotNil(t, actual)
 				require.Nil(t, actual.Deny)
-				require.NotNil(t, actual.Allow)
-				require.Len(t, actual.Allow, 1)
-				require.Len(t, actual.Deny, 0)
-				require.Contains(t, actual.Allow, `(Pingdom\.com_bot_version_)(\d+)\.(\d+)`)
+				require.Empty(t, actual.Deny)
+				require.Equal(t, []string{`(Pingdom\.com_bot_version_)(\d+)\.(\d+)`}, actual.Allow)
 			},
 		},
 		{
@@ -49,10 +47,7 @@ func testUserAgentFilter[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 				actual := getUserAgentFilter(opts)
 				require.NotNil(t, actual)
 				require.Nil(t, actual.Allow)
-				require.Len(t, actual.Allow, 0)
-				require.NotNil(t, actual.Deny)
-				require.Len(t, actual.Deny, 1)
-				require.Contains(t, actual.Deny, `(Pingdom\.com_bot_version_)(\d+)\.(\d+)`)
+				require.Equal(t, []string{`(Pingdom\.com_bot_version_)(\d+)\.(\d+)`}, actual.Deny)
 			},
 		},
 		{
@@ -64,10 +59,8 @@ func testUserAgentFilter[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 			expectOpts: func(t *testing.T, opts *O) {
 				actual := getUserAgentFilter(opts)
 				require.NotNil(t, actual)
-				require.Len(t, actual.Allow, 1)
-				require.Len(t, actual.Deny, 1)
-				require.Contains(t, actual.Allow, `(Pingdom\.com_bot_version_)(\d+)\.(\d+)`)
-				require.Contains(t, actual.Deny, `(Pingdom\.com_bot_version_)(\d+)\.(\d+)`)
+				require.Equal(t, []string{`(Pingdom\.com_bot_version_)(\d+)\.(\d+)`}, actual.Allow)
+				require.Equal(t, []string{`(Pingdom\.com_bot_version_)(\d+)\.(\d+)`}, actual.Deny)
 			},
 		},
 		{
@@ -81,12 +74,8 @@ func testUserAgentFilter[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 			expectOpts: func(t *testing.T, opts *O) {
 				actual := getUserAgentFilter(opts)
 				require.NotNil(t, actual)
-				require.Len(t, actual.Allow, 2)
-				require.Len(t, actual.Deny, 2)
-				require.Contains(t, actual.Allow, `(Pingdom\.com_bot_version_)(\d+)\.(\d+)`)
-				require.Contains(t, actual.Deny, `(Pingdom\.com_bot_version_)(\d+)\.(\d+)`)
-				require.Contains(t, actual.Allow, `(Pingdom2\.com_bot_version_)(\d+)\.(\d+)`)
-				require.Contains(t, actual.Deny, `(Pingdom2\.com_bot_version_)(\d+)\.(\d+)`)
+				require.Equal(t, []string{`(Pingdom\.com_bot_version_)(\d+)\.(\d+)`, `(Pingdom2\.com_bot_version_)(\d+)\.(\d+)`}, actual.Allow)
+				require.Equal(t, []string{`(Pingdom\.com_bot_version_)(\d+)\.(\d+)`, `(Pingdom2\.com_bot_version_)(\d+)\.(\d+)`}, actual.Deny)
 			},
 		},
 	}
