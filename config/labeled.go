@@ -16,7 +16,7 @@ func (of labeledOptionFunc) ApplyLabeled(cfg *labeledOptions) {
 	of(cfg)
 }
 
-// Construct a new set of Labeled tunnel options.
+// LabeledTunnel constructs a new set options for a labeled Edge.
 func LabeledTunnel(opts ...LabeledTunnelOption) Tunnel {
 	cfg := labeledOptions{}
 	for _, opt := range opts {

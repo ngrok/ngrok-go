@@ -18,7 +18,7 @@ func (of httpOptionFunc) ApplyHTTP(cfg *httpOptions) {
 	of(cfg)
 }
 
-// Construct a new set of HTTP tunnel options.
+// HTTPEndpoint constructs a new set options for a HTTP endpoint.
 func HTTPEndpoint(opts ...HTTPEndpointOption) Tunnel {
 	cfg := httpOptions{}
 	for _, opt := range opts {
