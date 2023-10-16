@@ -18,7 +18,7 @@ func (of tlsOptionFunc) ApplyTLS(cfg *tlsOptions) {
 	of(cfg)
 }
 
-// Construct a new set of TLS tunnel options.
+// TLSEndpoint constructs a new set options for a TLS endpoint.
 func TLSEndpoint(opts ...TLSEndpointOption) Tunnel {
 	cfg := tlsOptions{}
 	for _, opt := range opts {
