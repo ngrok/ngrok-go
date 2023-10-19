@@ -130,7 +130,10 @@ func openBackend(ctx context.Context, logger log15.Logger, tun Tunnel, tunnelCon
 	// Create TLS config if necessary
 	var tlsConfig *tls.Config
 	if usesTLS(url.Scheme) {
-		tlsConfig = &tls.Config{ServerName: url.Hostname()}
+		tlsConfig = &tls.Config{
+			ServerName:    url.Hostname(),
+			Renegotiation: tls.RenegotiateOnceAsClient,
+		}
 	}
 
 	dialer := &net.Dialer{}

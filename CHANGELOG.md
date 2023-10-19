@@ -1,3 +1,7 @@
+## 1.5.1
+
+- Adds TLS Renegotiation to the backend `tls.Config`.
+
 ## 1.5.0
 
 - Added new forwarding API. See `[Session].ListenAndForward` and `[Session].ListenAndServeHTTP`. 
