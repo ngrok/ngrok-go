@@ -85,6 +85,19 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 The best place to get support using ngrok-go is through the [ngrok Slack Community](https://ngrok.com/slack). If you find bugs or would like to contribute code, please follow the instructions in the [contributing guide](/CONTRIBUTING.md).
 
+## Changelog
+
+Changes to `ngrok-go` are tracked under [CHANGELOG.md](https://github.com/ngrok/ngrok-go/blob/main/CHANGELOG.md).
+
+## Join the ngrok Community
+
+- Check out [our official docs](https://docs.ngrok.com)
+- Read about updates on [our blog](https://ngrok.com/blog)
+- Open an [issue](https://github.com/ngrok/ngrok-go/issues) or [pull request](https://github.com/ngrok/ngrok-go/pulls)
+- Join our [Slack community](https://ngrok.com/slack)
+- Follow us on [X / Twitter (@ngrokHQ)](https://twitter.com/ngrokhq)
+- Subscribe to our [Youtube channel (@ngrokHQ)](https://www.youtube.com/@ngrokhq)
+
 ## License
 
 ngrok-go is licensed under the terms of the MIT license.
