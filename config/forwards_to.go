@@ -10,6 +10,8 @@ type forwardsToOption string
 
 // WithForwardsTo sets the ForwardsTo string for this tunnel.
 // This can be viewed via the API or dashboard.
+//
+// https://ngrok.com/docs/api/resources/tunnels/#tunnel-fields
 func WithForwardsTo(meta string) Options {
 	return forwardsToOption(meta)
 }

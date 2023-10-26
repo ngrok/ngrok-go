@@ -19,7 +19,7 @@ type userAgentFilter struct {
 //
 // Any invalid regular expression will result in an error when creating the tunnel.
 //
-// https://ngrok.com/docs/cloud-edge/modules/user-agent-filter
+// https://ngrok.com/docs/http/user-agent-filter/
 // ERR_NGROK_2090 for invalid allow/deny on connect.
 // ERR_NGROK_3211 The server does not authorize requests from your user-agent
 // ERR_NGROK_9022 Your account is not authorized to use user agent filtering.
@@ -37,7 +37,7 @@ func WithAllowUserAgent(allow ...string) HTTPEndpointOption {
 //
 // Any invalid regular expression will result in an error when creating the tunnel.
 //
-// https://ngrok.com/docs/cloud-edge/modules/user-agent-filter
+// https://ngrok.com/docs/http/user-agent-filter/
 // ERR_NGROK_2090 for invalid allow/deny on connect.
 // ERR_NGROK_3211 The server does not authorize requests from your user-agent
 // ERR_NGROK_9022 Your account is not authorized to use user agent filtering.

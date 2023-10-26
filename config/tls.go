@@ -19,6 +19,8 @@ func (of tlsOptionFunc) ApplyTLS(cfg *tlsOptions) {
 }
 
 // TLSEndpoint constructs a new set options for a TLS endpoint.
+//
+// https://ngrok.com/docs/tls/
 func TLSEndpoint(opts ...TLSEndpointOption) Tunnel {
 	cfg := tlsOptions{}
 	for _, opt := range opts {

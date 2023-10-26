@@ -24,6 +24,8 @@ func (wv *webhookVerification) toProtoConfig() *pb.MiddlewareConfiguration_Webho
 }
 
 // WithWebhookVerification configures webhook verification for this edge.
+//
+// https://ngrok.com/docs/http/webhook-verification/
 func WithWebhookVerification(provider string, secret string) HTTPEndpointOption {
 	return httpOptionFunc(func(cfg *httpOptions) {
 		cfg.WebhookVerification = &webhookVerification{

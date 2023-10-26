@@ -63,6 +63,8 @@ func (h responseHeaders) ApplyHTTP(cfg *httpOptions) {
 }
 
 // WithRequestHeader adds a header to all requests to this edge.
+//
+// https://ngrok.com/docs/http/request-headers/
 func WithRequestHeader(name, value string) HTTPEndpointOption {
 	return requestHeaders(headers{
 		Added: map[string]string{name: value},
@@ -70,6 +72,8 @@ func WithRequestHeader(name, value string) HTTPEndpointOption {
 }
 
 // WithRequestHeader adds a header to all responses coming from this edge.
+//
+// https://ngrok.com/docs/http/response-headers/
 func WithResponseHeader(name, value string) HTTPEndpointOption {
 	return responseHeaders(headers{
 		Added: map[string]string{name: value},
@@ -77,6 +81,8 @@ func WithResponseHeader(name, value string) HTTPEndpointOption {
 }
 
 // WithRemoveRequestHeader removes a header from requests to this edge.
+//
+// https://ngrok.com/docs/http/request-headers/
 func WithRemoveRequestHeader(name string) HTTPEndpointOption {
 	return requestHeaders(headers{
 		Removed: []string{name},
@@ -84,6 +90,8 @@ func WithRemoveRequestHeader(name string) HTTPEndpointOption {
 }
 
 // WithRemoveResponseHeader removes a header from responses from this edge.
+//
+// https://ngrok.com/docs/http/response-headers/
 func WithRemoveResponseHeader(name string) HTTPEndpointOption {
 	return responseHeaders(headers{
 		Removed: []string{name},

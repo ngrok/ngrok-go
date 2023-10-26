@@ -15,6 +15,8 @@ type cidrRestrictions struct {
 }
 
 // Add the provided CIDRS to the [CIDRRestriction].Allowed list.
+//
+// https://ngrok.com/docs/http/ip-restrictions/
 func WithAllowCIDRString(cidr ...string) interface {
 	HTTPEndpointOption
 	TCPEndpointOption
@@ -24,6 +26,8 @@ func WithAllowCIDRString(cidr ...string) interface {
 }
 
 // Add the provided [net.IPNet] to the [CIDRRestriction].Allowed list.
+//
+// https://ngrok.com/docs/http/ip-restrictions/
 func WithAllowCIDR(net ...*net.IPNet) interface {
 	HTTPEndpointOption
 	TCPEndpointOption
@@ -37,6 +41,8 @@ func WithAllowCIDR(net ...*net.IPNet) interface {
 }
 
 // Add the provided CIDRS to the [CIDRRestriction].Denied list.
+//
+// https://ngrok.com/docs/http/ip-restrictions/
 func WithDenyCIDRString(cidr ...string) interface {
 	HTTPEndpointOption
 	TCPEndpointOption
@@ -46,6 +52,8 @@ func WithDenyCIDRString(cidr ...string) interface {
 }
 
 // Add the provided [net.IPNet] to the [CIDRRestriction].Denied list.
+//
+// https://ngrok.com/docs/http/ip-restrictions/
 func WithDenyCIDR(net ...*net.IPNet) interface {
 	HTTPEndpointOption
 	TCPEndpointOption

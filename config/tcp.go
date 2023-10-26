@@ -17,6 +17,8 @@ func (of tcpOptionFunc) ApplyTCP(cfg *tcpOptions) {
 }
 
 // TCPEndpoint constructs a new set options for a TCP endpoint.
+//
+// https://ngrok.com/docs/tcp/
 func TCPEndpoint(opts ...TCPEndpointOption) Tunnel {
 	cfg := tcpOptions{}
 	for _, opt := range opts {

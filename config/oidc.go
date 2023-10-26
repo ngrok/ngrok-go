@@ -33,6 +33,8 @@ func (oidc *oidcOptions) toProtoConfig() *pb.MiddlewareConfiguration_OIDC {
 
 // WithOIDC configures this edge with the the given OIDC provider.
 // Overwrites any previously-set OIDC configuration.
+//
+// https://ngrok.com/docs/http/openid-connect/
 func WithOIDC(issuerURL string, clientID string, clientSecret string, opts ...OIDCOption) HTTPEndpointOption {
 	return httpOptionFunc(func(cfg *httpOptions) {
 		oidc := &oidcOptions{

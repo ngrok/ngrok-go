@@ -20,6 +20,8 @@ func (ba basicAuth) toProtoConfig() *pb.MiddlewareConfiguration_BasicAuthCredent
 
 // WithBasicAuth adds the provided credentials to the list of basic
 // authentication credentials.
+//
+// https://ngrok.com/docs/http/basic-auth/
 func WithBasicAuth(username, password string) HTTPEndpointOption {
 	return httpOptionFunc(func(cfg *httpOptions) {
 		cfg.BasicAuth = append(cfg.BasicAuth,

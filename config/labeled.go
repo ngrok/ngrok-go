@@ -17,6 +17,8 @@ func (of labeledOptionFunc) ApplyLabeled(cfg *labeledOptions) {
 }
 
 // LabeledTunnel constructs a new set options for a labeled Edge.
+//
+// https://ngrok.com/docs/network-edge/edges/#tunnel-group
 func LabeledTunnel(opts ...LabeledTunnelOption) Tunnel {
 	cfg := labeledOptions{}
 	for _, opt := range opts {

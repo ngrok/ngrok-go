@@ -39,6 +39,8 @@ type TLSTerminationOption func(tt *tlsTermination)
 // WithTLSTermination arranges for incoming TLS connections to be automatically terminated.
 // The backend will then receive plaintext streams, rather than raw TLS connections.
 // Defaults to terminating TLS at the ngrok edge with an automatically-provisioned keypair.
+//
+// https://ngrok.com/docs/tls/tls-termination/
 func WithTLSTermination(opts ...TLSTerminationOption) TLSEndpointOption {
 	tt := tlsTermination{
 		location: TLSAtEdge,
