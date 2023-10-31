@@ -34,8 +34,8 @@ func TestHTTPHeaders(t *testing.T) {
 				require.NotNil(t, req)
 				require.Nil(t, resp)
 
-				require.Equal(t, []string{"foo:bar baz"}, req.Add)
-				require.Equal(t, []string{"baz"}, req.Remove)
+				require.Equal(t, []string{"Foo:bar baz"}, req.Add)
+				require.Equal(t, []string{"Baz"}, req.Remove)
 			},
 		},
 		{
@@ -54,8 +54,8 @@ func TestHTTPHeaders(t *testing.T) {
 				require.NotNil(t, req)
 				require.Nil(t, resp)
 
-				require.ElementsMatch(t, []string{"foo:bar;baz", "spam:eggs"}, req.Add)
-				require.ElementsMatch(t, []string{"qas", "wex"}, req.Remove)
+				require.ElementsMatch(t, []string{"Foo:bar;baz", "Spam:eggs"}, req.Add)
+				require.ElementsMatch(t, []string{"Qas", "Wex"}, req.Remove)
 			},
 		},
 		{
@@ -71,8 +71,8 @@ func TestHTTPHeaders(t *testing.T) {
 				require.Nil(t, req)
 				require.NotNil(t, resp)
 
-				require.Equal(t, []string{"foo:bar baz"}, resp.Add)
-				require.Equal(t, []string{"baz"}, resp.Remove)
+				require.Equal(t, []string{"Foo:bar baz"}, resp.Add)
+				require.Equal(t, []string{"Baz"}, resp.Remove)
 			},
 		},
 		{
@@ -90,8 +90,8 @@ func TestHTTPHeaders(t *testing.T) {
 				require.Nil(t, req)
 				require.NotNil(t, resp)
 
-				require.ElementsMatch(t, []string{"foo:bar baz", "spam:eggs"}, resp.Add)
-				require.ElementsMatch(t, []string{"qas", "wex"}, resp.Remove)
+				require.ElementsMatch(t, []string{"Foo:bar baz", "Spam:eggs"}, resp.Add)
+				require.ElementsMatch(t, []string{"Qas", "Wex"}, resp.Remove)
 			},
 		},
 		{
@@ -113,8 +113,8 @@ func TestHTTPHeaders(t *testing.T) {
 				require.NotNil(t, req)
 				require.NotNil(t, resp)
 
-				require.ElementsMatch(t, []string{"spam:eggs", "foo:bar baz"}, resp.Add)
-				require.ElementsMatch(t, []string{"qas", "wex"}, resp.Remove)
+				require.ElementsMatch(t, []string{"Spam:eggs", "Foo:bar baz"}, resp.Add)
+				require.ElementsMatch(t, []string{"Qas", "Wex"}, resp.Remove)
 			},
 		},
 	}
