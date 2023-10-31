@@ -9,7 +9,7 @@ import (
 )
 
 func TestHTTP(t *testing.T) {
-	cases := testCases[httpOptions, proto.HTTPEndpoint]{
+	cases := testCases[*httpOptions, proto.HTTPEndpoint]{
 		{
 			name:         "empty",
 			opts:         HTTPEndpoint(),

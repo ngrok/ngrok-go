@@ -7,7 +7,7 @@ import (
 )
 
 func TestTLS(t *testing.T) {
-	cases := testCases[tlsOptions, proto.TLSEndpoint]{
+	cases := testCases[*tlsOptions, proto.TLSEndpoint]{
 		{
 			name:         "basic",
 			opts:         TLSEndpoint(),

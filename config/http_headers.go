@@ -62,6 +62,18 @@ func (h responseHeaders) ApplyHTTP(cfg *httpOptions) {
 	cfg.ResponseHeaders = cfg.ResponseHeaders.merge(headers(h))
 }
 
+// WithHostHeaderRewrite will automatically set the `Host` header to the one in
+// the URL passed to `ListenAndForward`. Does nothing if using `Listen`.
+// Defaults to `false`.
+//
+// If you need to set the host header to a specific value, use
+// `WithRequestHeader("host", "some.host.com")` instead.
+func WithHostHeaderRewrite(rewrite bool) HTTPEndpointOption {
+	return httpOptionFunc(func(cfg *httpOptions) {
+		cfg.RewriteHostHeader = rewrite
+	})
+}
+
 // WithRequestHeader adds a header to all requests to this edge.
 func WithRequestHeader(name, value string) HTTPEndpointOption {
 	return requestHeaders(headers{

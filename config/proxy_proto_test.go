@@ -41,13 +41,13 @@ func testProxyProto[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 }
 
 func TestProxyProto(t *testing.T) {
-	testProxyProto[httpOptions](t, HTTPEndpoint, func(opts *proto.HTTPEndpoint) proto.ProxyProto {
+	testProxyProto[*httpOptions](t, HTTPEndpoint, func(opts *proto.HTTPEndpoint) proto.ProxyProto {
 		return opts.ProxyProto
 	})
-	testProxyProto[tlsOptions](t, TLSEndpoint, func(opts *proto.TLSEndpoint) proto.ProxyProto {
+	testProxyProto[*tlsOptions](t, TLSEndpoint, func(opts *proto.TLSEndpoint) proto.ProxyProto {
 		return opts.ProxyProto
 	})
-	testProxyProto[tcpOptions](t, TCPEndpoint, func(opts *proto.TCPEndpoint) proto.ProxyProto {
+	testProxyProto[*tcpOptions](t, TCPEndpoint, func(opts *proto.TCPEndpoint) proto.ProxyProto {
 		return opts.ProxyProto
 	})
 }

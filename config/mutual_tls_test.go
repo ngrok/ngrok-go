@@ -54,10 +54,10 @@ func testMutualTLS[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 }
 
 func TestMutualTLS(t *testing.T) {
-	testMutualTLS[httpOptions](t, HTTPEndpoint, func(opts *proto.HTTPEndpoint) *pb.MiddlewareConfiguration_MutualTLS {
+	testMutualTLS[*httpOptions](t, HTTPEndpoint, func(opts *proto.HTTPEndpoint) *pb.MiddlewareConfiguration_MutualTLS {
 		return opts.MutualTLSCA
 	})
-	testMutualTLS[tlsOptions](t, TLSEndpoint, func(opts *proto.TLSEndpoint) *pb.MiddlewareConfiguration_MutualTLS {
+	testMutualTLS[*tlsOptions](t, TLSEndpoint, func(opts *proto.TLSEndpoint) *pb.MiddlewareConfiguration_MutualTLS {
 		return opts.MutualTLSAtEdge
 	})
 }

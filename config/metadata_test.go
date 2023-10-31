@@ -32,8 +32,8 @@ func testMetadata[T tunnelConfigPrivate, OT any](t *testing.T,
 }
 
 func TestMetadata(t *testing.T) {
-	testMetadata[httpOptions](t, HTTPEndpoint)
-	testMetadata[tlsOptions](t, TLSEndpoint)
-	testMetadata[tcpOptions](t, TCPEndpoint)
-	testMetadata[labeledOptions](t, LabeledTunnel)
+	testMetadata[*httpOptions](t, HTTPEndpoint)
+	testMetadata[*tlsOptions](t, TLSEndpoint)
+	testMetadata[*tcpOptions](t, TCPEndpoint)
+	testMetadata[*labeledOptions](t, LabeledTunnel)
 }

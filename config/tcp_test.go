@@ -9,7 +9,7 @@ import (
 )
 
 func TestTCP(t *testing.T) {
-	cases := testCases[tcpOptions, proto.TCPEndpoint]{
+	cases := testCases[*tcpOptions, proto.TCPEndpoint]{
 		{
 			name:         "empty",
 			opts:         TCPEndpoint(),

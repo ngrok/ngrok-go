@@ -7,7 +7,7 @@ import (
 )
 
 func TestLabeled(t *testing.T) {
-	cases := testCases[labeledOptions, proto.LabelOptions]{
+	cases := testCases[*labeledOptions, proto.LabelOptions]{
 		{
 			name: "simple",
 			opts: LabeledTunnel(WithLabel("foo", "bar")),

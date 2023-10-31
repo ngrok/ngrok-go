@@ -2,6 +2,7 @@ package config
 
 import (
 	"net/http"
+	"net/url"
 
 	"golang.ngrok.com/ngrok/internal/tunnel/proto"
 )
@@ -22,7 +23,7 @@ func TCPEndpoint(opts ...TCPEndpointOption) Tunnel {
 	for _, opt := range opts {
 		opt.ApplyTCP(&cfg)
 	}
-	return cfg
+	return &cfg
 }
 
 // The options for a TCP edge.
@@ -55,8 +56,8 @@ func (cfg tcpOptions) ForwardsTo() string {
 	return cfg.commonOpts.getForwardsTo()
 }
 
-func (cfg tcpOptions) WithForwardsTo(hostname string) {
-	cfg.commonOpts.ForwardsTo = hostname
+func (cfg *tcpOptions) WithForwardsTo(url *url.URL) {
+	cfg.commonOpts.ForwardsTo = url.Host
 }
 
 func (cfg tcpOptions) Extra() proto.BindExtra {

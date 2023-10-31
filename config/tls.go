@@ -3,6 +3,7 @@ package config
 import (
 	"crypto/x509"
 	"net/http"
+	"net/url"
 
 	"golang.ngrok.com/ngrok/internal/pb"
 	"golang.ngrok.com/ngrok/internal/tunnel/proto"
@@ -24,7 +25,7 @@ func TLSEndpoint(opts ...TLSEndpointOption) Tunnel {
 	for _, opt := range opts {
 		opt.ApplyTLS(&cfg)
 	}
-	return cfg
+	return &cfg
 }
 
 // The options for TLS edges.
@@ -85,8 +86,8 @@ func (cfg tlsOptions) ForwardsTo() string {
 	return cfg.commonOpts.getForwardsTo()
 }
 
-func (cfg tlsOptions) WithForwardsTo(hostname string) {
-	cfg.commonOpts.ForwardsTo = hostname
+func (cfg *tlsOptions) WithForwardsTo(url *url.URL) {
+	cfg.commonOpts.ForwardsTo = url.Host
 }
 
 func (cfg tlsOptions) Extra() proto.BindExtra {

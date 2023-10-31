@@ -28,8 +28,8 @@ func testForwardsTo[T tunnelConfigPrivate, OT any](t *testing.T,
 }
 
 func TestForwardsTo(t *testing.T) {
-	testForwardsTo[httpOptions](t, HTTPEndpoint)
-	testForwardsTo[tlsOptions](t, TLSEndpoint)
-	testForwardsTo[tcpOptions](t, TCPEndpoint)
-	testForwardsTo[labeledOptions](t, LabeledTunnel)
+	testForwardsTo[*httpOptions](t, HTTPEndpoint)
+	testForwardsTo[*tlsOptions](t, TLSEndpoint)
+	testForwardsTo[*tcpOptions](t, TCPEndpoint)
+	testForwardsTo[*labeledOptions](t, LabeledTunnel)
 }

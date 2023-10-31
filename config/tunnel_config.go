@@ -1,6 +1,10 @@
 package config
 
-import "golang.ngrok.com/ngrok/internal/tunnel/proto"
+import (
+	"net/url"
+
+	"golang.ngrok.com/ngrok/internal/tunnel/proto"
+)
 
 // Tunnel is a marker interface for options that can be used to start
 // tunnels.
@@ -14,9 +18,11 @@ type Tunnel interface {
 // the public interface with internal details.
 type tunnelConfigPrivate interface {
 	ForwardsTo() string
-	WithForwardsTo(string)
 	Extra() proto.BindExtra
 	Proto() string
 	Opts() any
 	Labels() map[string]string
+	// Extra config when auto-forwarding to a URL.
+	// Normal operation should use the functional builder.
+	WithForwardsTo(*url.URL)
 }

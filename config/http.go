@@ -3,6 +3,7 @@ package config
 import (
 	"crypto/x509"
 	"net/http"
+	"net/url"
 
 	"golang.ngrok.com/ngrok/internal/pb"
 	"golang.ngrok.com/ngrok/internal/tunnel/proto"
@@ -24,7 +25,7 @@ func HTTPEndpoint(opts ...HTTPEndpointOption) Tunnel {
 	for _, opt := range opts {
 		opt.ApplyHTTP(&cfg)
 	}
-	return cfg
+	return &cfg
 }
 
 type httpOptions struct {
@@ -62,6 +63,9 @@ type httpOptions struct {
 	RequestHeaders *headers
 	// Headers to be added to or removed from all responses at the ngrok edge.
 	ResponseHeaders *headers
+
+	// Auto-rewrite host header on ListenAndForward?
+	RewriteHostHeader bool
 
 	// Credentials for basic authentication.
 	// If empty, basic authentication is disabled.
@@ -126,8 +130,11 @@ func (cfg httpOptions) ForwardsTo() string {
 	return cfg.commonOpts.getForwardsTo()
 }
 
-func (cfg httpOptions) WithForwardsTo(hostname string) {
-	cfg.commonOpts.ForwardsTo = hostname
+func (cfg *httpOptions) WithForwardsTo(url *url.URL) {
+	cfg.commonOpts.ForwardsTo = url.Host
+	if cfg.RewriteHostHeader {
+		WithRequestHeader("host", url.Host).ApplyHTTP(cfg)
+	}
 }
 
 func (cfg httpOptions) Extra() proto.BindExtra {

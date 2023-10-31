@@ -829,7 +829,7 @@ func (s *sessionImpl) ListenAndForward(ctx context.Context, url *url.URL, cfg co
 	}
 
 	// Set 'Forwards To'
-	tunnelCfg.WithForwardsTo(url.Host)
+	tunnelCfg.WithForwardsTo(url)
 
 	tun, err := s.Listen(ctx, cfg)
 	if err != nil {
