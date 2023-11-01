@@ -35,8 +35,9 @@ type tunnel struct {
 	labels      map[string]string
 	forwardsTo  string
 
-	accept   chan *ProxyConn // new connections come on this channel
-	unlisten func() error    // call this function to close the tunnel
+	accept     chan *ProxyConn // new connections come on this channel
+	unlisten   func() error    // call this function to close the tunnel
+	closeError error           // error to use on accept error after a tunnel close
 
 	shut shutdown // for clean shutdowns
 }
@@ -54,6 +55,7 @@ func newTunnel(resp proto.BindResp, extra proto.BindExtra, s *session, forwardsT
 		accept:      make(chan *ProxyConn),
 		unlisten:    func() error { return s.unlisten(resp.ClientID) },
 		forwardsTo:  forwardsTo,
+		closeError:  errors.New("Listener closed"),
 	}
 }
 
@@ -69,6 +71,7 @@ func newTunnelLabel(resp proto.StartTunnelWithLabelResp, metadata string, labels
 		accept:     make(chan *ProxyConn),
 		unlisten:   func() error { return s.unlisten(resp.ID) },
 		forwardsTo: forwardsTo,
+		closeError: errors.New("Listener closed"),
 	}
 }
 
@@ -83,9 +86,17 @@ func (t *tunnel) handleConn(r *ProxyConn) {
 func (t *tunnel) Accept() (*ProxyConn, error) {
 	conn, ok := <-t.accept
 	if !ok {
-		return nil, errors.New("Tunnel closed")
+		return nil, t.closeError
 	}
 	return conn, nil
+}
+
+func (t *tunnel) CloseWithError(closeError error) {
+	t.closeError = closeError
+	// Skips the call to unlisten, since the remote has already rejected it.
+	t.shut.Shut(func() {
+		close(t.accept)
+	})
 }
 
 // Closes the Tunnel by asking the remote machine to deallocate its listener, or

@@ -149,7 +149,13 @@ type tunnelImpl struct {
 func (t *tunnelImpl) Accept() (net.Conn, error) {
 	conn, err := t.Tunnel.Accept()
 	if err != nil {
-		return nil, errAcceptFailed{Inner: err}
+		err = errAcceptFailed{Inner: err}
+		if s, ok := t.Sess.(*sessionImpl); ok {
+			if si := s.inner(); si != nil {
+				si.Logger.Info(err.Error(), "clientid", t.Tunnel.ID())
+			}
+		}
+		return nil, err
 	}
 	return &connImpl{
 		Conn:  conn.Conn,

@@ -57,9 +57,7 @@ func main() {
 }
 
 func run(ctx context.Context, backend *url.URL) error {
-	fwd, err := ngrok.ListenAndForward(ctx,
-		backend,
-		config.HTTPEndpoint(),
+	sess, err := ngrok.Connect(ctx,
 		ngrok.WithAuthtokenFromEnv(),
 		ngrok.WithLogger(&logger{lvl: ngrok_log.LogLevelDebug}),
 	)
@@ -67,9 +65,24 @@ func run(ctx context.Context, backend *url.URL) error {
 		return err
 	}
 
-	l.Log(ctx, ngrok_log.LogLevelInfo, "ingress established", map[string]any{
-		"url": fwd.URL(),
-	})
+	for {
+		fwd, err := sess.ListenAndForward(ctx,
+			backend,
+			config.HTTPEndpoint(),
+		)
+		if err != nil {
+			return err
+		}
 
-	return fwd.Wait()
+		l.Log(ctx, ngrok_log.LogLevelInfo, "ingress established", map[string]any{
+			"url": fwd.URL(),
+		})
+
+		err = fwd.Wait()
+		if err == nil {
+			return nil
+		}
+		l.Log(ctx, ngrok_log.LogLevelWarn, "accept error. now setting up a new forwarder.",
+			map[string]any{"err": err})
+	}
 }

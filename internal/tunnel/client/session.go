@@ -67,6 +67,10 @@ type Session interface {
 	// Latency updates
 	Latency() <-chan time.Duration
 
+	// Close the tunnel with this clientID, with an error that will be reported
+	// from the tunnel's Accept() method.
+	CloseTunnel(clientID string, err error) error
+
 	// Closes the session
 	Close() error
 }
@@ -174,6 +178,15 @@ func (s *session) ListenSSH(opts *proto.SSHOptions, extra proto.BindExtra, forwa
 
 func (s *session) SrvInfo() (proto.SrvInfoResp, error) {
 	return s.raw.SrvInfo()
+}
+
+func (s *session) CloseTunnel(clientId string, err error) error {
+	t, ok := s.getTunnel(clientId)
+	if !ok {
+		return proto.StringError("no listener found for client id " + clientId)
+	}
+	t.CloseWithError(err)
+	return nil
 }
 
 func (s *session) Close() error {
