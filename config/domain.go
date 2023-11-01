@@ -3,6 +3,8 @@ package config
 type domainOption string
 
 // WithDomain sets the fully-qualified domain name for this edge.
+//
+// https://ngrok.com/docs/network-edge/domains-and-tcp-addresses/#domains
 func WithDomain(name string) interface {
 	HTTPEndpointOption
 	TLSEndpointOption

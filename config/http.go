@@ -20,6 +20,8 @@ func (of httpOptionFunc) ApplyHTTP(cfg *httpOptions) {
 }
 
 // HTTPEndpoint constructs a new set options for a HTTP endpoint.
+//
+// https://ngrok.com/docs/http/
 func HTTPEndpoint(opts ...HTTPEndpointOption) Tunnel {
 	cfg := httpOptions{}
 	for _, opt := range opts {

@@ -13,6 +13,8 @@ type mutualTLSEndpointOption []*x509.Certificate
 // authentication.
 // These will be used to authenticate client certificates for requests at the
 // ngrok edge.
+//
+// https://ngrok.com/docs/http/mutual-tls/
 func WithMutualTLSCA(certs ...*x509.Certificate) interface {
 	HTTPEndpointOption
 	TLSEndpointOption

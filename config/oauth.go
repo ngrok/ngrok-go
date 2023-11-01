@@ -82,6 +82,8 @@ func (oauth *oauthOptions) toProtoConfig() *pb.MiddlewareConfiguration_OAuth {
 
 // WithOAuth configures this edge with the the given OAuth provider.
 // Overwrites any previously-set OAuth configuration.
+//
+// https://ngrok.com/docs/http/oauth/
 func WithOAuth(provider string, opts ...OAuthOption) HTTPEndpointOption {
 	return httpOptionFunc(func(cfg *httpOptions) {
 		oauth := oauthProvider(provider)
