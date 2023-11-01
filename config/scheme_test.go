@@ -7,7 +7,7 @@ import (
 )
 
 func TestScheme(t *testing.T) {
-	cases := testCases[httpOptions, proto.HTTPEndpoint]{
+	cases := testCases[*httpOptions, proto.HTTPEndpoint]{
 		{
 			name:        "default",
 			opts:        HTTPEndpoint(),

@@ -31,4 +31,4 @@ func (cfg *commonOpts) getForwardsTo() string {
 	return cfg.ForwardsTo
 }
 
-func (cfg commonOpts) tunnelOptions() {}
+func (cfg *commonOpts) tunnelOptions() {}

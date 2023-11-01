@@ -122,15 +122,15 @@ func testCIDRRestrictions[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 }
 
 func TestCIDRRestrictions(t *testing.T) {
-	testCIDRRestrictions[httpOptions](t, HTTPEndpoint,
+	testCIDRRestrictions[*httpOptions](t, HTTPEndpoint,
 		func(h *proto.HTTPEndpoint) *pb.MiddlewareConfiguration_IPRestriction {
 			return h.IPRestriction
 		})
-	testCIDRRestrictions[tcpOptions](t, TCPEndpoint,
+	testCIDRRestrictions[*tcpOptions](t, TCPEndpoint,
 		func(h *proto.TCPEndpoint) *pb.MiddlewareConfiguration_IPRestriction {
 			return h.IPRestriction
 		})
-	testCIDRRestrictions[tlsOptions](t, TLSEndpoint,
+	testCIDRRestrictions[*tlsOptions](t, TLSEndpoint,
 		func(h *proto.TLSEndpoint) *pb.MiddlewareConfiguration_IPRestriction {
 			return h.IPRestriction
 		})

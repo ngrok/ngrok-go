@@ -9,7 +9,7 @@ import (
 )
 
 func TestWebsocketTCPConversion(t *testing.T) {
-	cases := testCases[httpOptions, proto.HTTPEndpoint]{
+	cases := testCases[*httpOptions, proto.HTTPEndpoint]{
 		{
 			name: "absent",
 			opts: HTTPEndpoint(),

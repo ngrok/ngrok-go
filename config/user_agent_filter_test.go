@@ -84,7 +84,7 @@ func testUserAgentFilter[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 }
 
 func TestUserAgentFilter(t *testing.T) {
-	testUserAgentFilter[httpOptions](t, HTTPEndpoint,
+	testUserAgentFilter[*httpOptions](t, HTTPEndpoint,
 		func(h *proto.HTTPEndpoint) *pb.MiddlewareConfiguration_UserAgentFilter {
 			return h.UserAgentFilter
 		})

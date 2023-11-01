@@ -2,6 +2,7 @@ package config
 
 import (
 	"net/http"
+	"net/url"
 
 	"golang.ngrok.com/ngrok/internal/tunnel/proto"
 )
@@ -22,7 +23,7 @@ func LabeledTunnel(opts ...LabeledTunnelOption) Tunnel {
 	for _, opt := range opts {
 		opt.ApplyLabeled(&cfg)
 	}
-	return cfg
+	return &cfg
 }
 
 // Options for labeled tunnels.
@@ -53,8 +54,8 @@ func (cfg labeledOptions) ForwardsTo() string {
 	return cfg.commonOpts.getForwardsTo()
 }
 
-func (cfg labeledOptions) WithForwardsTo(hostname string) {
-	cfg.commonOpts.ForwardsTo = hostname
+func (cfg *labeledOptions) WithForwardsTo(url *url.URL) {
+	cfg.commonOpts.ForwardsTo = url.Host
 }
 
 func (cfg labeledOptions) Extra() proto.BindExtra {

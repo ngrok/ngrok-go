@@ -9,7 +9,7 @@ import (
 )
 
 func TestTLSTermination(t *testing.T) {
-	cases := testCases[tlsOptions, proto.TLSEndpoint]{
+	cases := testCases[*tlsOptions, proto.TLSEndpoint]{
 		{
 			name: "absent",
 			opts: TLSEndpoint(),

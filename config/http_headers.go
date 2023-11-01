@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net/http"
 
 	"golang.ngrok.com/ngrok/internal/pb"
 )
@@ -62,30 +63,42 @@ func (h responseHeaders) ApplyHTTP(cfg *httpOptions) {
 	cfg.ResponseHeaders = cfg.ResponseHeaders.merge(headers(h))
 }
 
+// WithHostHeaderRewrite will automatically set the `Host` header to the one in
+// the URL passed to `ListenAndForward`. Does nothing if using `Listen`.
+// Defaults to `false`.
+//
+// If you need to set the host header to a specific value, use
+// `WithRequestHeader("host", "some.host.com")` instead.
+func WithHostHeaderRewrite(rewrite bool) HTTPEndpointOption {
+	return httpOptionFunc(func(cfg *httpOptions) {
+		cfg.RewriteHostHeader = rewrite
+	})
+}
+
 // WithRequestHeader adds a header to all requests to this edge.
 func WithRequestHeader(name, value string) HTTPEndpointOption {
 	return requestHeaders(headers{
-		Added: map[string]string{name: value},
+		Added: map[string]string{http.CanonicalHeaderKey(name): value},
 	})
 }
 
 // WithRequestHeader adds a header to all responses coming from this edge.
 func WithResponseHeader(name, value string) HTTPEndpointOption {
 	return responseHeaders(headers{
-		Added: map[string]string{name: value},
+		Added: map[string]string{http.CanonicalHeaderKey(name): value},
 	})
 }
 
 // WithRemoveRequestHeader removes a header from requests to this edge.
 func WithRemoveRequestHeader(name string) HTTPEndpointOption {
 	return requestHeaders(headers{
-		Removed: []string{name},
+		Removed: []string{http.CanonicalHeaderKey(name)},
 	})
 }
 
 // WithRemoveResponseHeader removes a header from responses from this edge.
 func WithRemoveResponseHeader(name string) HTTPEndpointOption {
 	return responseHeaders(headers{
-		Removed: []string{name},
+		Removed: []string{http.CanonicalHeaderKey(name)},
 	})
 }

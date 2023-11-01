@@ -10,7 +10,7 @@ import (
 )
 
 func TestBasicAuth(t *testing.T) {
-	cases := testCases[httpOptions, proto.HTTPEndpoint]{
+	cases := testCases[*httpOptions, proto.HTTPEndpoint]{
 		{
 			name: "single",
 			opts: HTTPEndpoint(WithBasicAuth("foo", "bar")),
