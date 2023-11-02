@@ -11,6 +11,10 @@ type forwardsToOption string
 // WithForwardsTo sets the ForwardsTo string for this tunnel.
 // This can be viewed via the API or dashboard.
 //
+// This overrides the default process info if using
+// [golang.ngrok.com/ngrok.Listen], and is in turn overridden by the url
+// provided to [golang.ngrok.com/ngrok.ListenAndForward].
+//
 // https://ngrok.com/docs/api/resources/tunnels/#tunnel-fields
 func WithForwardsTo(meta string) Options {
 	return forwardsToOption(meta)
