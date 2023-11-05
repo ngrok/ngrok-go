@@ -53,18 +53,20 @@ func (fwd *forwarder) Wait() error {
 // compile-time check that we're implementing the proper interface
 var _ Forwarder = (*forwarder)(nil)
 
-func join(ctx context.Context, left, right io.ReadWriter) {
-	g := &sync.WaitGroup{}
-	g.Add(2)
-	go func() {
-		_, _ = io.Copy(left, right)
-		g.Done()
-	}()
-	go func() {
-		_, _ = io.Copy(right, left)
-		g.Done()
-	}()
+func join(ctx context.Context, left, right net.Conn) {
+	g, _ := errgroup.WithContext(ctx) // when ctx is canceled (on WithStopHandler or WithDisconnectHandler ) interrupts both io.Copy
+	g.Go(func() error {
+		_, err := io.Copy(left, right)
+		left.Close() // on left disconnection interrupts io.Copy(right, left)
+		return err
+	})
+	g.Go(func() error {
+		_, err := io.Copy(right, left)
+		right.Close() // on right disconnection interrupts io.Copy(left, right)
+		return err
+	})
 	g.Wait()
+
 }
 
 func forwardTunnel(ctx context.Context, tun Tunnel, url *url.URL) Forwarder {
@@ -85,20 +87,20 @@ func forwardTunnel(ctx context.Context, tun Tunnel, url *url.URL) Forwarder {
 			if err != nil {
 				return err
 			}
+			logger.Debug("accept connection from", "address", conn.RemoteAddr())
 			fwdTasks.Add(1)
 
 			go func() {
 				ngrokConn := conn.(Conn)
-				defer ngrokConn.Close()
 
 				backend, err := openBackend(ctx, logger, tun, ngrokConn, url)
 				if err != nil {
+					defer ngrokConn.Close()
 					logger.Warn("failed to connect to backend url", "error", err)
 					fwdTasks.Done()
 					return
 				}
 
-				defer backend.Close()
 				join(ctx, ngrokConn, backend)
 				fwdTasks.Done()
 			}()
