@@ -53,15 +53,17 @@ func (fwd *forwarder) Wait() error {
 // compile-time check that we're implementing the proper interface
 var _ Forwarder = (*forwarder)(nil)
 
-func join(ctx context.Context, left, right io.ReadWriter) {
+func join(ctx context.Context, left, right net.Conn) {
 	g := &sync.WaitGroup{}
 	g.Add(2)
 	go func() {
 		_, _ = io.Copy(left, right)
+		left.Close()
 		g.Done()
 	}()
 	go func() {
 		_, _ = io.Copy(right, left)
+		right.Close()
 		g.Done()
 	}()
 	g.Wait()
