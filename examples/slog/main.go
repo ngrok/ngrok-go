@@ -50,7 +50,7 @@ func run(ctx context.Context, lvlName string) error {
 	h := slog.HandlerOptions{Level: programLevel}.NewTextHandler(os.Stdout)
 	slog.SetDefault(slog.New(h))
 
-	tun, err := ngrok.Listen(ctx,
+	ln, err := ngrok.Listen(ctx,
 		config.HTTPEndpoint(),
 		ngrok.WithAuthtokenFromEnv(),
 		ngrok.WithLogger(slogadapter.NewLogger(slog.Default())),
@@ -59,9 +59,9 @@ func run(ctx context.Context, lvlName string) error {
 		return err
 	}
 
-	slog.Info("tunnel created", "url", tun.URL())
+	slog.Info("Ingress established", "url", ln.URL())
 
-	return http.Serve(tun, http.HandlerFunc(handler))
+	return http.Serve(ln, http.HandlerFunc(handler))
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {

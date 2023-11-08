@@ -1,5 +1,5 @@
 // Naïve ngrok agent implementation.
-// Sets up a single tunnel and connects to an arbitrary HTTP server.
+// Sets up a single listener and connects to an arbitrary HTTP server.
 
 package main
 
@@ -38,7 +38,7 @@ func main() {
 		fmt.Fprintln(w, "Hello from ngrok-go!")
 	})}
 
-	// Serve with tunnel backend
+	// Serve with listener backend
 	if err := run(context.Background(), server); err != nil {
 		log.Fatal(err)
 	}
@@ -50,7 +50,7 @@ func main() {
 }
 
 func run(ctx context.Context, server *http.Server) error {
-	tunnel, err := ngrok.ListenAndServeHTTP(ctx,
+	ln, err := ngrok.ListenAndServeHTTP(ctx,
 		server,
 		config.HTTPEndpoint(),
 		ngrok.WithAuthtokenFromEnv(),
@@ -58,8 +58,8 @@ func run(ctx context.Context, server *http.Server) error {
 	)
 
 	if err == nil {
-		l.Log(ctx, ngrok_log.LogLevelInfo, "tunnel created", map[string]any{
-			"url": tunnel.URL(),
+		l.Log(ctx, ngrok_log.LogLevelInfo, "ingress established", map[string]any{
+			"url": ln.URL(),
 		})
 	}
 

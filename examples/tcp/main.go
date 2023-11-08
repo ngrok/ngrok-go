@@ -20,7 +20,7 @@ func main() {
 }
 
 func run(ctx context.Context) error {
-	tun, err := ngrok.Listen(ctx,
+	ln, err := ngrok.Listen(ctx,
 		config.TCPEndpoint(),
 		ngrok.WithAuthtokenFromEnv(),
 	)
@@ -28,9 +28,9 @@ func run(ctx context.Context) error {
 		return err
 	}
 
-	log.Println("started tunnel:", tun.URL())
+	log.Println("Ingress established at:", ln.URL())
 
-	return runListener(ctx, tun)
+	return runListener(ctx, ln)
 }
 
 func runListener(ctx context.Context, l net.Listener) error {
