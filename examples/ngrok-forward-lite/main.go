@@ -1,5 +1,5 @@
 // Naïve ngrok agent implementation.
-// Sets up a single tunnel and forwards it to another service.
+// Sets up a single listener and forwards it to another service.
 
 package main
 
@@ -67,7 +67,7 @@ func run(ctx context.Context, backend *url.URL) error {
 		return err
 	}
 
-	l.Log(ctx, ngrok_log.LogLevelInfo, "tunnel created", map[string]any{
+	l.Log(ctx, ngrok_log.LogLevelInfo, "ingress established", map[string]any{
 		"url": fwd.URL(),
 	})
 

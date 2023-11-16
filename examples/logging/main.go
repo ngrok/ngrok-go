@@ -47,7 +47,7 @@ func run(ctx context.Context, lvlName string) error {
 		return err
 	}
 
-	tun, err := ngrok.Listen(ctx,
+	ln, err := ngrok.Listen(ctx,
 		config.HTTPEndpoint(),
 		ngrok.WithAuthtokenFromEnv(),
 		ngrok.WithLogger(&logger{lvl}),
@@ -56,9 +56,9 @@ func run(ctx context.Context, lvlName string) error {
 		return err
 	}
 
-	log.Println("tunnel created:", tun.URL())
+	log.Println("Ingress established at:", ln.URL())
 
-	return http.Serve(tun, http.HandlerFunc(handler))
+	return http.Serve(ln, http.HandlerFunc(handler))
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
