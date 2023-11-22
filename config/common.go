@@ -12,6 +12,11 @@ type commonOpts struct {
 	// bearing on tunnel behavior.
 	// If not set, defaults to a URI in the format `app://hostname/path/to/executable?pid=12345`
 	ForwardsTo string
+
+	// The protocol that's forwarded from the ngrok edge.
+	// Currently only relevant for HTTP/1.1 vs HTTP/2, since there's a potential
+	// change-of-protocol happening at our edge.
+	ForwardsProto string
 }
 
 type CommonOptionsFunc func(cfg *commonOpts)

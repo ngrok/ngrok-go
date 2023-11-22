@@ -58,6 +58,10 @@ func (cfg tcpOptions) ForwardsTo() string {
 	return cfg.commonOpts.getForwardsTo()
 }
 
+func (cfg tcpOptions) ForwardsProto() string {
+	return "" // Not supported for TCP
+}
+
 func (cfg *tcpOptions) WithForwardsTo(url *url.URL) {
 	cfg.commonOpts.ForwardsTo = url.Host
 }

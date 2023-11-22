@@ -13,6 +13,7 @@ import (
 // Duplicated from config/tunnel_config.go
 type tunnelConfigPrivate interface {
 	ForwardsTo() string
+	ForwardsProto() string
 	Extra() proto.BindExtra
 	Proto() string
 	Opts() any

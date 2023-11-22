@@ -800,9 +800,9 @@ func (s *sessionImpl) Listen(ctx context.Context, cfg config.Tunnel) (Tunnel, er
 
 	extra := tunnelCfg.Extra()
 	if tunnelCfg.Proto() != "" {
-		tunnel, err = s.inner().Listen(tunnelCfg.Proto(), tunnelCfg.Opts(), extra, tunnelCfg.ForwardsTo())
+		tunnel, err = s.inner().Listen(tunnelCfg.Proto(), tunnelCfg.Opts(), extra, tunnelCfg.ForwardsTo(), tunnelCfg.ForwardsProto())
 	} else {
-		tunnel, err = s.inner().ListenLabel(tunnelCfg.Labels(), extra.Metadata, tunnelCfg.ForwardsTo())
+		tunnel, err = s.inner().ListenLabel(tunnelCfg.Labels(), extra.Metadata, tunnelCfg.ForwardsTo(), tunnelCfg.ForwardsProto())
 	}
 
 	impl := &tunnelImpl{

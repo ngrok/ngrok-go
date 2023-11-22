@@ -38,20 +38,20 @@ type Session interface {
 	//
 	// Applications will typically prefer to call the protocol-specific methods like
 	// ListenHTTP, ListenTCP, etc.
-	Listen(protocol string, opts any, extra proto.BindExtra, forwardsTo string) (Tunnel, error)
+	Listen(protocol string, opts any, extra proto.BindExtra, forwardsTo string, forwardsProto string) (Tunnel, error)
 
 	// Listen negotiates with the server to create a new remote listen for the
 	// given labels. It returns a *Tunnel on success from which the caller can
 	// accept new connections over the listen.
-	ListenLabel(labels map[string]string, metadata string, forwardsTo string) (Tunnel, error)
+	ListenLabel(labels map[string]string, metadata string, forwardsTo string, forwardsProto string) (Tunnel, error)
 
 	// Convenience methods
 
 	// ListenHTTP listens on a new HTTP endpoint
-	ListenHTTP(opts *proto.HTTPEndpoint, extra proto.BindExtra, forwardsTo string) (Tunnel, error)
+	ListenHTTP(opts *proto.HTTPEndpoint, extra proto.BindExtra, forwardsTo string, forwardsProto string) (Tunnel, error)
 
 	// ListenHTTP listens on a new HTTPS endpoint
-	ListenHTTPS(opts *proto.HTTPEndpoint, extra proto.BindExtra, forwardsTo string) (Tunnel, error)
+	ListenHTTPS(opts *proto.HTTPEndpoint, extra proto.BindExtra, forwardsTo string, forwardsProto string) (Tunnel, error)
 
 	// ListenTCP listens on a remote TCP endpoint
 	ListenTCP(opts *proto.TCPEndpoint, extra proto.BindExtra, forwardsTo string) (Tunnel, error)
@@ -116,8 +116,8 @@ func (s *session) Heartbeat() (time.Duration, error) {
 	return s.raw.Heartbeat()
 }
 
-func (s *session) Listen(protocol string, opts any, extra proto.BindExtra, forwardsTo string) (Tunnel, error) {
-	resp, err := s.raw.Listen(protocol, opts, extra, "", forwardsTo)
+func (s *session) Listen(protocol string, opts any, extra proto.BindExtra, forwardsTo string, forwardsProto string) (Tunnel, error) {
+	resp, err := s.raw.Listen(protocol, opts, extra, "", forwardsTo, forwardsProto)
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +128,7 @@ func (s *session) Listen(protocol string, opts any, extra proto.BindExtra, forwa
 	}
 
 	// make tunnel
-	t := newTunnel(resp, extra, s, forwardsTo)
+	t := newTunnel(resp, extra, s, forwardsTo, forwardsProto)
 
 	// add to tunnel registry
 	s.addTunnel(resp.ClientID, t)
@@ -136,8 +136,8 @@ func (s *session) Listen(protocol string, opts any, extra proto.BindExtra, forwa
 	return t, nil
 }
 
-func (s *session) ListenLabel(labels map[string]string, metadata string, forwardsTo string) (Tunnel, error) {
-	resp, err := s.raw.ListenLabel(labels, metadata, forwardsTo)
+func (s *session) ListenLabel(labels map[string]string, metadata string, forwardsTo string, forwardsProto string) (Tunnel, error) {
+	resp, err := s.raw.ListenLabel(labels, metadata, forwardsTo, forwardsProto)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +148,7 @@ func (s *session) ListenLabel(labels map[string]string, metadata string, forward
 	}
 
 	// make tunnel
-	t := newTunnelLabel(resp, metadata, labels, s, forwardsTo)
+	t := newTunnelLabel(resp, metadata, labels, s, forwardsTo, forwardsProto)
 
 	// add to tunnel registry
 	s.addTunnel(resp.ID, t)
@@ -156,24 +156,24 @@ func (s *session) ListenLabel(labels map[string]string, metadata string, forward
 	return t, nil
 }
 
-func (s *session) ListenHTTP(opts *proto.HTTPEndpoint, extra proto.BindExtra, forwardsTo string) (Tunnel, error) {
-	return s.Listen("http", opts, extra, forwardsTo)
+func (s *session) ListenHTTP(opts *proto.HTTPEndpoint, extra proto.BindExtra, forwardsTo string, forwardsProto string) (Tunnel, error) {
+	return s.Listen("http", opts, extra, forwardsTo, forwardsProto)
 }
 
-func (s *session) ListenHTTPS(opts *proto.HTTPEndpoint, extra proto.BindExtra, forwardsTo string) (Tunnel, error) {
-	return s.Listen("https", opts, extra, forwardsTo)
+func (s *session) ListenHTTPS(opts *proto.HTTPEndpoint, extra proto.BindExtra, forwardsTo string, forwardsProto string) (Tunnel, error) {
+	return s.Listen("https", opts, extra, forwardsTo, forwardsProto)
 }
 
 func (s *session) ListenTCP(opts *proto.TCPEndpoint, extra proto.BindExtra, forwardsTo string) (Tunnel, error) {
-	return s.Listen("tcp", opts, extra, forwardsTo)
+	return s.Listen("tcp", opts, extra, forwardsTo, "")
 }
 
 func (s *session) ListenTLS(opts *proto.TLSEndpoint, extra proto.BindExtra, forwardsTo string) (Tunnel, error) {
-	return s.Listen("tls", opts, extra, forwardsTo)
+	return s.Listen("tls", opts, extra, forwardsTo, "")
 }
 
 func (s *session) ListenSSH(opts *proto.SSHOptions, extra proto.BindExtra, forwardsTo string) (Tunnel, error) {
-	return s.Listen("ssh", opts, extra, forwardsTo)
+	return s.Listen("ssh", opts, extra, forwardsTo, "")
 }
 
 func (s *session) SrvInfo() (proto.SrvInfoResp, error) {

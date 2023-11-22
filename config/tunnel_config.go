@@ -18,6 +18,7 @@ type Tunnel interface {
 // the public interface with internal details.
 type tunnelConfigPrivate interface {
 	ForwardsTo() string
+	ForwardsProto() string
 	Extra() proto.BindExtra
 	Proto() string
 	Opts() any
