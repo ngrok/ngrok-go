@@ -37,6 +37,7 @@ type SessionHandler interface {
 	OnStop(*proto.Stop, HandlerRespFunc)
 	OnRestart(*proto.Restart, HandlerRespFunc)
 	OnUpdate(*proto.Update, HandlerRespFunc)
+	OnStopTunnel(*proto.StopTunnel, HandlerRespFunc)
 }
 
 // A RawSession is a client session which handles authorization with the tunnel
@@ -75,7 +76,7 @@ func (s *rawSession) Auth(id string, extra proto.AuthExtra) (resp proto.AuthResp
 	req := proto.Auth{
 		ClientID: id,
 		Extra:    extra,
-		Version:  []string{proto.Version},
+		Version:  proto.Version,
 	}
 	if err = s.rpc(proto.AuthReq, &req, &resp); err != nil {
 		return
@@ -200,6 +201,11 @@ func (s *rawSession) Accept() (netx.LoggedConn, error) {
 			var req proto.Update
 			if deserialize(&req) {
 				go s.handler.OnUpdate(&req, respFunc)
+			}
+		case proto.StopTunnelReq:
+			var req proto.StopTunnel
+			if deserialize(&req) {
+				go s.handler.OnStopTunnel(&req, respFunc)
 			}
 		default:
 			return netx.NewLoggedConn(s.Logger, raw, "type", "proxy", "sess", s.id), nil

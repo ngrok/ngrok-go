@@ -771,6 +771,10 @@ func (s *sessionImpl) setInner(raw *sessionInner) {
 	atomic.StorePointer(&s.raw, unsafe.Pointer(raw))
 }
 
+func (s *sessionImpl) closeTunnel(clientID string, err error) error {
+	return s.inner().CloseTunnel(clientID, err)
+}
+
 func (s *sessionImpl) Close() error {
 	return s.inner().Close()
 }
@@ -908,7 +912,7 @@ func (s *sessionImpl) Latency() <-chan time.Duration {
 
 type remoteCallbackHandler struct {
 	log15.Logger
-	sess           Session
+	sess           *sessionImpl
 	stopHandler    ServerCommandHandler
 	restartHandler ServerCommandHandler
 	updateHandler  ServerCommandHandler
@@ -957,5 +961,14 @@ func (rc remoteCallbackHandler) OnUpdate(_ *proto.Update, respond tunnel_client.
 		if err := respond(resp); err != nil {
 			rc.Warn("error responding to restart request", "error", err)
 		}
+	}
+}
+
+func (rc remoteCallbackHandler) OnStopTunnel(stopTunnel *proto.StopTunnel, respond tunnel_client.HandlerRespFunc) {
+	ngrokErr := &ngrokError{Message: stopTunnel.Message, ErrCode: stopTunnel.ErrorCode}
+	// close the tunnel and maintain the session
+	err := rc.sess.closeTunnel(stopTunnel.ClientID, ngrokErr)
+	if err != nil {
+		rc.Warn("error closing tunnel", "error", err)
 	}
 }

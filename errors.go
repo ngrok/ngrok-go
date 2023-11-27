@@ -132,3 +132,26 @@ func (e errSessionDial) Is(target error) bool {
 	_, ok := target.(errSessionDial)
 	return ok
 }
+
+// Generic ngrok error that requires no parsing
+type ngrokError struct {
+	Message string
+	ErrCode string
+}
+
+func (m ngrokError) Error() string {
+	return m.Message + "\n\n" + m.ErrCode
+}
+
+func (m ngrokError) Msg() string {
+	return m.Message
+}
+
+func (m ngrokError) ErrorCode() string {
+	return m.ErrCode
+}
+
+func (e ngrokError) Is(target error) bool {
+	_, ok := target.(ngrokError)
+	return ok
+}
