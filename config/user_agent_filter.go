@@ -12,6 +12,20 @@ type userAgentFilter struct {
 	Deny []string
 }
 
+// WithAllowUserAgentFilter is a deprecated alias for [WithAllowUserAgent].
+//
+// Deprecated: use [WithAllowUserAgent] instead.
+func WithAllowUserAgentFilter(allow ...string) HTTPEndpointOption {
+	return WithAllowUserAgent(allow...)
+}
+
+// WithDenyUserAgentFilter is a deprecated alias for [WithDenyUserAgent].
+//
+// Deprecated: use [WithDenyUserAgent] instead.
+func WithDenyUserAgentFilter(allow ...string) HTTPEndpointOption {
+	return WithDenyUserAgent(allow...)
+}
+
 // WithAllowUserAgent adds user agent filtering to the endpoint.
 //
 // The allow argument is a regular expressions for the user-agent
