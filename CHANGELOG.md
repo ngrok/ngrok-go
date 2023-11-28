@@ -1,3 +1,7 @@
+## 1.6.0
+
+- Adds support for remote stop of listener.
+
 ## 1.5.1
 
 - Adds TLS Renegotiation to the backend `tls.Config`.
