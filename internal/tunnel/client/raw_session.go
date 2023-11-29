@@ -19,8 +19,8 @@ import (
 
 type RawSession interface {
 	Auth(id string, extra proto.AuthExtra) (proto.AuthResp, error)
-	Listen(proto string, opts any, extra proto.BindExtra, id string, forwardsTo string) (proto.BindResp, error)
-	ListenLabel(labels map[string]string, metadata string, forwardsTo string) (proto.StartTunnelWithLabelResp, error)
+	Listen(proto string, opts any, extra proto.BindExtra, id string, forwardsTo string, forwardsProto string) (proto.BindResp, error)
+	ListenLabel(labels map[string]string, metadata string, forwardsTo string, forwardsProto string) (proto.StartTunnelWithLabelResp, error)
 	Unlisten(id string) (proto.UnbindResp, error)
 	Accept() (netx.LoggedConn, error)
 
@@ -95,13 +95,14 @@ func (s *rawSession) Auth(id string, extra proto.AuthExtra) (resp proto.AuthResp
 // opts are protocol-specific options for listening.
 // extra is an opaque struct useful for passing application-specific data.
 // id is an session-unique identifier, if empty it will be assigned for you
-func (s *rawSession) Listen(protocol string, opts any, extra proto.BindExtra, id string, forwardsTo string) (resp proto.BindResp, err error) {
+func (s *rawSession) Listen(protocol string, opts any, extra proto.BindExtra, id string, forwardsTo string, forwardsProto string) (resp proto.BindResp, err error) {
 	req := proto.Bind{
-		ClientID:   id,
-		Proto:      protocol,
-		Opts:       opts,
-		Extra:      extra,
-		ForwardsTo: forwardsTo,
+		ClientID:      id,
+		Proto:         protocol,
+		Opts:          opts,
+		Extra:         extra,
+		ForwardsTo:    forwardsTo,
+		ForwardsProto: forwardsProto,
 	}
 	err = s.rpc(proto.BindReq, &req, &resp)
 	if err != nil {
@@ -115,11 +116,12 @@ func (s *rawSession) Listen(protocol string, opts any, extra proto.BindExtra, id
 }
 
 // ListenLabel sends a listen message to the server and returns the server's response
-func (s *rawSession) ListenLabel(labels map[string]string, metadata string, forwardsTo string) (resp proto.StartTunnelWithLabelResp, err error) {
+func (s *rawSession) ListenLabel(labels map[string]string, metadata string, forwardsTo string, forwardsProto string) (resp proto.StartTunnelWithLabelResp, err error) {
 	req := proto.StartTunnelWithLabel{
-		Labels:     labels,
-		Metadata:   metadata,
-		ForwardsTo: forwardsTo,
+		Labels:        labels,
+		Metadata:      metadata,
+		ForwardsTo:    forwardsTo,
+		ForwardsProto: forwardsProto,
 	}
 	err = s.rpc(proto.StartTunnelWithLabelReq, &req, &resp)
 	return

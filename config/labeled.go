@@ -52,6 +52,10 @@ func WithLabel(label, value string) LabeledTunnelOption {
 	})
 }
 
+func (cfg labeledOptions) ForwardsProto() string {
+	return cfg.commonOpts.ForwardsProto
+}
+
 func (cfg labeledOptions) ForwardsTo() string {
 	return cfg.commonOpts.getForwardsTo()
 }

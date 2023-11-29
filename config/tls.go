@@ -84,6 +84,10 @@ func (cfg *tlsOptions) toProtoConfig() *proto.TLSEndpoint {
 	return opts
 }
 
+func (cfg tlsOptions) ForwardsProto() string {
+	return "" // Not supported for TLS
+}
+
 func (cfg tlsOptions) ForwardsTo() string {
 	return cfg.commonOpts.getForwardsTo()
 }

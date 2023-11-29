@@ -39,16 +39,16 @@ func (s *swapRaw) Auth(id string, extra proto.AuthExtra) (resp proto.AuthResp, e
 	return proto.AuthResp{}, ErrSessionNotReady
 }
 
-func (s *swapRaw) Listen(protocol string, opts any, extra proto.BindExtra, id string, forwardsTo string) (resp proto.BindResp, err error) {
+func (s *swapRaw) Listen(protocol string, opts any, extra proto.BindExtra, id string, forwardsTo string, forwardsProto string) (resp proto.BindResp, err error) {
 	if raw := s.get(); raw != nil {
-		return raw.Listen(protocol, opts, extra, id, forwardsTo)
+		return raw.Listen(protocol, opts, extra, id, forwardsTo, forwardsProto)
 	}
 	return proto.BindResp{}, ErrSessionNotReady
 }
 
-func (s *swapRaw) ListenLabel(labels map[string]string, metadata string, forwardsTo string) (resp proto.StartTunnelWithLabelResp, err error) {
+func (s *swapRaw) ListenLabel(labels map[string]string, metadata string, forwardsTo string, forwardsProto string) (resp proto.StartTunnelWithLabelResp, err error) {
 	if raw := s.get(); raw != nil {
-		return raw.ListenLabel(labels, metadata, forwardsTo)
+		return raw.ListenLabel(labels, metadata, forwardsTo, forwardsProto)
 	}
 	return proto.StartTunnelWithLabelResp{}, ErrSessionNotReady
 }
@@ -236,7 +236,7 @@ func (s *reconnectingSession) connect(acceptErr error) error {
 
 			var respErr string
 			if tCfg.Labels != nil {
-				resp, err := raw.ListenLabel(tCfg.Labels, tCfg.Metadata, t.ForwardsTo())
+				resp, err := raw.ListenLabel(tCfg.Labels, tCfg.Metadata, t.ForwardsTo(), t.ForwardsProto())
 				if err != nil {
 					return err
 				}
@@ -250,7 +250,7 @@ func (s *reconnectingSession) connect(acceptErr error) error {
 					newTunnels[oldID] = t
 				}
 			} else {
-				resp, err := raw.Listen(tCfg.ConfigProto, tCfg.Opts, t.bindExtra, t.ID(), t.ForwardsTo())
+				resp, err := raw.Listen(tCfg.ConfigProto, tCfg.Opts, t.bindExtra, t.ID(), t.ForwardsTo(), t.ForwardsProto())
 				if err != nil {
 					return err
 				}

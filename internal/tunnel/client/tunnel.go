@@ -26,14 +26,15 @@ type ProxyConn struct {
 // A Tunnel is a net.Listener that Accept()'s connections from a
 // remote machine.
 type tunnel struct {
-	id          atomic.Value
-	configProto string
-	url         string
-	opts        any
-	token       string
-	bindExtra   proto.BindExtra
-	labels      map[string]string
-	forwardsTo  string
+	id            atomic.Value
+	configProto   string
+	url           string
+	opts          any
+	token         string
+	bindExtra     proto.BindExtra
+	labels        map[string]string
+	forwardsTo    string
+	forwardsProto string
 
 	accept     chan *ProxyConn // new connections come on this channel
 	unlisten   func() error    // call this function to close the tunnel
@@ -42,24 +43,25 @@ type tunnel struct {
 	shut shutdown // for clean shutdowns
 }
 
-func newTunnel(resp proto.BindResp, extra proto.BindExtra, s *session, forwardsTo string) *tunnel {
+func newTunnel(resp proto.BindResp, extra proto.BindExtra, s *session, forwardsTo string, forwardsProto string) *tunnel {
 	id := atomic.Value{}
 	id.Store(resp.ClientID)
 	return &tunnel{
-		id:          id,
-		configProto: resp.Proto,
-		url:         resp.URL,
-		opts:        resp.Opts,
-		token:       resp.Extra.Token,
-		bindExtra:   extra, // this makes the reconnecting session a little easier
-		accept:      make(chan *ProxyConn),
-		unlisten:    func() error { return s.unlisten(resp.ClientID) },
-		forwardsTo:  forwardsTo,
-		closeError:  errors.New("Listener closed"),
+		id:            id,
+		configProto:   resp.Proto,
+		url:           resp.URL,
+		opts:          resp.Opts,
+		token:         resp.Extra.Token,
+		bindExtra:     extra, // this makes the reconnecting session a little easier
+		accept:        make(chan *ProxyConn),
+		unlisten:      func() error { return s.unlisten(resp.ClientID) },
+		forwardsTo:    forwardsTo,
+		forwardsProto: forwardsProto,
+		closeError:    errors.New("Listener closed"),
 	}
 }
 
-func newTunnelLabel(resp proto.StartTunnelWithLabelResp, metadata string, labels map[string]string, s *session, forwardsTo string) *tunnel {
+func newTunnelLabel(resp proto.StartTunnelWithLabelResp, metadata string, labels map[string]string, s *session, forwardsTo string, forwardsProto string) *tunnel {
 	id := atomic.Value{}
 	id.Store(resp.ID)
 	return &tunnel{
@@ -67,11 +69,12 @@ func newTunnelLabel(resp proto.StartTunnelWithLabelResp, metadata string, labels
 		bindExtra: proto.BindExtra{
 			Metadata: metadata,
 		}, // this makes the reconnecting session a little easier
-		labels:     labels,
-		accept:     make(chan *ProxyConn),
-		unlisten:   func() error { return s.unlisten(resp.ID) },
-		forwardsTo: forwardsTo,
-		closeError: errors.New("Listener closed"),
+		labels:        labels,
+		accept:        make(chan *ProxyConn),
+		unlisten:      func() error { return s.unlisten(resp.ID) },
+		forwardsTo:    forwardsTo,
+		forwardsProto: forwardsProto,
+		closeError:    errors.New("Listener closed"),
 	}
 }
 
@@ -113,6 +116,12 @@ func (t *tunnel) Close() (err error) {
 // remote machine.
 func (t *tunnel) Addr() net.Addr {
 	return t.RemoteBindConfig()
+}
+
+// ForwardsProto returns the protocol of the upstream that the ngrok agent
+// adverstises to the edge.
+func (t *tunnel) ForwardsProto() string {
+	return t.forwardsProto
 }
 
 // ForwardsTo returns the address of the upstream the ngrok agent will

@@ -128,6 +128,10 @@ func (cfg *httpOptions) toProtoConfig() *proto.HTTPEndpoint {
 	return opts
 }
 
+func (cfg httpOptions) ForwardsProto() string {
+	return cfg.commonOpts.ForwardsProto
+}
+
 func (cfg httpOptions) ForwardsTo() string {
 	return cfg.commonOpts.getForwardsTo()
 }
