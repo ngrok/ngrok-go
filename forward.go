@@ -134,6 +134,14 @@ func openBackend(ctx context.Context, logger log15.Logger, tun Tunnel, tunnelCon
 			ServerName:    url.Hostname(),
 			Renegotiation: tls.RenegotiateOnceAsClient,
 		}
+		if fwdProto, ok := tun.(interface{ ForwardsProto() string }); ok {
+			// If the backend is TLS and we've requested HTTP2, we'll need to
+			// make the backend aware of that via ALPN.
+			if fwdProto.ForwardsProto() == "http2" {
+				tlsConfig.NextProtos = append(tlsConfig.NextProtos, "h2", "http/1.1")
+
+			}
+		}
 	}
 
 	dialer := &net.Dialer{}
