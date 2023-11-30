@@ -16,6 +16,7 @@ type Tunnel interface {
 	RemoteBindConfig() *RemoteBindConfig
 	ID() string
 	ForwardsTo() string
+	ForwardsProto() string
 }
 
 type ProxyConn struct {

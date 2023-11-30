@@ -191,6 +191,10 @@ func (t *tunnelImpl) Proto() string {
 	return t.Tunnel.RemoteBindConfig().ConfigProto
 }
 
+func (t *tunnelImpl) ForwardsProto() string {
+	return t.Tunnel.ForwardsProto()
+}
+
 func (t *tunnelImpl) ForwardsTo() string {
 	return t.Tunnel.ForwardsTo()
 }

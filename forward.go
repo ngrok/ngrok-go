@@ -126,6 +126,10 @@ func openBackend(ctx context.Context, logger log15.Logger, tun Tunnel, tunnelCon
 		}
 		logger.Debug("set default port", "port", port)
 	}
+	var appProto string
+	if fwdProto, ok := tun.(interface{ ForwardsProto() string }); ok {
+		appProto = fwdProto.ForwardsProto()
+	}
 
 	// Create TLS config if necessary
 	var tlsConfig *tls.Config
@@ -133,6 +137,12 @@ func openBackend(ctx context.Context, logger log15.Logger, tun Tunnel, tunnelCon
 		tlsConfig = &tls.Config{
 			ServerName:    url.Hostname(),
 			Renegotiation: tls.RenegotiateOnceAsClient,
+		}
+		// If the backend is TLS and we've requested HTTP2, we'll need to
+		// make the backend aware of that via ALPN.
+		if appProto == "http2" {
+			logger.Debug("negotiating http/2 via alpn")
+			tlsConfig.NextProtos = append(tlsConfig.NextProtos, "h2", "http/1.1")
 		}
 	}
 
@@ -144,7 +154,11 @@ func openBackend(ctx context.Context, logger log15.Logger, tun Tunnel, tunnelCon
 	if err != nil {
 		defer tunnelConn.Close()
 
-		if isHTTP(tunnelConn.Proto()) {
+		// TODO: this http error is only valid for http/1.1. If the edge is
+		//       expecting http/2, it'll end up being a proxy error instead.
+		//       We should probably find a better way to do this that doesn't involve
+		//       understanding http here.
+		if isHTTP(tunnelConn.Proto()) && appProto != "http2" {
 			_ = writeHTTPError(tunnelConn, err)
 		}
 		return nil, err
