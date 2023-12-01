@@ -1,3 +1,10 @@
+## 1.7.0
+
+- Adds the `WithAppProtocol` option for labeled listeners and HTTP endpoints.
+
+  This provides a protocol hint that can be used to enable support for HTTP/2 to
+  the backend service.
+
 ## 1.6.0
 
 - Adds support for remote stop of listener.
@@ -8,7 +15,7 @@
 
 ## 1.5.0
 
-- Added new forwarding API. See `[Session].ListenAndForward` and `[Session].ListenAndServeHTTP`. 
+- Added new forwarding API. See `[Session].ListenAndForward` and `[Session].ListenAndServeHTTP`.
 - Deprecates `WithHTTPServer` and `WithHTTPHandler`. Use `[Session].ListenAndServeHTTP` instead.
 
 ## 1.4.0
@@ -19,4 +26,5 @@
 ## 1.0.0 (2023-01-10)
 
 Enhancements:
-* Initial release
+
+- Initial release
