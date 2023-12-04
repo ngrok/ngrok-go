@@ -33,11 +33,7 @@ type actionBuilder struct {
 }
 
 // Add the provided policies to the ngrok edge
-func WithPolicies(opts ...policiesOption) interface {
-	HTTPEndpointOption
-	TCPEndpointOption
-	TLSEndpointOption
-} {
+func NewPolicies(opts ...policiesOption) *policies {
 	p := &policies{}
 
 	for _, opt := range opts {
@@ -49,78 +45,69 @@ func WithPolicies(opts ...policiesOption) interface {
 
 // Add the provided policy to be applied on inbound connections on an ngrok edge.
 // The order in which policies are added is respected at runtime.
-func WithInboundPolicy(opts ...policyOption) policiesOption {
-	return func(p *policies) {
-		policy := &policy{}
-		for _, opt := range opts {
-			opt(policy)
-		}
-		p.Inbound = append(p.Inbound, policy)
-	}
+func (p *policies) WithInboundPolicy(in *policy) *policies {
+	p.Inbound = append(p.Inbound, in)
+	return p
 }
 
 // Add the provided policy to be applied on outbound connections on an ngrok edge.
 // The order in which policies are added is respected at runtime.
-func WithOutboundPolicy(opts ...policyOption) policiesOption {
-	return func(p *policies) {
-		policy := &policy{}
-		for _, opt := range opts {
-			opt(policy)
-		}
-		p.Outbound = append(p.Outbound, policy)
-	}
+func (p *policies) WithOutboundPolicy(out *policy) *policies {
+	p.Outbound = append(p.Outbound, out)
+	return p
+}
+
+// Creates a builder for a policy
+func NewPolicy() *policy {
+	return &policy{}
 }
 
 // Add the provided name to this policy
-func WithName(name string) policyOption {
-	return func(p *policy) {
-		p.Name = name
-	}
+func (p *policy) WithName(name string) *policy {
+	p.Name = name
+	return p
 }
 
 // Add the provided cel expression to this policy
-func WithExpression(expr string) policyOption {
-	return func(p *policy) {
-		p.Expressions = append(p.Expressions, expr)
-	}
+func (p *policy) WithExpression(expr string) *policy {
+	p.Expressions = append(p.Expressions, expr)
+	return p
 }
 
 // Add the provided action to be executed when this policy's expressions match a connection to an ngrok edge.
 // The order in which actions are added to a policy is respected at runtime. At least one action must be specified.
-func WithAction(opts ...actionOption) policyOption {
-	return func(p *policy) {
-		act := &action{}
-		for _, opt := range opts {
-			opt(act)
-		}
-		p.Actions = append(p.Actions, act)
-	}
+func (p *policy) WithAction(act *action) *policy {
+	p.Actions = append(p.Actions, act)
+	return p
+}
+
+// Creates a builder for an action
+func NewAction() *action {
+	return &action{}
 }
 
 // Use the provided type for this action. Type must be specified.
-func WithType(typ string) actionOption {
-	return func(a *action) {
-		a.Type = typ
-	}
+func (a *action) WithType(typ string) *action {
+	a.Type = typ
+	return a
 }
 
 // Use the provided json or yaml string as the configuration for this action
-func WithConfig(cfg string) actionOption {
-	return func(a *action) {
-		a.Config = cfg
-	}
+func (a *action) WithConfig(cfg string) *action {
+	a.Config = cfg
+	return a
 }
 
-func (p policies) ApplyHTTP(opts *httpOptions) {
-	opts.Policies = &p
+func (p *policies) ApplyHTTP(opts *httpOptions) {
+	opts.Policies = p
 }
 
-func (p policies) ApplyTCP(opts *tcpOptions) {
-	opts.Policies = &p
+func (p *policies) ApplyTCP(opts *tcpOptions) {
+	opts.Policies = p
 }
 
-func (p policies) ApplyTLS(opts *tlsOptions) {
-	opts.Policies = &p
+func (p *policies) ApplyTLS(opts *tlsOptions) {
+	opts.Policies = p
 }
 
 func (p *policies) toProtoConfig() *pb.MiddlewareConfiguration_Policies {
