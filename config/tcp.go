@@ -50,6 +50,7 @@ func (cfg *tcpOptions) toProtoConfig() *proto.TCPEndpoint {
 	return &proto.TCPEndpoint{
 		Addr:          cfg.RemoteAddr,
 		IPRestriction: cfg.commonOpts.CIDRRestrictions.toProtoConfig(),
+		Policies:      cfg.commonOpts.Policies.toProtoConfig(),
 		ProxyProto:    proto.ProxyProto(cfg.commonOpts.ProxyProto),
 	}
 }

@@ -78,6 +78,23 @@ message MiddlewareConfiguration {
     repeated string allow = 1;
     repeated string deny = 2;
   }
+
+  Policies policies = 14;
+  message Policies {
+    repeated Policy inbound = 1;
+    repeated Policy outbound = 2;
+  }
+
+  message Policy {
+    string name = 1;
+    repeated string expressions = 2;
+    repeated Action actions = 3;
+  }
+
+  message Action {
+    string type = 1;
+    bytes config = 2;
+  }
 }
 
 message HTTPMiddleware {
