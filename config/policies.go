@@ -4,9 +4,16 @@ import (
 	"golang.ngrok.com/ngrok/internal/pb"
 )
 
+type inboundPolicy struct {
+	*policy
+}
+type outboundPolicy struct {
+	*policy
+}
+
 type policies struct {
-	Inbound  []*policy
-	Outbound []*policy
+	Inbound  []inboundPolicy
+	Outbound []outboundPolicy
 }
 type policy struct {
 	Name        string
@@ -22,63 +29,53 @@ type PoliciesOption func(*policies)
 type PolicyOption func(*policy)
 type ActionOption func(*action)
 
-// WithPolicies creates a new set of policies with the provided options
-func WithPolicies(opts ...PoliciesOption) interface {
+// WithInboundPolicy adds the provided policy to be applied on inbound connections on an ngrok edge.
+// The order in which policies are added is respected at runtime.
+func WithInboundPolicy(opts ...PolicyOption) interface {
 	HTTPEndpointOption
 	TLSEndpointOption
 	TCPEndpointOption
 } {
-	p := &policies{}
-
+	inP := &policy{}
 	for _, opt := range opts {
-		opt(p)
+		opt(inP)
 	}
 
-	return p
-}
-
-// WithInboundPolicy adds the provided policy to be applied on inbound connections on an ngrok edge.
-// The order in which policies are added is respected at runtime.
-func WithInboundPolicy(opts ...PolicyOption) PoliciesOption {
-	return func(p *policies) {
-		inP := &policy{}
-		for _, opt := range opts {
-			opt(inP)
-		}
-
-		p.Inbound = append(p.Inbound, inP)
-	}
+	return inboundPolicy{inP}
 }
 
 // WithOutboundPolicy adds the provided policy to be applied on outbound connections on an ngrok edge.
 // The order in which policies are added is respected at runtime.
-func WithOutboundPolicy(opts ...PolicyOption) PoliciesOption {
-	return func(p *policies) {
-		outP := &policy{}
-		for _, opt := range opts {
-			opt(outP)
-		}
-		p.Outbound = append(p.Outbound, outP)
+func WithOutboundPolicy(opts ...PolicyOption) interface {
+	HTTPEndpointOption
+	TLSEndpointOption
+	TCPEndpointOption
+} {
+	outP := &policy{}
+	for _, opt := range opts {
+		opt(outP)
 	}
+
+	return outboundPolicy{outP}
 }
 
-// WithName sets the provided name on this policy
-func WithName(name string) PolicyOption {
+// WithPolicyName sets the provided name on this policy
+func WithPolicyName(name string) PolicyOption {
 	return func(p *policy) {
 		p.Name = name
 	}
 }
 
 // WithExpressions appends the provided cel expression to this policy
-func WithExpression(expr string) PolicyOption {
+func WithPolicyExpression(expr string) PolicyOption {
 	return func(p *policy) {
 		p.Expressions = append(p.Expressions, expr)
 	}
 }
 
-// WithAction appends the provided action to be executed when this policy's expressions match a connection to an ngrok edge.
+// WithPolicyAction appends the provided action to be executed when this policy's expressions match a connection to an ngrok edge.
 // The order in which actions are added to a policy is respected at runtime. At least one action must be specified.
-func WithAction(opts ...ActionOption) PolicyOption {
+func WithPolicyAction(opts ...ActionOption) PolicyOption {
 	return func(p *policy) {
 		act := &action{}
 		for _, opt := range opts {
@@ -88,30 +85,60 @@ func WithAction(opts ...ActionOption) PolicyOption {
 	}
 }
 
-// WithType sets the provided type for this action. Type must be specified.
-func WithType(typ string) ActionOption {
+// WithActionType sets the provided type for this action. Type must be specified.
+func WithActionType(typ string) ActionOption {
 	return func(a *action) {
 		a.Type = typ
 	}
 }
 
-// WithConfig sets the provided json or yaml string as the configuration for this action
-func WithConfig(cfg string) ActionOption {
+// WithActionConfig sets the provided json or yaml string as the configuration for this action
+func WithActionConfig(cfg string) ActionOption {
 	return func(a *action) {
 		a.Config = cfg
 	}
 }
 
-func (p *policies) ApplyHTTP(opts *httpOptions) {
-	opts.Policies = p
+func (ip inboundPolicy) ApplyHTTP(opts *httpOptions) {
+	if opts.Policies == nil {
+		opts.Policies = &policies{}
+	}
+	opts.Policies.Inbound = append(opts.Policies.Inbound, ip)
 }
 
-func (p *policies) ApplyTCP(opts *tcpOptions) {
-	opts.Policies = p
+func (ip inboundPolicy) ApplyTCP(opts *tcpOptions) {
+	if opts.Policies == nil {
+		opts.Policies = &policies{}
+	}
+	opts.Policies.Inbound = append(opts.Policies.Inbound, ip)
 }
 
-func (p *policies) ApplyTLS(opts *tlsOptions) {
-	opts.Policies = p
+func (ip inboundPolicy) ApplyTLS(opts *tlsOptions) {
+	if opts.Policies == nil {
+		opts.Policies = &policies{}
+	}
+	opts.Policies.Inbound = append(opts.Policies.Inbound, ip)
+}
+
+func (op outboundPolicy) ApplyHTTP(opts *httpOptions) {
+	if opts.Policies == nil {
+		opts.Policies = &policies{}
+	}
+	opts.Policies.Outbound = append(opts.Policies.Outbound, op)
+}
+
+func (op outboundPolicy) ApplyTCP(opts *tcpOptions) {
+	if opts.Policies == nil {
+		opts.Policies = &policies{}
+	}
+	opts.Policies.Outbound = append(opts.Policies.Outbound, op)
+}
+
+func (op outboundPolicy) ApplyTLS(opts *tlsOptions) {
+	if opts.Policies == nil {
+		opts.Policies = &policies{}
+	}
+	opts.Policies.Outbound = append(opts.Policies.Outbound, op)
 }
 
 func (p *policies) toProtoConfig() *pb.MiddlewareConfiguration_Policies {
