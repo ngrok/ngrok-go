@@ -28,30 +28,25 @@ func testPolicies[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 		{
 			name: "with policies",
 			opts: optsFunc(
-				NewPolicies(
+				WithPolicies(
 					WithInboundPolicy(
-						NewPolicy(
-							WithName("deny put requests"),
-							WithExpression("req.Method == 'PUT'"),
-							WithAction(NewAction(
-								WithType("deny"))))),
+						WithName("deny put requests"),
+						WithExpression("req.Method == 'PUT'"),
+						WithAction(
+							WithType("deny"))),
 					WithInboundPolicy(
-						NewPolicy(
-							WithName("log 'foo' header"),
-							WithExpression("'foo' in req.Headers"),
-							WithAction(
-								NewAction(
-									WithType("log"),
-									WithConfig("{\"key\":\"val\"}"))))),
+						WithName("log 'foo' header"),
+						WithExpression("'foo' in req.Headers"),
+						WithAction(
+							WithType("log"),
+							WithConfig("{\"key\":\"val\"}"))),
 					WithOutboundPolicy(
-						NewPolicy(
-							WithName("return 500 when response not success"),
-							WithExpression("res.StatusCode <= 0"),
-							WithExpression("&& res.StatusCode >= 300"),
-							WithAction(
-								NewAction(
-									WithType("custom_response"),
-									WithConfig(`{"status_code":500}`))))))),
+						WithName("return 500 when response not success"),
+						WithExpression("res.StatusCode <= 0"),
+						WithExpression("&& res.StatusCode >= 300"),
+						WithAction(
+							WithType("custom_response"),
+							WithConfig(`{"status_code":500}`))))),
 			expectOpts: func(t *testing.T, opts *O) {
 				actual := getPolicies(opts)
 				require.NotNil(t, actual)

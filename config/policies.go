@@ -22,8 +22,12 @@ type PoliciesOption func(*policies)
 type PolicyOption func(*policy)
 type ActionOption func(*action)
 
-// NewPolicies creates a new set of policies with the provided options
-func NewPolicies(opts ...PoliciesOption) *policies {
+// WithPolicies creates a new set of policies with the provided options
+func WithPolicies(opts ...PoliciesOption) interface {
+	HTTPEndpointOption
+	TLSEndpointOption
+	TCPEndpointOption
+} {
 	p := &policies{}
 
 	for _, opt := range opts {
@@ -35,28 +39,27 @@ func NewPolicies(opts ...PoliciesOption) *policies {
 
 // WithInboundPolicy adds the provided policy to be applied on inbound connections on an ngrok edge.
 // The order in which policies are added is respected at runtime.
-func WithInboundPolicy(in *policy) PoliciesOption {
+func WithInboundPolicy(opts ...PolicyOption) PoliciesOption {
 	return func(p *policies) {
-		p.Inbound = append(p.Inbound, in)
+		inP := &policy{}
+		for _, opt := range opts {
+			opt(inP)
+		}
+
+		p.Inbound = append(p.Inbound, inP)
 	}
 }
 
 // WithOutboundPolicy adds the provided policy to be applied on outbound connections on an ngrok edge.
 // The order in which policies are added is respected at runtime.
-func WithOutboundPolicy(out *policy) PoliciesOption {
+func WithOutboundPolicy(opts ...PolicyOption) PoliciesOption {
 	return func(p *policies) {
-		p.Outbound = append(p.Outbound, out)
+		outP := &policy{}
+		for _, opt := range opts {
+			opt(outP)
+		}
+		p.Outbound = append(p.Outbound, outP)
 	}
-}
-
-// NewPolicy creates a policy with the specified options
-func NewPolicy(opts ...PolicyOption) *policy {
-	p := &policy{}
-	for _, opt := range opts {
-		opt(p)
-	}
-
-	return p
 }
 
 // WithName sets the provided name on this policy
@@ -75,20 +78,14 @@ func WithExpression(expr string) PolicyOption {
 
 // WithAction appends the provided action to be executed when this policy's expressions match a connection to an ngrok edge.
 // The order in which actions are added to a policy is respected at runtime. At least one action must be specified.
-func WithAction(act *action) PolicyOption {
+func WithAction(opts ...ActionOption) PolicyOption {
 	return func(p *policy) {
+		act := &action{}
+		for _, opt := range opts {
+			opt(act)
+		}
 		p.Actions = append(p.Actions, act)
 	}
-}
-
-// NewAction creates an action with the specified options
-func NewAction(opts ...ActionOption) *action {
-	a := &action{}
-	for _, opt := range opts {
-		opt(a)
-	}
-
-	return a
 }
 
 // WithType sets the provided type for this action. Type must be specified.
