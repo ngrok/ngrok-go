@@ -1,5 +1,5 @@
-// Package slog provides a logger that writes to a
-// golang.org/x/exp/slog.Logger and implements the
+// Package slog provides a logger that writes
+// to a log/slog.Logger and implements the
 // golang.ngrok.com/ngrok/log.Logger interface.
 package slog
 
@@ -7,7 +7,7 @@ import (
 	"context"
 	"fmt"
 
-	"golang.org/x/exp/slog"
+	"log/slog"
 )
 
 type LogLevel = int
