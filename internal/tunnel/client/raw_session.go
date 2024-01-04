@@ -278,24 +278,26 @@ func (s *rawSession) rpc(reqtype proto.ReqType, req any, resp any) error {
 }
 
 func (s *rawSession) onHeartbeat(pingTime time.Duration, timeout bool) {
+	if timeout {
+		s.Error("heartbeat timeout, terminating session")
+		s.Close()
+		return
+	}
+
 	// make sure we don't send on a closed channel.
 	// Any number of `onHeartbeat` callbacks can be in flight at a given time,
 	// but only one Close.
 	s.closedLock.RLock()
 	defer s.closedLock.RUnlock()
+
 	if s.closed {
 		return
 	}
 
-	if timeout {
-		s.Error("heartbeat timeout, terminating session")
-		s.Close()
-	} else {
-		s.Debug("heartbeat received", "latency_ms", int(pingTime.Milliseconds()))
-		select {
-		case s.latency <- pingTime:
-		default:
-		}
+	s.Debug("heartbeat received", "latency_ms", int(pingTime.Milliseconds()))
+	select {
+	case s.latency <- pingTime:
+	default:
 	}
 }
 
