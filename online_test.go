@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"math/rand"
@@ -13,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -20,7 +22,49 @@ import (
 	"golang.org/x/net/websocket"
 
 	"golang.ngrok.com/ngrok/config"
+	"golang.ngrok.com/ngrok/log"
 )
+
+type testLogger struct {
+	t        *testing.T
+	testName string
+}
+
+func newTestLogger(t *testing.T) *testLogger {
+	return &testLogger{
+		t:        t,
+		testName: t.Name(),
+	}
+}
+
+func (tl *testLogger) Log(context context.Context, level log.LogLevel, msg string, data map[string]interface{}) {
+	cpy := map[string]any{}
+	for k, v := range data {
+		cpy[k] = v
+	}
+	cpy["test"] = tl.testName
+	bs, err := json.Marshal(cpy)
+	if err != nil {
+		bs = []byte("<marshal error>")
+	}
+	lvl, err := log.StringFromLogLevel(level)
+	if err != nil {
+		lvl = "UKWN"
+	}
+	lvl = strings.ToUpper(lvl)
+	tl.t.Logf("%s [%s] %s %s", time.Now().Format(time.RFC3339), lvl, msg, string(bs))
+}
+
+func expectChanError(t *testing.T, ch <-chan error, timeout time.Duration) {
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	select {
+	case err := <-ch:
+		require.Error(t, err)
+	case <-timer.C:
+		t.Error("timeout while waiting on error channel")
+	}
+}
 
 func skipUnless(t *testing.T, varname string, message ...any) {
 	if os.Getenv(varname) == "" && os.Getenv("NGROK_TEST_ALL") == "" {
@@ -34,22 +78,12 @@ func onlineTest(t *testing.T) {
 	// the tests run quickly enough in series that they trigger simultaneous
 	// session errors for free accounts. "Something something eventual
 	// consistency" most likely.
-	if os.Getenv("NGROK_AUTHTOKEN") != "" {
-		skipUnless(t, "NGROK_TEST_PAID", "Skipping test for paid features")
-	}
-}
-
-func authenticatedTest(t *testing.T) {
-	skipUnless(t, "NGROK_TEST_AUTHED", "Skipping test for authenticated features")
-}
-
-func paidTest(t *testing.T) {
-	skipUnless(t, "NGROK_TEST_PAID", "Skipping test for paid features")
+	require.NotEmpty(t, os.Getenv("NGROK_AUTHTOKEN"), "Online tests require an authtoken.")
 }
 
 func setupSession(ctx context.Context, t *testing.T, opts ...ConnectOption) Session {
 	onlineTest(t)
-	opts = append(opts, WithAuthtokenFromEnv())
+	opts = append(opts, WithAuthtokenFromEnv(), WithLogger(newTestLogger(t)))
 	sess, err := Connect(ctx, opts...)
 	require.NoError(t, err, "Session Connect")
 	return sess
@@ -63,6 +97,8 @@ func startTunnel(ctx context.Context, t *testing.T, sess Session, opts config.Tu
 }
 
 var helloHandler = http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+	_, _ = io.ReadAll(r.Body)
+	_ = r.Body.Close()
 	_, _ = fmt.Fprintln(rw, "Hello, world!")
 })
 
@@ -74,17 +110,20 @@ func serveHTTP(ctx context.Context, t *testing.T, connectOpts []ConnectOption, o
 
 	go func() {
 		exited <- http.Serve(tun, handler)
+		sess.Close()
 	}()
 	return tun, exited
 }
 
 func TestListen(t *testing.T) {
 	onlineTest(t)
-	_, err := Listen(context.Background(),
+	tun, err := Listen(context.Background(),
 		config.HTTPEndpoint(),
 		WithAuthtokenFromEnv(),
+		WithLogger(newTestLogger(t)),
 	)
 	require.NoError(t, err, "Session Connect")
+	tun.Close()
 }
 
 func TestTunnel(t *testing.T) {
@@ -98,6 +137,8 @@ func TestTunnel(t *testing.T) {
 	require.NotEmpty(t, tun.URL(), "Tunnel URL")
 	require.Equal(t, "Hello, world!", tun.Metadata())
 	require.Equal(t, "some application", tun.ForwardsTo())
+	tun.Close()
+	sess.Close()
 }
 
 func TestTunnelConnMetadata(t *testing.T) {
@@ -121,6 +162,8 @@ func TestTunnelConnMetadata(t *testing.T) {
 
 	require.Equal(t, "https", proxyconn.Proto())
 	require.Equal(t, EdgeTypeUndefined, proxyconn.EdgeType())
+	tun.Close()
+	sess.Close()
 }
 
 func TestWithHTTPHandler(t *testing.T) {
@@ -167,7 +210,7 @@ func TestHTTPS(t *testing.T) {
 	require.NoError(t, tun.CloseWithContext(ctx))
 
 	// The http server should exit with a "closed" error
-	require.Error(t, <-exited)
+	expectChanError(t, exited, 5*time.Second)
 }
 
 func TestHTTP(t *testing.T) {
@@ -193,11 +236,11 @@ func TestHTTP(t *testing.T) {
 	require.NoError(t, tun.CloseWithContext(ctx))
 
 	// The http server should exit with a "closed" error
-	require.Error(t, <-exited)
+	expectChanError(t, exited, 5*time.Second)
 }
 
 func TestHTTPCompression(t *testing.T) {
-	paidTest(t)
+	onlineTest(t)
 	ctx := context.Background()
 	opts := config.HTTPEndpoint(config.WithCompression())
 	tun, exited := serveHTTP(ctx, t, nil, opts, helloHandler)
@@ -221,7 +264,7 @@ func TestHTTPCompression(t *testing.T) {
 	require.Equal(t, "Hello, world!\n", string(body), "HTTP Body Contents")
 
 	require.NoError(t, tun.CloseWithContext(ctx))
-	require.Error(t, <-exited)
+	expectChanError(t, exited, 5*time.Second)
 }
 
 // *testing.T wrapper to force `require` to Fail() then panic() rather than
@@ -240,7 +283,7 @@ func (f failPanic) FailNow() {
 }
 
 func TestHTTPHeaders(t *testing.T) {
-	paidTest(t)
+	onlineTest(t)
 	ctx := context.Background()
 	opts := config.HTTPEndpoint(
 		config.WithRequestHeader("foo", "bar"),
@@ -280,11 +323,11 @@ func TestHTTPHeaders(t *testing.T) {
 	require.Equal(t, "eggs", resp.Header.Get("Spam"), "Spam=eggs")
 
 	require.NoError(t, tun.CloseWithContext(ctx))
-	require.Error(t, <-exited)
+	expectChanError(t, exited, 5*time.Second)
 }
 
 func TestBasicAuth(t *testing.T) {
-	paidTest(t)
+	onlineTest(t)
 	ctx := context.Background()
 
 	opts := config.HTTPEndpoint(config.WithBasicAuth("user", "foobarbaz"))
@@ -314,13 +357,13 @@ func TestBasicAuth(t *testing.T) {
 	require.Equal(t, "Hello, world!\n", string(body), "HTTP Body Contents")
 
 	require.NoError(t, tun.CloseWithContext(ctx))
-	require.Error(t, <-exited)
+	expectChanError(t, exited, 5*time.Second)
 }
 
 func TestCircuitBreaker(t *testing.T) {
 	// Don't run this one by default - it has to make ~50 requests.
 	skipUnless(t, "NGROK_TEST_LONG", "Skipping long circuit breaker test")
-	paidTest(t)
+	onlineTest(t)
 	ctx := context.Background()
 
 	opts := config.HTTPEndpoint(config.WithCircuitBreaker(0.1))
@@ -348,12 +391,11 @@ func TestCircuitBreaker(t *testing.T) {
 	require.Equal(t, http.StatusServiceUnavailable, resp.StatusCode)
 
 	require.NoError(t, tun.CloseWithContext(ctx))
-	require.Error(t, <-exited)
+	expectChanError(t, exited, 5*time.Second)
 }
 
 func TestProxyProto(t *testing.T) {
 	onlineTest(t)
-	paidTest(t)
 	ctx := context.Background()
 
 	type testCase struct {
@@ -433,7 +475,7 @@ func TestProxyProto(t *testing.T) {
 }
 
 func TestSubdomain(t *testing.T) {
-	paidTest(t)
+	onlineTest(t)
 	ctx := context.Background()
 
 	buf := make([]byte, 8)
@@ -457,11 +499,11 @@ func TestSubdomain(t *testing.T) {
 	require.Equal(t, "Hello, world!\n", string(content))
 
 	require.NoError(t, tun.CloseWithContext(ctx))
-	require.Error(t, <-exited)
+	expectChanError(t, exited, 5*time.Second)
 }
 
 func TestOAuth(t *testing.T) {
-	paidTest(t)
+	onlineTest(t)
 	ctx := context.Background()
 
 	opts := config.HTTPEndpoint(config.WithOAuth("google"))
@@ -477,11 +519,11 @@ func TestOAuth(t *testing.T) {
 	require.NotContains(t, string(content), "Hello, world!")
 
 	require.NoError(t, tun.CloseWithContext(ctx))
-	require.Error(t, <-exited)
+	expectChanError(t, exited, 5*time.Second)
 }
 
 func TestHTTPIPRestriction(t *testing.T) {
-	paidTest(t)
+	onlineTest(t)
 	ctx := context.Background()
 
 	_, cidr, err := net.ParseCIDR("0.0.0.0/0")
@@ -500,11 +542,11 @@ func TestHTTPIPRestriction(t *testing.T) {
 	require.Equal(t, http.StatusForbidden, resp.StatusCode)
 
 	require.NoError(t, tun.CloseWithContext(ctx))
-	require.Error(t, <-exited)
+	expectChanError(t, exited, 5*time.Second)
 }
 
 func TestTCP(t *testing.T) {
-	authenticatedTest(t)
+	onlineTest(t)
 	ctx := context.Background()
 
 	opts := config.TCPEndpoint()
@@ -525,11 +567,11 @@ func TestTCP(t *testing.T) {
 	require.Equal(t, "Hello, world!\n", string(body), "HTTP Body Contents")
 
 	require.NoError(t, tun.CloseWithContext(ctx))
-	require.Error(t, <-exited)
+	expectChanError(t, exited, 5*time.Second)
 }
 
 func TestTCPIPRestriction(t *testing.T) {
-	paidTest(t)
+	onlineTest(t)
 	ctx := context.Background()
 
 	_, cidr, err := net.ParseCIDR("127.0.0.1/32")
@@ -552,11 +594,11 @@ func TestTCPIPRestriction(t *testing.T) {
 	require.Error(t, err, "GET Tunnel URL")
 
 	require.NoError(t, tun.CloseWithContext(ctx))
-	require.Error(t, <-exited)
+	expectChanError(t, exited, 5*time.Second)
 }
 
 func TestWebsocketConversion(t *testing.T) {
-	paidTest(t)
+	onlineTest(t)
 	ctx := context.Background()
 	sess := setupSession(ctx, t)
 	tun := startTunnel(ctx, t, sess,
@@ -599,7 +641,7 @@ func TestWebsocketConversion(t *testing.T) {
 	require.Equal(t, "Hello, world!\n", string(body), "HTTP Body Contents")
 
 	require.NoError(t, tun.CloseWithContext(ctx))
-	require.Error(t, <-exited)
+	expectChanError(t, exited, 5*time.Second)
 }
 
 func TestConnectionCallbacks(t *testing.T) {
@@ -676,21 +718,18 @@ func TestPermanentErrors(t *testing.T) {
 	ctx := context.Background()
 	u, _ := url.Parse("notarealscheme://example.com")
 
-	_, err = Connect(ctx, WithProxyURL(u))
+	_, err = Connect(ctx, WithProxyURL(u), WithAuthtokenFromEnv())
 	var proxyErr errProxyInit
 	require.ErrorIs(t, err, proxyErr)
 	require.ErrorAs(t, err, &proxyErr)
 
-	sess, err := Connect(ctx)
+	sess, err := Connect(ctx, WithAuthtokenFromEnv())
 	require.NoError(t, err)
-	_, err = sess.Listen(ctx, config.TCPEndpoint())
-	var startErr errListen
-	require.ErrorIs(t, err, startErr)
-	require.ErrorAs(t, err, &startErr)
+	sess.Close()
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
-	_, err = Connect(timeoutCtx, WithServer("127.0.0.234:123"))
+	_, err = Connect(timeoutCtx, WithServer("127.0.0.234:123"), WithAuthtokenFromEnv())
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 }
 
