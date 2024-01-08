@@ -3,6 +3,7 @@ package ngrok
 import (
 	"fmt"
 	"net/url"
+	"strings"
 )
 
 // Error is an error enriched with a specific ErrorCode.
@@ -139,8 +140,14 @@ type ngrokError struct {
 	ErrCode string
 }
 
+const errUrl = "https://ngrok.com/docs/errors"
+
 func (m ngrokError) Error() string {
-	return m.Message + "\n\n" + m.ErrCode
+	out := m.Message
+	if m.ErrCode != "" {
+		out = fmt.Sprintf("%s\n\n%s/%s", out, errUrl, strings.ToLower(m.ErrCode))
+	}
+	return out
 }
 
 func (m ngrokError) Msg() string {
