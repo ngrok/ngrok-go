@@ -11,6 +11,7 @@ jobs:
       NGROK_TEST_ONLINE: 1
       NGROK_TEST_LONG: 1
       NGROK_TEST_FLAKEY: 1
+      NGROK_AUTHTOKEN: ${{ secrets.NGROK_AUTHTOKEN }}
     steps:
     - uses: actions/checkout@v3
     - uses: cachix/install-nix-action@v18

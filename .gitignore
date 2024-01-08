@@ -1,3 +1,4 @@
+.env
 .direnv
 *.swp
 cover.out
