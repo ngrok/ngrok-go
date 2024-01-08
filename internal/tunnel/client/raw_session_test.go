@@ -1,7 +1,10 @@
 package client
 
 import (
+	"context"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/inconshreveable/log15/v3"
 
@@ -20,4 +23,55 @@ func TestRawSessionDoubleClose(t *testing.T) {
 	// Verify that closing the session twice doesn't cause a panic
 	r.Close()
 	r.Close()
+}
+
+func TestHeartbeatTimeout(t *testing.T) {
+	r := NewRawSession(log15.New(), muxado.Client(&dummyStream{}, nil), nil, nil)
+	// Make sure we don't deadlock
+	r.(*rawSession).onHeartbeat(1, true)
+}
+
+func TestRawSessionCloseRace(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
+	defer cancel()
+
+	// Since this is a race condition, run the test as many times as we can
+	// within the timebox to see if we can hit it.
+testloop:
+	for {
+		select {
+		case <-ctx.Done():
+			break testloop
+		default:
+		}
+
+		ctx, cancel := context.WithCancel(ctx)
+		r := NewRawSession(log15.New(), muxado.Client(&dummyStream{}, nil), nil, nil)
+
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+
+		// Call onHeartbeat as fast as we can in the background.
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
+				r.(*rawSession).onHeartbeat(time.Millisecond*1, false)
+			}
+		}()
+
+		// Verify that closing the session while a heartbeat is in flight won't
+		// cause a panic
+		r.Close()
+
+		cancel()
+
+		// Wait till the heartbeat goroutine exists to make sure we capture the
+		// panic and it doesn't occur after the test completes.
+		wg.Wait()
+	}
 }

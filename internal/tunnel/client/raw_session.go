@@ -46,11 +46,12 @@ type SessionHandler interface {
 // When RawSession.Accept() returns an error, that means the session is dead.
 // Client sessions run over a muxado session.
 type rawSession struct {
-	mux              *muxado.Heartbeat // the muxado session we're multiplexing streams over
-	id               string            // session id for logging purposes
-	handler          SessionHandler    // callbacks to allow the application to handle requests from the server
-	latency          chan time.Duration
-	closeLatencyOnce sync.Once
+	mux        *muxado.Heartbeat // the muxado session we're multiplexing streams over
+	id         string            // session id for logging purposes
+	handler    SessionHandler    // callbacks to allow the application to handle requests from the server
+	latency    chan time.Duration
+	closed     bool
+	closedLock sync.RWMutex
 	log.Logger
 }
 
@@ -230,10 +231,19 @@ func (s *rawSession) respFunc(raw net.Conn) func(v any) error {
 }
 
 func (s *rawSession) Close() error {
-	s.closeLatencyOnce.Do(func() {
+	// Close the muxado heartbeat session. After this, the goroutine calling the
+	// callback handler should exit.
+	err := s.mux.Close()
+
+	// Prevent sending on a closed channel in the callback handler by ensuring
+	// exclusive access to the channel and the closed boolean here.
+	s.closedLock.Lock()
+	defer s.closedLock.Unlock()
+	if !s.closed {
+		s.closed = true
 		close(s.latency)
-	})
-	return s.mux.Close()
+	}
+	return err
 }
 
 // This is essentially the RPC protocol. The request and response are just JSON
@@ -271,12 +281,23 @@ func (s *rawSession) onHeartbeat(pingTime time.Duration, timeout bool) {
 	if timeout {
 		s.Error("heartbeat timeout, terminating session")
 		s.Close()
-	} else {
-		s.Debug("heartbeat received", "latency_ms", int(pingTime.Milliseconds()))
-		select {
-		case s.latency <- pingTime:
-		default:
-		}
+		return
+	}
+
+	// make sure we don't send on a closed channel.
+	// Any number of `onHeartbeat` callbacks can be in flight at a given time,
+	// but only one Close.
+	s.closedLock.RLock()
+	defer s.closedLock.RUnlock()
+
+	if s.closed {
+		return
+	}
+
+	s.Debug("heartbeat received", "latency_ms", int(pingTime.Milliseconds()))
+	select {
+	case s.latency <- pingTime:
+	default:
 	}
 }
 

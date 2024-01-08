@@ -176,7 +176,8 @@ func (t *tunnelImpl) CloseWithContext(_ context.Context) error {
 			return err
 		}
 	}
-	return t.Tunnel.Close()
+	err := t.Tunnel.Close()
+	return err
 }
 
 func (t *tunnelImpl) Addr() net.Addr {
