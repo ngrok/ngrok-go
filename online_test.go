@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io"
 	"math/rand"
@@ -43,16 +42,12 @@ func (tl *testLogger) Log(context context.Context, level log.LogLevel, msg strin
 		cpy[k] = v
 	}
 	cpy["test"] = tl.testName
-	bs, err := json.Marshal(cpy)
-	if err != nil {
-		bs = []byte("<marshal error>")
-	}
 	lvl, err := log.StringFromLogLevel(level)
 	if err != nil {
 		lvl = "UKWN"
 	}
 	lvl = strings.ToUpper(lvl)
-	tl.t.Logf("%s [%s] %s %s", time.Now().Format(time.RFC3339), lvl, msg, string(bs))
+	tl.t.Logf("%s [%s] %s %v", time.Now().Format(time.RFC3339), lvl, msg, cpy)
 }
 
 func expectChanError(t *testing.T, ch <-chan error, timeout time.Duration) {
