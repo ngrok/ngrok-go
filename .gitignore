@@ -1,4 +1,5 @@
 /go.work.sum
+.env
 .direnv
 *.swp
 cover.out
