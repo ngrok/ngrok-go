@@ -5,7 +5,6 @@ package slog
 
 import (
 	"context"
-	"fmt"
 
 	"log/slog"
 )
@@ -34,23 +33,6 @@ func NewLogger(l *slog.Logger) *Logger {
 }
 
 func (l *Logger) Log(ctx context.Context, level LogLevel, msg string, data map[string]interface{}) {
-	var logError error
-	// The slog `Error` method takes an error field. Look through our log
-	// args and see if one was provided, and trim it out.
-	if level == LogLevelError {
-		var errorKey string
-		for k, v := range data {
-			if err, ok := v.(error); ok {
-				logError = err
-				errorKey = k
-				break
-			}
-		}
-		if logError != nil {
-			delete(data, errorKey)
-		}
-	}
-
 	logArgs := make([]interface{}, 0, len(data))
 	for k, v := range data {
 		logArgs = append(logArgs, k, v)
@@ -66,8 +48,8 @@ func (l *Logger) Log(ctx context.Context, level LogLevel, msg string, data map[s
 	case LogLevelWarn:
 		l.inner.Warn(msg, logArgs...)
 	case LogLevelError:
-		l.inner.Error(msg, logError, logArgs...)
+		l.inner.Error(msg, logArgs...)
 	default:
-		l.inner.Error(msg, fmt.Errorf("INVALID LOG LEVEL: %d", level), logArgs...)
+		l.inner.Error(msg, append(logArgs, "INVALID_LOG_LEVEL", level)...)
 	}
 }
