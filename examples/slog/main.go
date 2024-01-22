@@ -10,7 +10,7 @@ import (
 	"os"
 	"strings"
 
-	"golang.org/x/exp/slog"
+	"log/slog"
 
 	"golang.ngrok.com/ngrok"
 	"golang.ngrok.com/ngrok/config"
@@ -47,8 +47,9 @@ func run(ctx context.Context, lvlName string) error {
 	default:
 		return fmt.Errorf("invalid log level: %s", lvlName)
 	}
-	h := slog.HandlerOptions{Level: programLevel}.NewTextHandler(os.Stdout)
-	slog.SetDefault(slog.New(h))
+	opts := &slog.HandlerOptions{Level: programLevel}
+	logger := slog.New(slog.NewTextHandler(os.Stdout, opts))
+	slog.SetDefault(logger)
 
 	ln, err := ngrok.Listen(ctx,
 		config.HTTPEndpoint(),
