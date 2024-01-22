@@ -1,6 +1,6 @@
 module golang.ngrok.com/ngrok/log/zap
 
-go 1.20
+go 1.21
 
 require go.uber.org/zap v1.23.0
 

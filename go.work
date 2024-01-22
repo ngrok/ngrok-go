@@ -4,7 +4,7 @@
 // because `go mod tidy` & co seem to ignore the ones at the workspace level.
 // See: https://github.com/golang/go/issues/50750.
 
-go 1.20
+go 1.21
 
 use (
 	.
