@@ -69,7 +69,7 @@ func (cfg *tlsOptions) toProtoConfig() *proto.TLSEndpoint {
 	}
 
 	opts.IPRestriction = cfg.commonOpts.CIDRRestrictions.toProtoConfig()
-	opts.Policies = cfg.commonOpts.Policies.toProtoConfig()
+	opts.Policy = cfg.commonOpts.Policy.toProtoConfig()
 
 	opts.MutualTLSAtEdge = mutualTLSEndpointOption(cfg.MutualTLSCA).toProtoConfig()
 

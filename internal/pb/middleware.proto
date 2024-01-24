@@ -79,19 +79,19 @@ message MiddlewareConfiguration {
     repeated string deny = 2;
   }
 
-  Policies policies = 14;
-  message Policies {
-    repeated Policy inbound = 1;
-    repeated Policy outbound = 2;
+  Policy policy = 14;
+  message Policy {
+    repeated PolicyRule inbound = 1;
+    repeated PolicyRule outbound = 2;
   }
 
-  message Policy {
+  message PolicyRule {
     string name = 1;
     repeated string expressions = 2;
-    repeated Action actions = 3;
+    repeated PolicyAction actions = 3;
   }
 
-  message Action {
+  message PolicyAction {
     string type = 1;
     bytes config = 2;
   }
