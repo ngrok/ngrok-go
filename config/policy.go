@@ -25,10 +25,10 @@ type action struct {
 	Config json.RawMessage `json:"config,omitempty"`
 }
 
-type policyActionOption = option[*action]
-type policyRuleOption = option[*policyRule]
-type policyRuleSetOption = option[*[]policyRule]
-type policyOption = option[*policy]
+type PolicyActionOption = option[*action]
+type PolicyRuleOption = option[*policyRule]
+type PolicyRuleSetOption = option[*[]policyRule]
+type PolicyOption = option[*policy]
 
 // Supports conversion to a json string
 type JsonConvertible interface {
@@ -77,7 +77,7 @@ func WithPolicyConfig(jsonStr string) interface {
 // WithPolicy configures this edge with the given traffic and overwrites any
 // previously-set traffic policy
 // https://ngrok.com/docs/http/traffic-policy/
-func WithPolicy(opts ...policyOption) interface {
+func WithPolicy(opts ...PolicyOption) interface {
 	HTTPEndpointOption
 	TLSEndpointOption
 	TCPEndpointOption
@@ -92,7 +92,7 @@ func WithPolicy(opts ...policyOption) interface {
 // WithInboundRules adds the provided policy rules to the inbound
 // set of the given policy.
 // The order in which policies are specified is observed.
-func WithInboundRules(opts ...policyRuleSetOption) policyOption {
+func WithInboundRules(opts ...PolicyRuleSetOption) PolicyOption {
 	rules := []policyRule{}
 	applyOpts(&rules, opts...)
 
@@ -102,7 +102,7 @@ func WithInboundRules(opts ...policyRuleSetOption) policyOption {
 // WithOutboundRules adds the provided policy to be outbound
 // set of the given policy.
 // The order in which policies are specified is observed.
-func WithOutboundRules(opts ...policyRuleSetOption) policyOption {
+func WithOutboundRules(opts ...PolicyRuleSetOption) PolicyOption {
 	rules := []policyRule{}
 	applyOpts(&rules, opts...)
 
@@ -110,8 +110,8 @@ func WithOutboundRules(opts ...policyRuleSetOption) policyOption {
 }
 
 // WithPolicyRule provides a policy rule built from the given options.
-func WithPolicyRule(opts ...policyRuleOption) interface {
-	policyRuleSetOption
+func WithPolicyRule(opts ...PolicyRuleOption) interface {
+	PolicyRuleSetOption
 	JsonConvertible
 } {
 	pr := policyRule{}
@@ -121,7 +121,7 @@ func WithPolicyRule(opts ...policyRuleOption) interface {
 }
 
 // WithPolicyName sets the provided name on a policy rule.
-func WithPolicyName(n string) policyRuleOption {
+func WithPolicyName(n string) PolicyRuleOption {
 	return optionFunc[*policyRule](
 		func(r *policyRule) {
 			r.Name = n
@@ -129,7 +129,7 @@ func WithPolicyName(n string) policyRuleOption {
 }
 
 // WithPolicyExpression appends the provided CEL statement to a policy rule's expressions.
-func WithPolicyExpression(e string) policyRuleOption {
+func WithPolicyExpression(e string) PolicyRuleOption {
 	return optionFunc[*policyRule](
 		func(r *policyRule) {
 			r.Expressions = append(r.Expressions, e)
@@ -138,8 +138,8 @@ func WithPolicyExpression(e string) policyRuleOption {
 
 // WithPolicyAction appends the provided action to the set of the policy rule.
 // The order the actions are specified is observed.
-func WithPolicyAction(opts ...policyActionOption) interface {
-	policyRuleOption
+func WithPolicyAction(opts ...PolicyActionOption) interface {
+	PolicyRuleOption
 	JsonConvertible
 } {
 	a := action{}
@@ -149,12 +149,12 @@ func WithPolicyAction(opts ...policyActionOption) interface {
 }
 
 // WithActionType sets the provided type for this action. Type must be specified.
-func WithPolicyActionType(t string) policyActionOption {
+func WithPolicyActionType(t string) PolicyActionOption {
 	return optionFunc[*action](func(a *action) { a.Type = t })
 }
 
 // WithConfig sets the provided json string as the configuration for this action
-func WithPolicyActionConfig(cfg string) policyActionOption {
+func WithPolicyActionConfig(cfg string) PolicyActionOption {
 	return optionFunc[*action](
 		func(a *action) {
 			a.Config = []byte(cfg)
