@@ -31,12 +31,12 @@ func testPolicy[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 				WithPolicy(
 					WithInboundRules(
 						WithPolicyRule(
-							WithPolicyName("deny put requests"),
+							WithPolicyName("denyPUT"),
 							WithPolicyExpression("req.Method == 'PUT'"),
 							WithPolicyAction(WithPolicyActionType("deny")),
 						),
 						WithPolicyRule(
-							WithPolicyName("log 'foo' header"),
+							WithPolicyName("logFooHeader"),
 							WithPolicyExpression("'foo' in req.Headers"),
 							WithPolicyAction(
 								WithPolicyActionType("log"),
@@ -50,7 +50,7 @@ func testPolicy[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 					),
 					WithOutboundRules(
 						WithPolicyRule(
-							WithPolicyName("return 500 when response not success"),
+							WithPolicyName("InternalErrorWhenFailed"),
 							WithPolicyExpression("res.StatusCode <= 0"),
 							WithPolicyExpression("res.StatusCode >= 300"),
 							WithPolicyAction(
@@ -67,7 +67,7 @@ func testPolicy[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 				actual := getPolicies(opts)
 				require.NotNil(t, actual)
 				require.Len(t, actual.Inbound, 2)
-				require.Equal(t, "deny put requests", actual.Inbound[0].Name)
+				require.Equal(t, "denyPUT", actual.Inbound[0].Name)
 				require.Equal(t, actual.Inbound[0].Actions, []*pb.MiddlewareConfiguration_PolicyAction{{Type: "deny"}})
 				require.Len(t, actual.Outbound, 1)
 				require.Len(t, actual.Outbound[0].Expressions, 2)
@@ -151,7 +151,7 @@ func TestPolicyToJSON(t *testing.T) {
 					WithPolicyExpression("res.StatusCode <= 0"),
 					WithPolicyExpression("res.StatusCode >= 300"),
 					WithPolicyAction(
-						WithPolicyActionType("csustom-response"),
+						WithPolicyActionType("custom-response"),
 						WithPolicyActionConfig(map[string]any{"status_code": 500})))))
 
 		json := cfg.ToJSON()
