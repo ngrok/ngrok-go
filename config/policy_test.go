@@ -40,11 +40,7 @@ func testPolicy[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 							WithPolicyExpression("'foo' in req.Headers"),
 							WithPolicyAction(
 								WithPolicyActionType("log"),
-								WithPolicyActionConfig(map[string]any{
-									"metadata": map[string]any{
-										"key": "val",
-									},
-								}),
+								WithPolicyActionConfig(`{"metadata": {"key": "val"}}`),
 							),
 						),
 					),
@@ -55,9 +51,7 @@ func testPolicy[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 							WithPolicyExpression("res.StatusCode >= 300"),
 							WithPolicyAction(
 								WithPolicyActionType("custom-response"),
-								WithPolicyActionConfig(map[string]any{
-									"status_code": 500,
-								}),
+								WithPolicyActionConfig(`"status_code": 500}`),
 							),
 						),
 					),
@@ -144,7 +138,7 @@ func TestPolicyToJSON(t *testing.T) {
 					WithPolicyExpression("'foo' in req.Headers"),
 					WithPolicyAction(
 						WithPolicyActionType("log"),
-						WithPolicyActionConfig(map[string]any{"metadata": map[string]any{"key": "val"}})))),
+						WithPolicyActionConfig(`{"metadata":{"key":"val"}}`)))),
 			WithOutboundRules(
 				WithPolicyRule(
 					WithPolicyName("return 500 when response not success"),
@@ -152,7 +146,7 @@ func TestPolicyToJSON(t *testing.T) {
 					WithPolicyExpression("res.StatusCode >= 300"),
 					WithPolicyAction(
 						WithPolicyActionType("custom-response"),
-						WithPolicyActionConfig(map[string]any{"status_code": 500})))))
+						WithPolicyActionConfig(`{"status_code":500}`)))))
 
 		json := cfg.ToJSON()
 
@@ -169,9 +163,7 @@ func TestPolicyToJSON(t *testing.T) {
 			WithPolicyExpression("req.Method == 'PUT'"),
 			WithPolicyAction(
 				WithPolicyActionType("deny"),
-				WithPolicyActionConfig(map[string]any{
-					"status_code": 401,
-				}),
+				WithPolicyActionConfig(`{"status_code":401}`),
 			),
 		)
 
@@ -184,9 +176,7 @@ func TestPolicyToJSON(t *testing.T) {
 		expected := `{"type":"deny","config":{"status_code":401}}`
 		action := WithPolicyAction(
 			WithPolicyActionType("deny"),
-			WithPolicyActionConfig(map[string]any{
-				"status_code": 401,
-			}),
+			WithPolicyActionConfig(`{"status_code":401}`),
 		)
 
 		result := action.ToJSON()

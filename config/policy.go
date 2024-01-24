@@ -153,15 +153,11 @@ func WithPolicyActionType(t string) policyActionOption {
 	return optionFunc[*action](func(a *action) { a.Type = t })
 }
 
-// WithConfig sets the provided map as the configuration for this action
-func WithPolicyActionConfig(c map[string]any) policyActionOption {
+// WithConfig sets the provided json string as the configuration for this action
+func WithPolicyActionConfig(cfg string) policyActionOption {
 	return optionFunc[*action](
 		func(a *action) {
-			raw, err := json.Marshal(c)
-			if err != nil {
-				panic("unable to marshal action config")
-			}
-			a.Config = raw
+			a.Config = []byte(cfg)
 		})
 }
 
@@ -245,10 +241,8 @@ func (pr policyRule) toProtoConfig() *pb.MiddlewareConfiguration_PolicyRule {
 }
 
 func (a action) toProtoConfig() *pb.MiddlewareConfiguration_PolicyAction {
-	var cfg []byte
-	if len(a.Config) > 0 {
-		cfg = a.Config
+	return &pb.MiddlewareConfiguration_PolicyAction{
+		Type:   a.Type,
+		Config: []byte(a.Config),
 	}
-
-	return &pb.MiddlewareConfiguration_PolicyAction{Type: a.Type, Config: cfg}
 }
