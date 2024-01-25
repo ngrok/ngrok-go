@@ -124,6 +124,7 @@ func (cfg *httpOptions) toProtoConfig() *proto.HTTPEndpoint {
 	opts.WebhookVerification = cfg.WebhookVerification.toProtoConfig()
 	opts.IPRestriction = cfg.commonOpts.CIDRRestrictions.toProtoConfig()
 	opts.UserAgentFilter = cfg.UserAgentFilter.toProtoConfig()
+	opts.Policy = cfg.Policy.toProtoConfig()
 
 	return opts
 }
