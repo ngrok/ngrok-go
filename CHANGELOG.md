@@ -1,3 +1,6 @@
+## 1.8.0
+- Adds the `WithPolicy` and `WithPolicyConfig` options for applying a Traffic Policy to an endpoint.
+
 ## 1.7.0
 
 - Adds the `WithAppProtocol` option for labeled listeners and HTTP endpoints.
