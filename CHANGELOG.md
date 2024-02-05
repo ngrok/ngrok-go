@@ -1,3 +1,13 @@
+## 1.8.1
+Enhancements: 
+
+- Provides access to structs for building a Traffic Policy configuration
+
+Breaking changes:
+
+- Renames pre-release option `WithPolicyConfig` to `WithPolicyString`
+- Changes signature of `WithPolicy` option to accept the newly exposed structs for building a Traffic Policy configuration
+
 ## 1.8.0
 - Adds the `WithPolicy` and `WithPolicyConfig` options for applying a Traffic Policy to an endpoint.
 

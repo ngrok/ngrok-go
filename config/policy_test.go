@@ -7,6 +7,7 @@ import (
 
 	"golang.ngrok.com/ngrok/internal/pb"
 	"golang.ngrok.com/ngrok/internal/tunnel/proto"
+	"golang.ngrok.com/ngrok/trafficpolicy"
 )
 
 func testPolicy[T tunnelConfigPrivate, O any, OT any](t *testing.T,
@@ -29,32 +30,42 @@ func testPolicy[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 			name: "with policy",
 			opts: optsFunc(
 				WithPolicy(
-					WithInboundRules(
-						WithPolicyRule(
-							WithPolicyName("denyPUT"),
-							WithPolicyExpression("req.Method == 'PUT'"),
-							WithPolicyAction(WithPolicyActionType("deny")),
-						),
-						WithPolicyRule(
-							WithPolicyName("logFooHeader"),
-							WithPolicyExpression("'foo' in req.Headers"),
-							WithPolicyAction(
-								WithPolicyActionType("log"),
-								WithPolicyActionConfig(`{"metadata": {"key": "val"}}`),
-							),
-						),
-					),
-					WithOutboundRules(
-						WithPolicyRule(
-							WithPolicyName("InternalErrorWhenFailed"),
-							WithPolicyExpression("res.StatusCode <= 0"),
-							WithPolicyExpression("res.StatusCode >= 300"),
-							WithPolicyAction(
-								WithPolicyActionType("custom-response"),
-								WithPolicyActionConfig(`"status_code": 500}`),
-							),
-						),
-					),
+					trafficpolicy.Policy{
+						Inbound: []trafficpolicy.Rule{
+							{
+								Name:        "denyPUT",
+								Expressions: []string{"req.Method == 'PUT'"},
+								Actions: []trafficpolicy.Action{
+									{Type: "deny"},
+								},
+							},
+							{
+								Name:        "logFooHeader",
+								Expressions: []string{"'foo' in req.Headers"},
+								Actions: []trafficpolicy.Action{
+									{
+										Type:   "log",
+										Config: `{"metadata": {"key": "val"}}`,
+									},
+								},
+							},
+						},
+						Outbound: []trafficpolicy.Rule{
+							{
+								Name: "InternalErrorWhenFailed",
+								Expressions: []string{
+									"res.StatusCode <= '0'",
+									"res.StatusCode >= '300'",
+								},
+								Actions: []trafficpolicy.Action{
+									{
+										Type:   "custom-response",
+										Config: `"status_code": 500}`,
+									},
+								},
+							},
+						},
+					},
 				),
 			),
 			expectOpts: func(t *testing.T, opts *O) {
@@ -68,9 +79,9 @@ func testPolicy[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 			},
 		},
 		{
-			name: "with policy config",
+			name: "with policy string",
 			opts: optsFunc(
-				WithPolicyConfig(`
+				WithPolicyString(`
 					{
 						"inbound":[
 							{
@@ -99,7 +110,7 @@ func testPolicy[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 				require.NotNil(t, actual)
 				require.Len(t, actual.Inbound, 2)
 				require.Equal(t, "denyPut", actual.Inbound[0].Name)
-				require.Equal(t, actual.Inbound[0].Actions, []*pb.MiddlewareConfiguration_PolicyAction{{Type: "deny"}})
+				require.Equal(t, []*pb.MiddlewareConfiguration_PolicyAction{{Type: "deny"}}, actual.Inbound[0].Actions)
 				require.Len(t, actual.Outbound, 1)
 				require.Len(t, actual.Outbound[0].Expressions, 2)
 			},
@@ -122,65 +133,4 @@ func TestPolicy(t *testing.T) {
 		func(h *proto.TLSEndpoint) *pb.MiddlewareConfiguration_Policy {
 			return h.Policy
 		})
-}
-
-func TestPolicyToJSON(t *testing.T) {
-	t.Run("Convert whole policy to json", func(t *testing.T) {
-		cfg := WithPolicy(
-			WithInboundRules(
-				WithPolicyRule(
-					WithPolicyName("deny put requests"),
-					WithPolicyExpression("req.Method == 'PUT'"),
-					WithPolicyAction(
-						WithPolicyActionType("deny"))),
-				WithPolicyRule(
-					WithPolicyName("log 'foo' header"),
-					WithPolicyExpression("'foo' in req.Headers"),
-					WithPolicyAction(
-						WithPolicyActionType("log"),
-						WithPolicyActionConfig(`{"metadata":{"key":"val"}}`)))),
-			WithOutboundRules(
-				WithPolicyRule(
-					WithPolicyName("return 500 when response not success"),
-					WithPolicyExpression("res.StatusCode <= 0"),
-					WithPolicyExpression("res.StatusCode >= 300"),
-					WithPolicyAction(
-						WithPolicyActionType("custom-response"),
-						WithPolicyActionConfig(`{"status_code":500}`)))))
-
-		json := cfg.ToJSON()
-
-		result := WithPolicyConfig(json)
-
-		require.Equal(t, cfg, result)
-	})
-
-	t.Run("convert policy rule to json", func(t *testing.T) {
-		expected := `{"name":"denyPut","expressions":["req.Method == 'PUT'"],"actions":[{"type":"deny","config":{"status_code":401}}]}`
-
-		policy := WithPolicyRule(
-			WithPolicyName("denyPut"),
-			WithPolicyExpression("req.Method == 'PUT'"),
-			WithPolicyAction(
-				WithPolicyActionType("deny"),
-				WithPolicyActionConfig(`{"status_code":401}`),
-			),
-		)
-
-		result := policy.ToJSON()
-
-		require.Equal(t, expected, result)
-	})
-
-	t.Run("convert action to json", func(t *testing.T) {
-		expected := `{"type":"deny","config":{"status_code":401}}`
-		action := WithPolicyAction(
-			WithPolicyActionType("deny"),
-			WithPolicyActionConfig(`{"status_code":401}`),
-		)
-
-		result := action.ToJSON()
-
-		require.Equal(t, expected, result)
-	})
 }
