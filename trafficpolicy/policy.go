@@ -3,6 +3,7 @@ package trafficpolicy
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 
 	"gopkg.in/yaml.v3"
 )
@@ -39,9 +40,22 @@ func (s ActionConfigString) MarshalJSON() ([]byte, error) {
 }
 
 func (cfg *ActionConfigString) UnmarshalJSON(data []byte) error {
+	if cfg == nil {
+		return errors.New("ActionConfigString: UnmarshalJSON on nil pointer")
+	}
+
 	s := ActionConfigString(data)
 	*cfg = s
 	return nil
+}
+
+func (s ActionConfigString) MarshalYAML() (interface{}, error) {
+	var innerMap map[string]interface{}
+	if err := yaml.Unmarshal([]byte(s), &innerMap); err != nil {
+		return nil, err
+	}
+
+	return innerMap, nil
 }
 
 func (p Policy) MarshalJSON() (string, error) {
@@ -69,15 +83,15 @@ func marshalJSON(o any) (string, error) {
 }
 
 func (p Policy) MarshalYAML() (string, error) {
-	return marshalJSON(p)
+	return marshalYAML(p)
 }
 
 func (p Rule) MarshalYAML() (string, error) {
-	return marshalJSON(p)
+	return marshalYAML(p)
 }
 
 func (p Action) MarshalYAML() (string, error) {
-	return marshalJSON(p)
+	return marshalYAML(p)
 }
 
 func marshalYAML(o any) (string, error) {
