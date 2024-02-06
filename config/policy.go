@@ -2,14 +2,16 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 
 	"golang.ngrok.com/ngrok/internal/pb"
-	"golang.ngrok.com/ngrok/trafficpolicy"
+	po "golang.ngrok.com/ngrok/policy"
 )
 
-type policy trafficpolicy.Policy
-type rule trafficpolicy.Rule
-type action trafficpolicy.Action
+type policy po.Policy
+type rule po.Rule
+type action po.Action
 
 // WithPolicyString configures this edge with the provided policy configuration
 // passed as a json string and overwrites any previously-set traffic policy
@@ -30,14 +32,14 @@ func WithPolicyString(jsonStr string) interface {
 // WithPolicy configures this edge with the given traffic policy and overwrites any
 // previously-set traffic policy
 // https://ngrok.com/docs/http/traffic-policy/
-func WithPolicy(tp trafficpolicy.Policy) interface {
+func WithPolicy(p po.Policy) interface {
 	HTTPEndpointOption
 	TLSEndpointOption
 	TCPEndpointOption
 } {
-	p := policy(tp)
+	ret := policy(p)
 
-	return &p
+	return &ret
 }
 
 func (p *policy) ApplyTLS(opts *tlsOptions) {
@@ -82,8 +84,13 @@ func (pr rule) toProtoConfig() *pb.MiddlewareConfiguration_PolicyRule {
 
 func (a action) toProtoConfig() *pb.MiddlewareConfiguration_PolicyAction {
 	var cfgBytes []byte = nil
-	if a.Config != "" {
-		cfgBytes = []byte(a.Config)
+	if len(a.Config) > 0 {
+		var err error
+		cfgBytes, err = json.Marshal(a.Config)
+
+		if err != nil {
+			panic(errors.New(fmt.Sprintf("failed to parse action configuration due to error: %s", err.Error())))
+		}
 	}
 	return &pb.MiddlewareConfiguration_PolicyAction{
 		Type:   a.Type,

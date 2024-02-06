@@ -7,7 +7,7 @@ import (
 
 	"golang.ngrok.com/ngrok/internal/pb"
 	"golang.ngrok.com/ngrok/internal/tunnel/proto"
-	"golang.ngrok.com/ngrok/trafficpolicy"
+	po "golang.ngrok.com/ngrok/policy"
 )
 
 func testPolicy[T tunnelConfigPrivate, O any, OT any](t *testing.T,
@@ -30,37 +30,37 @@ func testPolicy[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 			name: "with policy",
 			opts: optsFunc(
 				WithPolicy(
-					trafficpolicy.Policy{
-						Inbound: []trafficpolicy.Rule{
+					po.Policy{
+						Inbound: []po.Rule{
 							{
 								Name:        "denyPUT",
 								Expressions: []string{"req.Method == 'PUT'"},
-								Actions: []trafficpolicy.Action{
+								Actions: []po.Action{
 									{Type: "deny"},
 								},
 							},
 							{
 								Name:        "logFooHeader",
 								Expressions: []string{"'foo' in req.Headers"},
-								Actions: []trafficpolicy.Action{
+								Actions: []po.Action{
 									{
 										Type:   "log",
-										Config: `{"metadata": {"key": "val"}}`,
+										Config: map[string]any{"metadata": map[string]any{"key": "val"}},
 									},
 								},
 							},
 						},
-						Outbound: []trafficpolicy.Rule{
+						Outbound: []po.Rule{
 							{
 								Name: "InternalErrorWhenFailed",
 								Expressions: []string{
 									"res.StatusCode <= '0'",
 									"res.StatusCode >= '300'",
 								},
-								Actions: []trafficpolicy.Action{
+								Actions: []po.Action{
 									{
 										Type:   "custom-response",
-										Config: `"status_code": 500}`,
+										Config: map[string]any{"status_code": 500},
 									},
 								},
 							},
@@ -113,6 +113,7 @@ func testPolicy[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 				require.Equal(t, []*pb.MiddlewareConfiguration_PolicyAction{{Type: "deny"}}, actual.Inbound[0].Actions)
 				require.Len(t, actual.Outbound, 1)
 				require.Len(t, actual.Outbound[0].Expressions, 2)
+				require.Equal(t, []byte(`{"status_code":500}`), actual.Outbound[0].Actions[0].Config)
 			},
 		},
 	}

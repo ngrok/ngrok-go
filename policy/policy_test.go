@@ -1,4 +1,4 @@
-package trafficpolicy
+package policy
 
 import (
 	"testing"
@@ -65,7 +65,7 @@ func TestPolicyToJSON(t *testing.T) {
 					Actions: []Action{
 						{
 							Type:   "log",
-							Config: `{"metadata":{"key":"val"}}`,
+							Config: map[string]any{"metadata": map[string]any{"key": "val"}},
 						},
 					},
 				},
@@ -80,14 +80,14 @@ func TestPolicyToJSON(t *testing.T) {
 					Actions: []Action{
 						{
 							Type:   "custom-response",
-							Config: `{"status_code":500}`,
+							Config: map[string]any{"status_code": 500},
 						},
 					},
 				},
 			},
 		}
 
-		json, err := cfg.MarshalJSON()
+		json, err := cfg.JSON()
 		require.NoError(t, err)
 		require.JSONEq(t, expected, json)
 	})
@@ -101,12 +101,12 @@ func TestPolicyToJSON(t *testing.T) {
 			Actions: []Action{
 				{
 					Type:   "deny",
-					Config: `{"status_code": 401}`,
+					Config: map[string]any{"status_code": 401},
 				},
 			},
 		}
 
-		result, err := policy.MarshalJSON()
+		result, err := policy.JSON()
 		require.NoError(t, err)
 		require.JSONEq(t, expected, result)
 	})
@@ -116,10 +116,10 @@ func TestPolicyToJSON(t *testing.T) {
 		action := Action{
 
 			Type:   "deny",
-			Config: `{"status_code": 401}`,
+			Config: map[string]any{"status_code": 401},
 		}
 
-		result, err := action.MarshalJSON()
+		result, err := action.JSON()
 		require.NoError(t, err)
 		require.JSONEq(t, expected, result)
 	})
@@ -164,7 +164,7 @@ func TestPolicyToYAML(t *testing.T) {
 					Actions: []Action{
 						{
 							Type:   "log",
-							Config: `{"metadata":{"key":"val"}}`,
+							Config: map[string]any{"metadata": map[string]any{"key": "val"}},
 						},
 					},
 				},
@@ -179,14 +179,14 @@ func TestPolicyToYAML(t *testing.T) {
 					Actions: []Action{
 						{
 							Type:   "custom-response",
-							Config: `{"status_code":500}`,
+							Config: map[string]any{"status_code": 500},
 						},
 					},
 				},
 			},
 		}
 
-		yaml, err := cfg.MarshalYAML()
+		yaml, err := cfg.YAML()
 		require.NoError(t, err)
 		require.YAMLEq(t, expected, yaml)
 	})
@@ -206,12 +206,12 @@ func TestPolicyToYAML(t *testing.T) {
 			Actions: []Action{
 				{
 					Type:   "deny",
-					Config: `{"status_code": 401}`,
+					Config: map[string]any{"status_code": 401},
 				},
 			},
 		}
 
-		result, err := policy.MarshalYAML()
+		result, err := policy.YAML()
 		require.NoError(t, err)
 		require.YAMLEq(t, expected, result)
 	})
@@ -224,11 +224,124 @@ func TestPolicyToYAML(t *testing.T) {
 		action := Action{
 
 			Type:   "deny",
-			Config: `{"status_code": 401}`,
+			Config: map[string]any{"status_code": 401},
 		}
 
-		result, err := action.MarshalYAML()
+		result, err := action.YAML()
 		require.NoError(t, err)
 		require.YAMLEq(t, expected, result)
+	})
+}
+
+func TestFromString(t *testing.T) {
+	t.Run("rule from json", func(t *testing.T) {
+		input := `{"name":"denyPUT","expressions":["req.Method == 'PUT'"],"actions":[{"type":"deny","config":{"status_code":401}}]}`
+		expected := Rule{
+			Name:        "denyPUT",
+			Expressions: []string{"req.Method == 'PUT'"},
+			Actions: []Action{
+				{
+					Type:   "deny",
+					Config: map[string]any{"status_code": 401},
+				},
+			},
+		}
+
+		result, err := NewRuleFromString(input)
+
+		require.NoError(t, err)
+		require.Equal(t, expected, result)
+	})
+
+	t.Run("new rule from yaml", func(t *testing.T) {
+		input := `
+            name: "denyPUT"
+            expressions: ["req.Method == 'PUT'"]
+            actions:
+              - type: "deny"
+                config:
+                    status_code: 401`
+
+		expected := Rule{
+			Name:        "denyPUT",
+			Expressions: []string{"req.Method == 'PUT'"},
+			Actions: []Action{
+				{
+					Type:   "deny",
+					Config: map[string]any{"status_code": 401},
+				},
+			},
+		}
+
+		result, err := NewRuleFromString(input)
+
+		require.NoError(t, err)
+		require.Equal(t, expected, result)
+	})
+
+	t.Run("convert action to json", func(t *testing.T) {
+		input := `{"type":"deny","config":{"status_code":401}}`
+		expected := Action{
+
+			Type:   "deny",
+			Config: map[string]any{"status_code": 401},
+		}
+
+		result, err := NewActionFromString(input)
+
+		require.NoError(t, err)
+		require.Equal(t, expected, result)
+	})
+
+	t.Run("action from yaml", func(t *testing.T) {
+		input := `
+            type: "deny"
+            config:
+                status_code: 401`
+		expected := Action{
+
+			Type:   "deny",
+			Config: map[string]any{"status_code": 401},
+		}
+
+		result, err := NewActionFromString(input)
+
+		require.NoError(t, err)
+		require.Equal(t, expected, result)
+	})
+
+	t.Run("must action to json", func(t *testing.T) {
+		input := `{"type":"deny","config":{"status_code":401}}`
+		expected := Action{
+
+			Type:   "deny",
+			Config: map[string]any{"status_code": 401},
+		}
+
+		result := MustActionFromString(input)
+
+		require.Equal(t, expected, result)
+	})
+
+	t.Run("must action from yaml", func(t *testing.T) {
+		input := `
+            type: "deny"
+            config:
+                status_code: 401`
+		expected := Action{
+
+			Type:   "deny",
+			Config: map[string]any{"status_code": 401},
+		}
+
+		result := MustActionFromString(input)
+
+		require.Equal(t, expected, result)
+	})
+
+	t.Run("must action from invalid", func(t *testing.T) {
+		input := `invalid: val`
+
+		require.Panics(t, func() { MustActionFromString(input) })
 	})
 }
