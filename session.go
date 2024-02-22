@@ -79,6 +79,8 @@ var defaultCACert []byte
 
 const defaultServer = "connect.ngrok-agent.com:443"
 
+var leastLatencyServer = regexp.MustCompile(`^connect\.([a-z]+?-)?ngrok-agent\.com(\.lan)?:443`)
+
 // Dialer is the interface a custom connection dialer must implement for use
 // with the [WithDialer] option.
 type Dialer interface {
@@ -716,13 +718,10 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 
 		// store any connect server addresses for use in subsequent legs
 		if cfg.EnableMultiLeg && legNumber == 0 && len(resp.Extra.ConnectAddresses) > 1 {
-			testServerAddr := strings.Replace(cfg.ServerAddr, ".lan", "", 1)
-			testServerAddr = strings.Replace(testServerAddr, ".dev-", ".", 1)
-			testServerAddr = strings.Replace(testServerAddr, ".stage-", ".", 1)
 			overrideAdditionalServers := len(cfg.AdditionalServerAddrs) == 0
 			for i, ca := range resp.Extra.ConnectAddresses {
 				if i == 0 {
-					if testServerAddr == defaultServer {
+					if leastLatencyServer.MatchString(cfg.ServerAddr) {
 						// lock in the leg 0 region
 						logger.Debug("first leg using region", "region", resp.Extra.Region, "server", ca.ServerAddr)
 						cfg.ServerAddr = ca.ServerAddr

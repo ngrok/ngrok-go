@@ -199,7 +199,7 @@ func (s *reconnectingSession) listenTunnel(listen func(*session) (Tunnel, error)
 		}
 		// connect this tunnel to the other legs
 		for _, session := range s.sessions[1:] {
-			if e := reconnectTunnelToSession(session.raw, tun.(*tunnel), make(map[string]*tunnel), tun.ID()); e != nil {
+			if e := s.reconnectTunnelToSession(session.raw, tun.(*tunnel), make(map[string]*tunnel), tun.ID()); e != nil {
 				return nil, e
 			}
 			// use locking method
@@ -338,7 +338,7 @@ func (s *reconnectingSession) connect(acceptErr error, connSession *session) err
 		// reconnected tunnels, which may have different IDs
 		newTunnels := make(map[string]*tunnel, len(session.tunnels))
 		for oldID, t := range session.tunnels {
-			if err := reconnectTunnelToSession(raw, t, newTunnels, oldID); err != nil {
+			if err := s.reconnectTunnelToSession(raw, t, newTunnels, oldID); err != nil {
 				return err
 			}
 		}
@@ -406,7 +406,7 @@ func (s *reconnectingSession) connect(acceptErr error, connSession *session) err
 	}
 }
 
-func reconnectTunnelToSession(raw RawSession, t *tunnel, newTunnels map[string]*tunnel, oldID string) error {
+func (s *reconnectingSession) reconnectTunnelToSession(raw RawSession, t *tunnel, newTunnels map[string]*tunnel, oldID string) error {
 	// set the returned token for reconnection
 	tCfg := t.RemoteBindConfig()
 	t.bindExtra.Token = tCfg.Token
