@@ -382,7 +382,9 @@ func (s *reconnectingSession) connect(acceptErr error, connSession *session) err
 		// check if more sessions need to be established
 		sendStateChange := true
 		if desiredLegs > len(s.sessions) {
-			// set up the next connection
+			// set up the next connection. additional sessions will
+			// continue to chain on from there until all legs are
+			// established
 			s.createTunnelClientSession(s)
 			// not done with initial setup yet
 			sendStateChange = false

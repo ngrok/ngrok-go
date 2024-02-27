@@ -977,7 +977,7 @@ func (s *sessionImpl) Heartbeat() (time.Duration, error) {
 func (s *sessionImpl) Latency() <-chan time.Duration {
 	return s.inner().Latency()
 }
-func (s *sessionImpl) ConnectAddreses() []ConnectAddress {
+func (s *sessionImpl) ConnectAddresses() []ConnectAddress {
 	connectAddresses := make([]ConnectAddress, len(s.inner().ConnectAddresses))
 	for i, addr := range s.inner().ConnectAddresses {
 		connectAddresses[i] = ConnectAddress(addr)
