@@ -43,9 +43,6 @@ func (avd *AgentVersionDeprecated) Error() string {
 	return (*proto.AgentVersionDeprecated)(avd).Error()
 }
 
-// ConnectAddress is a type wrapper for [proto.ConnectAddress]
-type ConnectAddress proto.ConnectAddress
-
 // Session encapsulates an established session with the ngrok service. Sessions
 // recover from network failures by automatically reconnecting.
 type Session interface {
@@ -977,10 +974,10 @@ func (s *sessionImpl) Heartbeat() (time.Duration, error) {
 func (s *sessionImpl) Latency() <-chan time.Duration {
 	return s.inner().Latency()
 }
-func (s *sessionImpl) ConnectAddresses() []ConnectAddress {
-	connectAddresses := make([]ConnectAddress, len(s.inner().ConnectAddresses))
+func (s *sessionImpl) ConnectAddresses() []struct{ Region, ServerAddr string } {
+	connectAddresses := make([]struct{ Region, ServerAddr string }, len(s.inner().ConnectAddresses))
 	for i, addr := range s.inner().ConnectAddresses {
-		connectAddresses[i] = ConnectAddress(addr)
+		connectAddresses[i] = struct{ Region, ServerAddr string }{addr.Region, addr.ServerAddr}
 	}
 	return connectAddresses
 }
