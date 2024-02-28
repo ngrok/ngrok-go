@@ -76,6 +76,8 @@ var defaultCACert []byte
 
 const defaultServer = "connect.ngrok-agent.com:443"
 
+var leastLatencyServer = regexp.MustCompile(`^connect\.([a-z]+?-)?ngrok-agent\.com(\.lan)?:443`)
+
 // Dialer is the interface a custom connection dialer must implement for use
 // with the [WithDialer] option.
 type Dialer interface {
@@ -143,6 +145,10 @@ type connectConfig struct {
 	// The address of the ngrok server to connect to.
 	// Defaults to `connect.ngrok-agent.com:443`
 	ServerAddr string
+	// The optional addresses of the additional ngrok servers to connect to.
+	AdditionalServerAddrs []string
+	// Enable using multiple session legs
+	EnableMultiLeg bool
 	// The [tls.Config] used when connecting to the ngrok server
 	TLSConfigCustomizer func(*tls.Config)
 	// The [x509.CertPool] used to authenticate the ngrok server certificate.
@@ -284,6 +290,28 @@ func WithRegion(region string) ConnectOption {
 func WithServer(addr string) ConnectOption {
 	return func(cfg *connectConfig) {
 		cfg.ServerAddr = addr
+	}
+}
+
+// WithAdditionalServers configures the network address to dial to connect to the ngrok
+// service on secondary legs. Use this option only if you are connecting to a custom agent
+// ingress, and have enabled multi leg.
+//
+// See the [server_addr parameter in the ngrok docs] for additional details.
+//
+// [server_addr parameter in the ngrok docs]: https://ngrok.com/docs/ngrok-agent/config#server_addr
+func WithAdditionalServers(addrs []string) ConnectOption {
+	return func(cfg *connectConfig) {
+		cfg.AdditionalServerAddrs = addrs
+	}
+}
+
+// WithMultiLeg as true allows connecting to the ngrok service on secondary legs.
+//
+// See [WithAdditionalServers] if connecting to a custom agent ingress.
+func WithMultiLeg(enable bool) ConnectOption {
+	return func(cfg *connectConfig) {
+		cfg.EnableMultiLeg = enable
 	}
 }
 
@@ -508,15 +536,6 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 		cfg.ServerAddr = defaultServer
 	}
 
-	tlsConfig := &tls.Config{
-		RootCAs:    cfg.CAPool,
-		ServerName: strings.Split(cfg.ServerAddr, ":")[0],
-		MinVersion: tls.VersionTLS12,
-	}
-	if cfg.TLSConfigCustomizer != nil {
-		cfg.TLSConfigCustomizer(tlsConfig)
-	}
-
 	var dialer Dialer
 
 	if cfg.Dialer != nil {
@@ -555,10 +574,23 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 		updateHandler:  cfg.UpdateHandler,
 	}
 
-	rawDialer := func() (tunnel_client.RawSession, error) {
-		conn, err := dialer.DialContext(ctx, "tcp", cfg.ServerAddr)
+	rawDialer := func(legNumber uint32) (tunnel_client.RawSession, error) {
+		serverAddr := cfg.ServerAddr
+		if legNumber > 0 && len(cfg.AdditionalServerAddrs) >= int(legNumber) {
+			serverAddr = cfg.AdditionalServerAddrs[legNumber-1]
+		}
+		tlsConfig := &tls.Config{
+			RootCAs:    cfg.CAPool,
+			ServerName: strings.Split(serverAddr, ":")[0],
+			MinVersion: tls.VersionTLS12,
+		}
+		if cfg.TLSConfigCustomizer != nil {
+			cfg.TLSConfigCustomizer(tlsConfig)
+		}
+
+		conn, err := dialer.DialContext(ctx, "tcp", serverAddr)
 		if err != nil {
-			return nil, errSessionDial{cfg.ServerAddr, err}
+			return nil, errSessionDial{serverAddr, err}
 		}
 
 		conn = tls.Client(conn, tlsConfig)
@@ -613,14 +645,15 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 		UpdateUnsupportedError:  cfg.remoteUpdateErr,
 	}
 
-	reconnect := func(sess tunnel_client.Session) error {
+	reconnect := func(sess tunnel_client.Session, raw tunnel_client.RawSession, legNumber uint32) (int, error) {
+		auth.LegNumber = legNumber
 		resp, err := sess.Auth(auth)
 		if err != nil {
 			remote := false
 			if resp.Error != "" {
 				remote = true
 			}
-			return errAuthFailed{remote, err}
+			return 0, errAuthFailed{remote, err}
 		}
 
 		if resp.Extra.DeprecationWarning != nil {
@@ -638,7 +671,7 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 			logger.Warn(warning.Error(), vars...)
 		}
 
-		session.setInner(&sessionInner{
+		sessionInner := &sessionInner{
 			Session:            sess,
 			Region:             resp.Extra.Region,
 			ProtoVersion:       resp.Version,
@@ -649,12 +682,21 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 			Banner:             resp.Extra.Banner,
 			SessionDuration:    resp.Extra.SessionDuration,
 			DeprecationWarning: resp.Extra.DeprecationWarning,
+			ConnectAddresses:   resp.Extra.ConnectAddresses,
 			Logger:             logger,
-		})
+		}
+
+		if legNumber == 0 {
+			session.setInner(sessionInner)
+		}
 
 		if cfg.HeartbeatHandler != nil {
+			// plumb a session with the proper region to the heartbeatHandler
+			heartbeatSession := new(sessionImpl)
+			heartbeatSession.setInner(sessionInner)
 			go func() {
-				beats := session.Latency()
+				// use the raw latency channel in case this is a multi-leg session
+				beats := raw.Latency()
 				for {
 					select {
 					case <-ctx.Done():
@@ -663,14 +705,36 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 						if !ok {
 							return
 						}
-						cfg.HeartbeatHandler(ctx, session, latency)
+						cfg.HeartbeatHandler(ctx, heartbeatSession, latency)
 					}
 				}
 			}()
 		}
 
 		auth.Cookie = resp.Extra.Cookie
-		return nil
+
+		// store any connect server addresses for use in subsequent legs
+		if cfg.EnableMultiLeg && legNumber == 0 && len(resp.Extra.ConnectAddresses) > 1 {
+			overrideAdditionalServers := len(cfg.AdditionalServerAddrs) == 0
+			for i, ca := range resp.Extra.ConnectAddresses {
+				if i == 0 {
+					if leastLatencyServer.MatchString(cfg.ServerAddr) {
+						// lock in the leg 0 region
+						logger.Debug("first leg using region", "region", resp.Extra.Region, "server", ca.ServerAddr)
+						cfg.ServerAddr = ca.ServerAddr
+					}
+				} else if overrideAdditionalServers {
+					cfg.AdditionalServerAddrs = append(cfg.AdditionalServerAddrs, ca.ServerAddr)
+				}
+			}
+		}
+
+		// if we are using multi-leg, we need to know how many legs to connect
+		desiredLegs := 1
+		if cfg.EnableMultiLeg {
+			desiredLegs = 1 + len(cfg.AdditionalServerAddrs)
+		}
+		return desiredLegs, nil
 	}
 
 	sess := tunnel_client.NewReconnectingSession(logger, rawDialer, stateChanges, reconnect)
@@ -755,6 +819,7 @@ type sessionInner struct {
 	Banner             string
 	SessionDuration    int64
 	DeprecationWarning *proto.AgentVersionDeprecated
+	ConnectAddresses   []proto.ConnectAddress
 
 	Logger log15.Logger
 }
@@ -908,6 +973,13 @@ func (s *sessionImpl) Heartbeat() (time.Duration, error) {
 }
 func (s *sessionImpl) Latency() <-chan time.Duration {
 	return s.inner().Latency()
+}
+func (s *sessionImpl) ConnectAddresses() []struct{ Region, ServerAddr string } {
+	connectAddresses := make([]struct{ Region, ServerAddr string }, len(s.inner().ConnectAddresses))
+	for i, addr := range s.inner().ConnectAddresses {
+		connectAddresses[i] = struct{ Region, ServerAddr string }{addr.Region, addr.ServerAddr}
+	}
+	return connectAddresses
 }
 
 type remoteCallbackHandler struct {

@@ -135,6 +135,11 @@ type AuthExtra struct {
 	CustomCAs       bool
 
 	ClientType ClientType // The type of client this is. Currently agent and library clients are supported
+
+	// The leg number of the client connection associated with this session.
+	// Defaults to zero, will be 1 or more for the additional connected
+	// leg(s) when multi-leg is engaged.
+	LegNumber uint32
 }
 
 type ClientType string
@@ -184,6 +189,11 @@ func (avd *AgentVersionDeprecated) Error() string {
 	return "Your agent is deprecated. Please update " + to + when
 }
 
+type ConnectAddress struct {
+	Region     string
+	ServerAddr string
+}
+
 type AuthRespExtra struct {
 	Version string // server version
 	Region  string // server region
@@ -195,6 +205,7 @@ type AuthRespExtra struct {
 	PlanName           string
 	Banner             string
 	DeprecationWarning *AgentVersionDeprecated
+	ConnectAddresses   []ConnectAddress
 }
 
 // A client sends this message to the server over a new stream

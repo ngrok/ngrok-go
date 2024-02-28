@@ -76,10 +76,12 @@ type Session interface {
 }
 
 type session struct {
-	raw RawSession
+	swapper *swapRaw
+	raw     RawSession
 	sync.RWMutex
 	log.Logger
-	tunnels map[string]*tunnel
+	tunnels   map[string]*tunnel
+	legNumber uint32
 }
 
 // NewSession starts a new go-tunnel client session running over the given

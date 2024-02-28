@@ -53,6 +53,7 @@ type rawSession struct {
 	closed     bool
 	closedLock sync.RWMutex
 	log.Logger
+	remoteAddr net.Addr
 }
 
 // Creates a new client tunnel session with the given id
@@ -62,7 +63,7 @@ func NewRawSession(logger log.Logger, mux muxado.Session, heartbeatConfig *muxad
 }
 
 func newRawSession(mux muxado.Session, logger log.Logger, heartbeatConfig *muxado.HeartbeatConfig, handler SessionHandler) RawSession {
-	s := &rawSession{Logger: logger, handler: handler, latency: make(chan time.Duration)}
+	s := &rawSession{Logger: logger, handler: handler, latency: make(chan time.Duration), remoteAddr: mux.RemoteAddr()}
 	typed := muxado.NewTypedStreamSession(mux)
 	heart := muxado.NewHeartbeat(typed, s.onHeartbeat, heartbeatConfig)
 	s.mux = heart
@@ -164,6 +165,7 @@ func (s *rawSession) Accept() (netx.LoggedConn, error) {
 		}
 
 		reqType := proto.ReqType(raw.StreamType())
+		s.Debug("tunnel Accept", "reqType", reqType, "remoteAddr", s.remoteAddr)
 		deserialize := func(v any) (ok bool) {
 			if err := json.NewDecoder(raw).Decode(v); err != nil {
 				s.Error("failed to deserialize", "type", reflect.TypeOf(v), "err", err)
