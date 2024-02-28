@@ -1,3 +1,8 @@
+## 1.9.0
+Enhancements:
+
+- Adds `WithAdditionalServers` and `WithMultiLeg` options
+
 ## 1.8.1
 Enhancements: 
 
