@@ -1,3 +1,9 @@
+## 1.9.1
+
+Bug fixes:
+
+- Protect against writing to closed channel on shutdown
+
 ## 1.9.0
 Enhancements:
 

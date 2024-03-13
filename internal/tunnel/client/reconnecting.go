@@ -2,6 +2,7 @@ package client
 
 import (
 	"errors"
+	"sync"
 	"sync/atomic"
 	"time"
 	"unsafe"
@@ -94,12 +95,13 @@ func (s *swapRaw) Accept() (netx.LoggedConn, error) {
 }
 
 type reconnectingSession struct {
-	closed       int32
-	dialer       RawSessionDialer
-	stateChanges chan<- error
-	clientID     string
-	cb           ReconnectCallback
-	sessions     []*session
+	closed            int32
+	dialer            RawSessionDialer
+	stateChanges      chan<- error
+	clientID          string
+	cb                ReconnectCallback
+	sessions          []*session
+	failPermanentOnce sync.Once
 	log.Logger
 }
 
@@ -325,8 +327,10 @@ func (s *reconnectingSession) connect(acceptErr error, connSession *session) err
 	}
 
 	failPermanent := func(err error) error {
-		s.stateChanges <- err
-		close(s.stateChanges)
+		s.failPermanentOnce.Do(func() {
+			s.stateChanges <- err
+			close(s.stateChanges)
+		})
 		return err
 	}
 
