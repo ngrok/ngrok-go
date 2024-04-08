@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/valyala/fasthttp"
+
 	"golang.ngrok.com/ngrok"
 	"golang.ngrok.com/ngrok/config"
 )
@@ -32,7 +33,10 @@ func run(ctx context.Context) error {
 		fmt.Fprintf(ctx, "Hello! You're requesting %q", ctx.RequestURI())
 	}
 
-	serv.Serve(tun)
+	err = serv.Serve(tun)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
