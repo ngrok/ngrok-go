@@ -53,20 +53,22 @@ func (fwd *forwarder) Wait() error {
 // compile-time check that we're implementing the proper interface
 var _ Forwarder = (*forwarder)(nil)
 
-func join(ctx context.Context, left, right net.Conn) {
-	g, _ := errgroup.WithContext(ctx) // when ctx is canceled (on WithStopHandler or WithDisconnectHandler ) interrupts both io.Copy
-	g.Go(func() error {
-		_, err := io.Copy(left, right)
-		left.Close() // on left disconnection interrupts io.Copy(right, left)
-		return err
-	})
-	g.Go(func() error {
-		_, err := io.Copy(right, left)
-		right.Close() // on right disconnection interrupts io.Copy(left, right)
-		return err
-	})
+func join(logger log15.Logger, left, right net.Conn) {
+	g := &sync.WaitGroup{}
+	g.Add(2)
+	go func() {
+		defer g.Done()
+		defer left.Close()
+		n, err := io.Copy(left, right)
+		logger.Debug("left join finished", "err", err, "bytes", n)
+	}()
+	go func() {
+		defer g.Done()
+		defer right.Close()
+		n, err := io.Copy(right, left)
+		logger.Debug("right join finished", "err", err, "bytes", n)
+	}()
 	g.Wait()
-
 }
 
 func forwardTunnel(ctx context.Context, tun Tunnel, url *url.URL) Forwarder {
@@ -101,7 +103,7 @@ func forwardTunnel(ctx context.Context, tun Tunnel, url *url.URL) Forwarder {
 					return
 				}
 
-				join(ctx, ngrokConn, backend)
+				join(logger.New("url", url), ngrokConn, backend)
 				fwdTasks.Done()
 			}()
 		}
