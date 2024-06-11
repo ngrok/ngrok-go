@@ -1,18 +1,18 @@
 package config
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
-	"golang.ngrok.com/ngrok/internal/pb"
 	"golang.ngrok.com/ngrok/internal/tunnel/proto"
 	po "golang.ngrok.com/ngrok/policy"
 )
 
 func testPolicy[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 	makeOpts func(...OT) Tunnel,
-	getPolicies func(*O) *pb.MiddlewareConfiguration_Policy,
+	getPolicies func(*O) any,
 ) {
 	optsFunc := func(opts ...any) Tunnel {
 		return makeOpts(assertSlice[OT](opts)...)
@@ -69,11 +69,14 @@ func testPolicy[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 				),
 			),
 			expectOpts: func(t *testing.T, opts *O) {
-				actual := getPolicies(opts)
-				require.NotNil(t, actual)
+				actualAny := getPolicies(opts)
+				require.NotNil(t, actualAny)
+
+				actual := actualAny.(po.Policy)
+
 				require.Len(t, actual.Inbound, 2)
 				require.Equal(t, "denyPUT", actual.Inbound[0].Name)
-				require.Equal(t, actual.Inbound[0].Actions, []*pb.MiddlewareConfiguration_PolicyAction{{Type: "deny"}})
+				require.Equal(t, actual.Inbound[0].Actions, []po.Action{{Type: "deny"}})
 				require.Len(t, actual.Outbound, 1)
 				require.Len(t, actual.Outbound[0].Expressions, 2)
 			},
@@ -106,14 +109,20 @@ func testPolicy[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 						]
 					}`)),
 			expectOpts: func(t *testing.T, opts *O) {
-				actual := getPolicies(opts)
+				actualAny := getPolicies(opts)
+				actualSer, err := json.Marshal(actualAny)
+				require.NoError(t, err)
+
+				var actual po.Policy
+				require.NoError(t, json.Unmarshal(actualSer, &actual))
+
 				require.NotNil(t, actual)
 				require.Len(t, actual.Inbound, 2)
 				require.Equal(t, "denyPut", actual.Inbound[0].Name)
-				require.Equal(t, []*pb.MiddlewareConfiguration_PolicyAction{{Type: "deny"}}, actual.Inbound[0].Actions)
+				require.Equal(t, []po.Action{{Type: "deny"}}, actual.Inbound[0].Actions)
 				require.Len(t, actual.Outbound, 1)
 				require.Len(t, actual.Outbound[0].Expressions, 2)
-				require.Equal(t, []byte(`{"status_code":500}`), actual.Outbound[0].Actions[0].Config)
+				require.Equal(t, map[string]any{"status_code": 500.}, actual.Outbound[0].Actions[0].Config)
 			},
 		},
 	}
@@ -123,15 +132,15 @@ func testPolicy[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 
 func TestPolicy(t *testing.T) {
 	testPolicy[*httpOptions](t, HTTPEndpoint,
-		func(h *proto.HTTPEndpoint) *pb.MiddlewareConfiguration_Policy {
+		func(h *proto.HTTPEndpoint) any {
 			return h.Policy
 		})
 	testPolicy[*tcpOptions](t, TCPEndpoint,
-		func(h *proto.TCPEndpoint) *pb.MiddlewareConfiguration_Policy {
+		func(h *proto.TCPEndpoint) any {
 			return h.Policy
 		})
 	testPolicy[*tlsOptions](t, TLSEndpoint,
-		func(h *proto.TLSEndpoint) *pb.MiddlewareConfiguration_Policy {
+		func(h *proto.TLSEndpoint) any {
 			return h.Policy
 		})
 }
