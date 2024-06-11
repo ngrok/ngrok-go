@@ -302,7 +302,7 @@ type HTTPEndpoint struct {
 	ResponseHeaders       *pb.MiddlewareConfiguration_Headers
 	WebsocketTCPConverter *pb.MiddlewareConfiguration_WebsocketTCPConverter
 	UserAgentFilter       *pb.MiddlewareConfiguration_UserAgentFilter
-	Policy                *pb.MiddlewareConfiguration_Policy
+	Policy                any
 }
 
 type TCPEndpoint struct {
@@ -311,7 +311,7 @@ type TCPEndpoint struct {
 
 	// middleware
 	IPRestriction *pb.MiddlewareConfiguration_IPRestriction
-	Policy        *pb.MiddlewareConfiguration_Policy
+	Policy        any
 }
 
 type TLSEndpoint struct {
@@ -325,7 +325,7 @@ type TLSEndpoint struct {
 	MutualTLSAtEdge *pb.MiddlewareConfiguration_MutualTLS
 	TLSTermination  *pb.MiddlewareConfiguration_TLSTermination
 	IPRestriction   *pb.MiddlewareConfiguration_IPRestriction
-	Policy          *pb.MiddlewareConfiguration_Policy
+	Policy          any
 }
 
 type SSHOptions struct {

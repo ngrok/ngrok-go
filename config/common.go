@@ -19,7 +19,7 @@ type commonOpts struct {
 	ForwardsProto string
 	// Policy that define rules that should be applied to incoming or outgoing
 	// connections to the edge.
-	Policy *policy
+	Policy Policy
 }
 
 type CommonOptionsFunc func(cfg *commonOpts)
