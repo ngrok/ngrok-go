@@ -16,7 +16,6 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
-	"unsafe"
 
 	"github.com/inconshreveable/log15/v3"
 	"go.uber.org/multierr"
@@ -804,7 +803,7 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 }
 
 type sessionImpl struct {
-	raw unsafe.Pointer
+	raw atomic.Pointer[sessionInner]
 }
 
 type sessionInner struct {
@@ -825,15 +824,11 @@ type sessionInner struct {
 }
 
 func (s *sessionImpl) inner() *sessionInner {
-	ptr := atomic.LoadPointer(&s.raw)
-	if ptr == nil {
-		return nil
-	}
-	return (*sessionInner)(ptr)
+	return s.raw.Load()
 }
 
 func (s *sessionImpl) setInner(raw *sessionInner) {
-	atomic.StorePointer(&s.raw, unsafe.Pointer(raw))
+	s.raw.Store(raw)
 }
 
 func (s *sessionImpl) closeTunnel(clientID string, err error) error {
@@ -850,7 +845,6 @@ func (s *sessionImpl) Warnings() []error {
 		return []error{(*AgentVersionDeprecated)(deprecated)}
 	}
 	return nil
-
 }
 
 func (s *sessionImpl) Listen(ctx context.Context, cfg config.Tunnel) (Tunnel, error) {

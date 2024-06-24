@@ -5,7 +5,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-	"unsafe"
 
 	log "github.com/inconshreveable/log15/v3"
 	"github.com/jpillora/backoff"
@@ -18,19 +17,19 @@ var ErrSessionNotReady = errors.New("an ngrok tunnel session has not yet been es
 
 // Wraps a RawSession so that it can be safely swapped out
 type swapRaw struct {
-	raw unsafe.Pointer
+	raw atomic.Pointer[RawSession]
 }
 
 func (s *swapRaw) get() RawSession {
-	ptr := atomic.LoadPointer(&s.raw)
+	ptr := s.raw.Load()
 	if ptr == nil {
 		return nil
 	}
-	return *(*RawSession)(ptr)
+	return *ptr
 }
 
 func (s *swapRaw) set(raw RawSession) {
-	atomic.StorePointer(&s.raw, unsafe.Pointer(&raw))
+	s.raw.Store(&raw)
 }
 
 func (s *swapRaw) Auth(id string, extra proto.AuthExtra) (resp proto.AuthResp, err error) {
