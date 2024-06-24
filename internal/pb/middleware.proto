@@ -95,6 +95,8 @@ message MiddlewareConfiguration {
     string type = 1;
     bytes config = 2;
   }
+
+  string TrafficPolicy = 15;
 }
 
 message HTTPMiddleware {

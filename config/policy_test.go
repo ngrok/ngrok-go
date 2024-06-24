@@ -5,25 +5,37 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"golang.ngrok.com/ngrok/internal/pb"
 	"golang.ngrok.com/ngrok/internal/tunnel/proto"
 	po "golang.ngrok.com/ngrok/policy"
 )
 
 func testPolicy[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 	makeOpts func(...OT) Tunnel,
-	getPolicies func(*O) *pb.MiddlewareConfiguration_Policy,
+	getPolicies func(*O) string,
 ) {
+
+	// putting yaml string up here as the formatting makes the test
+	// cases messy
+	yamlPolicy := `---
+inbound:
+    - name: DenyAll
+      actions:
+        - type: deny
+          config:
+            status_code: 446 
+`
+
 	optsFunc := func(opts ...any) Tunnel {
 		return makeOpts(assertSlice[OT](opts)...)
 	}
+
 	cases := testCases[T, O]{
 		{
 			name: "absent",
 			opts: optsFunc(),
 			expectOpts: func(t *testing.T, opts *O) {
 				actual := getPolicies(opts)
-				require.Nil(t, actual)
+				require.Empty(t, actual)
 			},
 		},
 		{
@@ -70,16 +82,12 @@ func testPolicy[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 			),
 			expectOpts: func(t *testing.T, opts *O) {
 				actual := getPolicies(opts)
-				require.NotNil(t, actual)
-				require.Len(t, actual.Inbound, 2)
-				require.Equal(t, "denyPUT", actual.Inbound[0].Name)
-				require.Equal(t, actual.Inbound[0].Actions, []*pb.MiddlewareConfiguration_PolicyAction{{Type: "deny"}})
-				require.Len(t, actual.Outbound, 1)
-				require.Len(t, actual.Outbound[0].Expressions, 2)
+				require.NotEmpty(t, actual)
+				require.Equal(t, actual, "{\"inbound\":[{\"name\":\"denyPUT\",\"expressions\":[\"req.Method == 'PUT'\"],\"actions\":[{\"type\":\"deny\"}]},{\"name\":\"logFooHeader\",\"expressions\":[\"'foo' in req.Headers\"],\"actions\":[{\"type\":\"log\",\"config\":{\"metadata\":{\"key\":\"val\"}}}]}],\"outbound\":[{\"name\":\"InternalErrorWhenFailed\",\"expressions\":[\"res.StatusCode \\u003c= '0'\",\"res.StatusCode \\u003e= '300'\"],\"actions\":[{\"type\":\"custom-response\",\"config\":{\"status_code\":500}}]}]}")
 			},
 		},
 		{
-			name: "with policy string",
+			name: "with valid JSON policy string",
 			opts: optsFunc(
 				WithPolicyString(`
 					{
@@ -107,13 +115,41 @@ func testPolicy[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 					}`)),
 			expectOpts: func(t *testing.T, opts *O) {
 				actual := getPolicies(opts)
-				require.NotNil(t, actual)
-				require.Len(t, actual.Inbound, 2)
-				require.Equal(t, "denyPut", actual.Inbound[0].Name)
-				require.Equal(t, []*pb.MiddlewareConfiguration_PolicyAction{{Type: "deny"}}, actual.Inbound[0].Actions)
-				require.Len(t, actual.Outbound, 1)
-				require.Len(t, actual.Outbound[0].Expressions, 2)
-				require.Equal(t, []byte(`{"status_code":500}`), actual.Outbound[0].Actions[0].Config)
+				require.NotEmpty(t, actual)
+				require.Equal(t, actual, `
+					{
+						"inbound":[
+							{
+								"name":"denyPut",
+								"expressions":["req.Method == 'PUT'"],
+								"actions":[{"type":"deny"}]
+							},
+							{
+								"name":"logFooHeader",
+								"expressions":["'foo' in req.Headers"],
+								"actions":[
+									{"type":"log","config":{"metadata":{"key":"val"}}}
+								]
+							}
+						],
+						"outbound":[
+							{
+								"name":"500ForFailures",
+								"expressions":["res.StatusCode <= 0", "res.StatusCode >= 300"],
+								"actions":[{"type":"custom-response", "config":{"status_code":500}}]
+							}
+						]
+					}`)
+			},
+		},
+		{
+			name: "with valid YAML policy string",
+			opts: optsFunc(
+				WithPolicyString(yamlPolicy)),
+			expectOpts: func(t *testing.T, opts *O) {
+				actual := getPolicies(opts)
+				require.NotEmpty(t, actual)
+				require.Equal(t, actual, yamlPolicy)
 			},
 		},
 	}
@@ -123,15 +159,15 @@ func testPolicy[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 
 func TestPolicy(t *testing.T) {
 	testPolicy[*httpOptions](t, HTTPEndpoint,
-		func(h *proto.HTTPEndpoint) *pb.MiddlewareConfiguration_Policy {
-			return h.Policy
+		func(h *proto.HTTPEndpoint) string {
+			return h.TrafficPolicy
 		})
 	testPolicy[*tcpOptions](t, TCPEndpoint,
-		func(h *proto.TCPEndpoint) *pb.MiddlewareConfiguration_Policy {
-			return h.Policy
+		func(h *proto.TCPEndpoint) string {
+			return h.TrafficPolicy
 		})
 	testPolicy[*tlsOptions](t, TLSEndpoint,
-		func(h *proto.TLSEndpoint) *pb.MiddlewareConfiguration_Policy {
-			return h.Policy
+		func(h *proto.TLSEndpoint) string {
+			return h.TrafficPolicy
 		})
 }
