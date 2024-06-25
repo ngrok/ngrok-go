@@ -224,6 +224,7 @@ type BindExtra struct {
 	Token       string
 	IPPolicyRef string
 	Metadata    string
+	Bindings    []string
 }
 
 // The server responds with a BindResp message to notify the client of the
