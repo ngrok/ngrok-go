@@ -1,3 +1,8 @@
+## 1.10.0
+Enhancements:
+
+- Adds `WithBindings` option
+
 ## 1.9.1
 
 Bug fixes:
@@ -10,7 +15,7 @@ Enhancements:
 - Adds `WithAdditionalServers` and `WithMultiLeg` options
 
 ## 1.8.1
-Enhancements: 
+Enhancements:
 
 - Provides access to structs for building a Traffic Policy configuration
 

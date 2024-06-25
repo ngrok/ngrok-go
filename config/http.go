@@ -147,6 +147,7 @@ func (cfg *httpOptions) WithForwardsTo(url *url.URL) {
 func (cfg httpOptions) Extra() proto.BindExtra {
 	return proto.BindExtra{
 		Metadata: cfg.Metadata,
+		Bindings: cfg.Bindings,
 	}
 }
 

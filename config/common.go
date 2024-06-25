@@ -20,6 +20,8 @@ type commonOpts struct {
 	// Policy that define rules that should be applied to incoming or outgoing
 	// connections to the edge.
 	Policy *policy
+	// Enables ingress for ngrok endpoints.
+	Bindings []string
 }
 
 type CommonOptionsFunc func(cfg *commonOpts)
