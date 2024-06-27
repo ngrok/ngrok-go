@@ -29,25 +29,6 @@ func WithPolicyString(str string) interface {
 	return trafficPolicy(str)
 }
 
-// WithPolicy configures this edge with the given traffic policy and overwrites any
-// previously-set traffic policy
-// https://ngrok.com/docs/http/traffic-policy/
-func WithPolicy(p po.Policy) interface {
-	HTTPEndpointOption
-	TLSEndpointOption
-	TCPEndpointOption
-} {
-	fmt.Println("WithPolicy has been deprecated. Please use WithPolicyString instead, as WithPolicy will stop working soon.")
-
-	val, err := json.Marshal(p)
-	if err != nil {
-		panic(errors.New(fmt.Sprintf("failed to parse action configuration due to error: %s", err.Error())))
-	}
-	fmt.Printf("%s\n", string(val))
-
-	return trafficPolicy(string(val))
-}
-
 func (p trafficPolicy) ApplyTLS(opts *tlsOptions) {
 	opts.TrafficPolicy = string(p)
 }
@@ -68,4 +49,40 @@ func isJsonString(jsonStr string) bool {
 func isYamlStr(yamlStr string) bool {
 	var yml map[string]any
 	return yaml.Unmarshal([]byte(yamlStr), &yml) == nil
+}
+
+// WithPolicy is deprecated, use WithPolicyString instead.
+// https://ngrok.com/docs/http/traffic-policy/
+func WithPolicy(p po.Policy) interface {
+	HTTPEndpointOption
+	TLSEndpointOption
+	TCPEndpointOption
+} {
+	ret := policy(p)
+
+	return &ret
+}
+
+func (p *policy) ApplyTLS(opts *tlsOptions) {
+	opts.TrafficPolicy = policyToString(p)
+}
+
+func (p *policy) ApplyHTTP(opts *httpOptions) {
+	opts.TrafficPolicy = policyToString(p)
+}
+
+func (p *policy) ApplyTCP(opts *tcpOptions) {
+	opts.TrafficPolicy = policyToString(p)
+}
+
+// policyToString converts the policy into a JSON string representation. This is to help remap Policy to TrafficPolicy.
+func policyToString(p *policy) string {
+	fmt.Println("WithPolicy has been deprecated. Please use WithPolicyString instead, as WithPolicy will stop working soon.")
+
+	val, err := json.Marshal(p)
+	if err != nil {
+		panic(errors.New(fmt.Sprintf("failed to parse action configuration due to error: %s", err.Error())))
+	}
+
+	return string(val)
 }
