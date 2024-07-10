@@ -17,9 +17,13 @@ type commonOpts struct {
 	// Currently only relevant for HTTP/1.1 vs HTTP/2, since there's a potential
 	// change-of-protocol happening at our edge.
 	ForwardsProto string
+
+	// DEPRECATED: use TrafficPolicy instead.
+	Policy *policy
 	// Policy that define rules that should be applied to incoming or outgoing
 	// connections to the edge.
-	Policy *policy
+	TrafficPolicy string
+
 	// Enables ingress for ngrok endpoints.
 	Bindings []string
 }
