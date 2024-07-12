@@ -1,7 +1,20 @@
 ## 1.10.0
+
 Enhancements:
 
+- Adds fasthttp example
 - Adds `WithBindings` option
+- Adds support for `TrafficPolicy` field
+ 
+Changes:
+
+- Replace log adapter module license symlinks with full files
+- Send `Policy` to the backend as a `TrafficPolicy` string
+- unsafe.Pointer -> atomic.Pointer
+
+Bug fixes:
+
+- Propagate half-closes correctly in forward
 
 ## 1.9.1
 
