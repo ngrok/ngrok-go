@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/inconshreveable/log15"
 	"gopkg.in/yaml.v3"
 
 	po "golang.ngrok.com/ngrok/policy"
@@ -77,7 +78,7 @@ func (p *policy) ApplyTCP(opts *tcpOptions) {
 
 // policyToString converts the policy into a JSON string representation. This is to help remap Policy to TrafficPolicy.
 func policyToString(p *policy) string {
-	fmt.Println("WithPolicy has been deprecated. Please use WithPolicyString instead, as WithPolicy will stop working soon.")
+	log15.Root().Warn("WithPolicy has been deprecated. Please use WithPolicyString instead, as WithPolicy will stop working soon.")
 
 	val, err := json.Marshal(p)
 	if err != nil {
