@@ -78,6 +78,25 @@ func (p *policy) ApplyTCP(opts *tcpOptions) {
 
 // policyToString converts the policy into a JSON string representation. This is to help remap Policy to TrafficPolicy.
 func policyToString(p *policy) string {
+	logger := log15.New()
+	logger.Warn("WHAT")
+	logger.Warn("WHAT")
+	logger.Warn("WHAT")
+	logger.Warn("WHAT")
+	logger.Warn("WHAT")
+	logger.Warn("WHAT")
+	logger.Warn("WHAT")
+	logger.Warn("WHAT")
+	logger.Warn("WHAT")
+	logger.Warn("WHAT")
+	logger.Warn("WHAT")
+	logger.Warn("WHAT")
+	logger.Warn("WHAT")
+	logger.Warn("WHAT")
+	logger.Warn("WHAT")
+	logger.Warn("WHAT")
+	logger.Warn("WHAT")
+	logger.Warn("WHAT")
 	log15.Root().Warn("WithPolicy has been deprecated. Please use WithPolicyString instead, as WithPolicy will stop working soon.")
 
 	val, err := json.Marshal(p)
