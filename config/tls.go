@@ -67,6 +67,8 @@ func (cfg *tlsOptions) toProtoConfig() *proto.TLSEndpoint {
 		URL:        cfg.URL,
 		Domain:     cfg.Domain,
 		ProxyProto: proto.ProxyProto(cfg.ProxyProto),
+		Description: cfg.Description,
+		Metadata:    cfg.Metadata,
 
 		Subdomain: cfg.Subdomain,
 		Hostname:  cfg.Hostname,
