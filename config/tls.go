@@ -35,9 +35,6 @@ type tlsOptions struct {
 	// Common tunnel options
 	commonOpts
 
-	// The URL to request for this endpoint
-	URL string
-
 	// The fqdn to request for this edge.
 	Domain string
 
@@ -64,9 +61,9 @@ type tlsOptions struct {
 
 func (cfg *tlsOptions) toProtoConfig() *proto.TLSEndpoint {
 	opts := &proto.TLSEndpoint{
-		URL:        cfg.URL,
-		Domain:     cfg.Domain,
-		ProxyProto: proto.ProxyProto(cfg.ProxyProto),
+		URL:         cfg.URL,
+		Domain:      cfg.Domain,
+		ProxyProto:  proto.ProxyProto(cfg.ProxyProto),
 		Description: cfg.Description,
 		Metadata:    cfg.Metadata,
 
