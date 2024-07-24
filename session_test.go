@@ -1,6 +1,7 @@
 package ngrok
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -19,4 +20,10 @@ func TestUserAgent(t *testing.T) {
 		Comments: []string{"{\"ProxyType\": \"socks5\", \"ConfigVersion\": \"2\"}"},
 	}).ToUserAgent()
 	require.Equal(t, "agent-official-go/3.2.1 ({\"ProxyType\": \"socks5\", \"ConfigVersion\": \"2\"})", s)
+}
+
+func TestConnect(t *testing.T) {
+	// ensure err if token is invalid or is missing
+	_, err := Connect(context.Background())
+	require.Error(t, err)
 }
