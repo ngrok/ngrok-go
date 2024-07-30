@@ -50,8 +50,6 @@ func WithRemoteAddr(addr string) TCPEndpointOption {
 func (cfg *tcpOptions) toProtoConfig() *proto.TCPEndpoint {
 	return &proto.TCPEndpoint{
 		URL:           cfg.URL,
-		Description:   cfg.Description,
-		Metadata:      cfg.Metadata,
 		Addr:          cfg.RemoteAddr,
 		IPRestriction: cfg.commonOpts.CIDRRestrictions.toProtoConfig(),
 		ProxyProto:    proto.ProxyProto(cfg.commonOpts.ProxyProto),
@@ -73,8 +71,9 @@ func (cfg *tcpOptions) WithForwardsTo(url *url.URL) {
 
 func (cfg tcpOptions) Extra() proto.BindExtra {
 	return proto.BindExtra{
-		Metadata: cfg.Metadata,
-		Bindings: cfg.Bindings,
+		Metadata:    cfg.Metadata,
+		Description: cfg.Description,
+		Bindings:    cfg.Bindings,
 	}
 }
 

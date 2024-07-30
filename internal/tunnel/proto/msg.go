@@ -224,6 +224,7 @@ type BindExtra struct {
 	Token       string
 	IPPolicyRef string
 	Metadata    string
+	Description string
 	Bindings    []string
 }
 
@@ -287,8 +288,6 @@ type HTTPEndpoint struct {
 	Hostname          string // public hostname of the bind
 	Subdomain         string
 	Auth              string
-	Description       string
-	Metadata          string
 	HostHeaderRewrite bool   // true if the request's host header is being rewritten
 	LocalURLScheme    string // scheme of the local forward
 	ProxyProto
@@ -313,8 +312,6 @@ type HTTPEndpoint struct {
 type TCPEndpoint struct {
 	URL  string
 	Addr string
-	Description string
-	Metadata    string
 	ProxyProto
 
 	// middleware
@@ -328,8 +325,6 @@ type TLSEndpoint struct {
 	Domain    string
 	Hostname  string // public hostname of the bind
 	Subdomain string
-	Description string
-	Metadata    string
 	ProxyProto
 	MutualTLSAtAgent bool
 

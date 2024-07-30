@@ -61,14 +61,11 @@ type tlsOptions struct {
 
 func (cfg *tlsOptions) toProtoConfig() *proto.TLSEndpoint {
 	opts := &proto.TLSEndpoint{
-		URL:         cfg.URL,
-		Domain:      cfg.Domain,
-		ProxyProto:  proto.ProxyProto(cfg.ProxyProto),
-		Description: cfg.Description,
-		Metadata:    cfg.Metadata,
-
-		Subdomain: cfg.Subdomain,
-		Hostname:  cfg.Hostname,
+		URL:        cfg.URL,
+		Domain:     cfg.Domain,
+		ProxyProto: proto.ProxyProto(cfg.ProxyProto),
+		Subdomain:  cfg.Subdomain,
+		Hostname:   cfg.Hostname,
 	}
 
 	opts.IPRestriction = cfg.commonOpts.CIDRRestrictions.toProtoConfig()
@@ -102,8 +99,9 @@ func (cfg *tlsOptions) WithForwardsTo(url *url.URL) {
 
 func (cfg tlsOptions) Extra() proto.BindExtra {
 	return proto.BindExtra{
-		Metadata: cfg.Metadata,
-		Bindings: cfg.Bindings,
+		Metadata:    cfg.Metadata,
+		Description: cfg.Description,
+		Bindings:    cfg.Bindings,
 	}
 }
 
