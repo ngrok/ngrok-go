@@ -6,6 +6,7 @@ func WithDescription(name string) interface {
 	HTTPEndpointOption
 	TCPEndpointOption
 	TLSEndpointOption
+	LabeledTunnelOption
 } {
 	return descriptionOption(name)
 }
@@ -19,5 +20,9 @@ func (opt descriptionOption) ApplyTLS(opts *tlsOptions) {
 }
 
 func (opt descriptionOption) ApplyTCP(opts *tcpOptions) {
+	opts.Description = string(opt)
+}
+
+func (opt descriptionOption) ApplyLabeled(opts *labeledOptions) {
 	opts.Description = string(opt)
 }
