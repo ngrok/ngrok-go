@@ -920,7 +920,7 @@ func (s *sessionImpl) ListenAndServeHTTP(ctx context.Context, cfg config.Tunnel,
 			impl.server = server
 		} else {
 			// Inform end user that they're using a deprecated option.
-			fmt.Println("Tunnel is serving an HTTP server via HTTP options. This has been deprecated. Please use Session.ListenAndServeHTTP instead.")
+			s.inner().Logger.Warn("Tunnel is serving an HTTP server via HTTP options. This has been deprecated. Please use Session.ListenAndServeHTTP instead.")
 		}
 	}
 

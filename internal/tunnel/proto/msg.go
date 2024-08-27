@@ -224,6 +224,7 @@ type BindExtra struct {
 	Token       string
 	IPPolicyRef string
 	Metadata    string
+	Description string
 	Bindings    []string
 }
 
@@ -282,6 +283,7 @@ func ParseProxyProto(proxyProto string) (ProxyProto, bool) {
 }
 
 type HTTPEndpoint struct {
+	URL               string
 	Domain            string
 	Hostname          string // public hostname of the bind
 	Subdomain         string
@@ -308,6 +310,7 @@ type HTTPEndpoint struct {
 }
 
 type TCPEndpoint struct {
+	URL  string
 	Addr string
 	ProxyProto
 
@@ -318,6 +321,7 @@ type TCPEndpoint struct {
 }
 
 type TLSEndpoint struct {
+	URL       string
 	Domain    string
 	Hostname  string // public hostname of the bind
 	Subdomain string
