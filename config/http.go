@@ -88,6 +88,7 @@ type httpOptions struct {
 
 func (cfg *httpOptions) toProtoConfig() *proto.HTTPEndpoint {
 	opts := &proto.HTTPEndpoint{
+		URL:       cfg.URL,
 		Domain:    cfg.Domain,
 		Hostname:  cfg.Hostname,
 		Subdomain: cfg.Subdomain,
@@ -146,8 +147,9 @@ func (cfg *httpOptions) WithForwardsTo(url *url.URL) {
 
 func (cfg httpOptions) Extra() proto.BindExtra {
 	return proto.BindExtra{
-		Metadata: cfg.Metadata,
-		Bindings: cfg.Bindings,
+		Metadata:    cfg.Metadata,
+		Description: cfg.Description,
+		Bindings:    cfg.Bindings,
 	}
 }
 

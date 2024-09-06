@@ -10,6 +10,13 @@ type commonOpts struct {
 	Metadata string
 	// Tunnel backend metadata. Viewable via the dashboard and API, but has no
 	// bearing on tunnel behavior.
+
+	// The URL to request for this endpoint
+	URL string
+
+	// user supplied description of the endpoint
+	Description string
+
 	// If not set, defaults to a URI in the format `app://hostname/path/to/executable?pid=12345`
 	ForwardsTo string
 
