@@ -21,7 +21,3 @@ func (opt allowsPoolingOption) ApplyTLS(opts *tlsOptions) {
 func (opt allowsPoolingOption) ApplyTCP(opts *tcpOptions) {
 	opts.AllowsPooling = bool(opt)
 }
-
-func (opt allowsPoolingOption) ApplyLabeled(opts *labeledOptions) {
-	opts.AllowsPooling = bool(opt)
-}
