@@ -6,7 +6,6 @@ func WithAllowsPooling(allowsPooling bool) interface {
 	HTTPEndpointOption
 	TCPEndpointOption
 	TLSEndpointOption
-	LabeledTunnelOption
 } {
 	return allowsPoolingOption(allowsPooling)
 }
