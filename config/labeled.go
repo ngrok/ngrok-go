@@ -68,7 +68,6 @@ func (cfg labeledOptions) Extra() proto.BindExtra {
 	return proto.BindExtra{
 		Metadata:      cfg.Metadata,
 		Description:   cfg.Description,
-		AllowsPooling: cfg.AllowsPooling,
 	}
 }
 
