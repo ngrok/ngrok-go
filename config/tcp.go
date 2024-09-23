@@ -71,9 +71,10 @@ func (cfg *tcpOptions) WithForwardsTo(url *url.URL) {
 
 func (cfg tcpOptions) Extra() proto.BindExtra {
 	return proto.BindExtra{
-		Metadata:    cfg.Metadata,
-		Description: cfg.Description,
-		Bindings:    cfg.Bindings,
+		Metadata:      cfg.Metadata,
+		Description:   cfg.Description,
+		Bindings:      cfg.Bindings,
+		AllowsPooling: cfg.AllowsPooling,
 	}
 }
 

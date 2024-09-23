@@ -221,11 +221,12 @@ type Bind struct {
 }
 
 type BindExtra struct {
-	Token       string
-	IPPolicyRef string
-	Metadata    string
-	Description string
-	Bindings    []string
+	Token         string
+	IPPolicyRef   string
+	Metadata      string
+	Description   string
+	Bindings      []string
+	AllowsPooling bool
 }
 
 // The server responds with a BindResp message to notify the client of the
