@@ -788,6 +788,7 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 			again = false
 		case again && err != nil: // error on reconnect
 			errs = multierr.Append(errs, err)
+			return nil, errs
 		case !again: // gave up trying to reconnect
 			errs = multierr.Append(errs, err)
 			return nil, errs
