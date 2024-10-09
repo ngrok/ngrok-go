@@ -15,10 +15,10 @@ type rule po.Rule
 type action po.Action
 type trafficPolicy string
 
-// WithPolicyString configures this edge with the provided policy configuration
-// passed as a json or yaml string and overwrites any previously-set traffic policy
+// WithTrafficPolicy configures this edge with the provided policy configuration
+// passed as a json or yaml string and overwrites any previously-set traffic policy.
 // https://ngrok.com/docs/http/traffic-policy
-func WithPolicyString(str string) interface {
+func WithTrafficPolicy(str string) interface {
 	HTTPEndpointOption
 	TLSEndpointOption
 	TCPEndpointOption
@@ -27,6 +27,16 @@ func WithPolicyString(str string) interface {
 		panic(errors.New("provided string is neither valid JSON nor valid YAML"))
 	}
 	return trafficPolicy(str)
+}
+
+// WithPolicyString is deprecated, use WithTrafficPolicy instead.
+// https://ngrok.com/docs/http/traffic-policy/
+func WithPolicyString(str string) interface {
+	HTTPEndpointOption
+	TLSEndpointOption
+	TCPEndpointOption
+} {
+	return WithTrafficPolicy(str)
 }
 
 func (p trafficPolicy) ApplyTLS(opts *tlsOptions) {
@@ -51,7 +61,7 @@ func isYamlStr(yamlStr string) bool {
 	return yaml.Unmarshal([]byte(yamlStr), &yml) == nil
 }
 
-// WithPolicy is deprecated, use WithPolicyString instead.
+// WithPolicy is deprecated, use WithTrafficPolicy instead.
 // https://ngrok.com/docs/http/traffic-policy/
 func WithPolicy(p po.Policy) interface {
 	HTTPEndpointOption

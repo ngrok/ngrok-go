@@ -1,3 +1,9 @@
+## 1.11.0
+
+Changes:
+
+- Adds `WithTrafficPolicy` function, replacing `WithPolicyString`
+
 ## 1.10.0
 
 Enhancements:
