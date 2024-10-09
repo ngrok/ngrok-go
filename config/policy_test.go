@@ -89,7 +89,7 @@ inbound:
 		{
 			name: "with valid JSON policy string",
 			opts: optsFunc(
-				WithPolicyString(`
+				WithTrafficPolicy(`
 					{
 						"inbound":[
 							{
@@ -145,7 +145,7 @@ inbound:
 		{
 			name: "with valid YAML policy string",
 			opts: optsFunc(
-				WithPolicyString(yamlPolicy)),
+				WithTrafficPolicy(yamlPolicy)),
 			expectOpts: func(t *testing.T, opts *O) {
 				actual := getPolicies(opts)
 				require.NotEmpty(t, actual)
