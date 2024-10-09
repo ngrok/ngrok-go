@@ -1,8 +1,13 @@
 ## 1.11.0
 
+Enhancements:
+
+- Adds `WithAllowsPooling` option
+- Adds `WithURL` option
+
 Changes:
 
-- Adds `WithTrafficPolicy` function, replacing `WithPolicyString`
+- Replaces `WithPolicyString` option with `WithTrafficPolicy`
 
 ## 1.10.0
 
