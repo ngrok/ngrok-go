@@ -1,8 +1,14 @@
 ## 1.11.0
 
+Enhancements:
+
+- Adds `WithAllowsPooling` option, allowing the endpoint to pool with other endpoints with the same host/port/binding
+- Adds `WithURL` option, specifying a URL for the endpoint
+- Adds `WithTrafficPolicy` option, applying Traffic Policy to the endpoint
+
 Changes:
 
-- Adds `WithTrafficPolicy` function, replacing `WithPolicyString`
+- Deprecates `WithPolicyString` in favor of `WithTrafficPolicy`
 
 ## 1.10.0
 
