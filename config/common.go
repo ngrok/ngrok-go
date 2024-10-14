@@ -17,6 +17,9 @@ type commonOpts struct {
 	// user supplied description of the endpoint
 	Description string
 
+	// user supplied name for the endpoint
+	Name string
+
 	// If not set, defaults to a URI in the format `app://hostname/path/to/executable?pid=12345`
 	ForwardsTo string
 

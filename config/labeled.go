@@ -66,6 +66,7 @@ func (cfg *labeledOptions) WithForwardsTo(url *url.URL) {
 
 func (cfg labeledOptions) Extra() proto.BindExtra {
 	return proto.BindExtra{
+		Name:        cfg.Name,
 		Metadata:    cfg.Metadata,
 		Description: cfg.Description,
 	}
