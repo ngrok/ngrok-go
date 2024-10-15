@@ -221,6 +221,7 @@ type Bind struct {
 }
 
 type BindExtra struct {
+	Name          string
 	Token         string
 	IPPolicyRef   string
 	Metadata      string

@@ -99,6 +99,7 @@ func (cfg *tlsOptions) WithForwardsTo(url *url.URL) {
 
 func (cfg tlsOptions) Extra() proto.BindExtra {
 	return proto.BindExtra{
+		Name:          cfg.Name,
 		Metadata:      cfg.Metadata,
 		Description:   cfg.Description,
 		Bindings:      cfg.Bindings,
