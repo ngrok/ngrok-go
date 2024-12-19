@@ -1,3 +1,9 @@
+## 1.12.0
+
+Enhancements:
+
+- Adds `agent.ConnRequest` and `agent.ConnResponse` for communicating custom TCP proto headers with the ngrok edge
+
 ## 1.11.0
 
 Enhancements:
@@ -17,7 +23,7 @@ Enhancements:
 - Adds fasthttp example
 - Adds `WithBindings` option
 - Adds support for `TrafficPolicy` field
- 
+
 Changes:
 
 - Replace log adapter module license symlinks with full files
