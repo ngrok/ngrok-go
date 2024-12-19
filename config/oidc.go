@@ -1,7 +1,7 @@
 package config
 
 import (
-	"golang.ngrok.com/ngrok/internal/pb"
+	"golang.ngrok.com/ngrok/internal/mw"
 	"golang.ngrok.com/ngrok/internal/tunnel/proto"
 )
 
@@ -16,12 +16,12 @@ type oidcOptions struct {
 	Scopes       []string
 }
 
-func (oidc *oidcOptions) toProtoConfig() *pb.MiddlewareConfiguration_OIDC {
+func (oidc *oidcOptions) toProtoConfig() *mw.MiddlewareConfiguration_OIDC {
 	if oidc == nil {
 		return nil
 	}
 
-	return &pb.MiddlewareConfiguration_OIDC{
+	return &mw.MiddlewareConfiguration_OIDC{
 		IssuerUrl:    oidc.IssuerURL,
 		ClientId:     oidc.ClientID,
 		ClientSecret: oidc.ClientSecret.PlainText(),

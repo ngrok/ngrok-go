@@ -1,7 +1,7 @@
 package config
 
 import (
-	"golang.ngrok.com/ngrok/internal/pb"
+	"golang.ngrok.com/ngrok/internal/mw"
 )
 
 // UserAgentFilter is a pair of strings slices that allow/deny traffic to an endpoint
@@ -62,11 +62,11 @@ func WithDenyUserAgent(deny ...string) HTTPEndpointOption {
 	}
 }
 
-func (b *userAgentFilter) toProtoConfig() *pb.MiddlewareConfiguration_UserAgentFilter {
+func (b *userAgentFilter) toProtoConfig() *mw.MiddlewareConfiguration_UserAgentFilter {
 	if b == nil {
 		return nil
 	}
-	return &pb.MiddlewareConfiguration_UserAgentFilter{
+	return &mw.MiddlewareConfiguration_UserAgentFilter{
 		Allow: b.Allow,
 		Deny:  b.Deny,
 	}

@@ -4,7 +4,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 
-	"golang.ngrok.com/ngrok/internal/pb"
+	"golang.ngrok.com/ngrok/internal/mw"
 )
 
 type mutualTLSEndpointOption []*x509.Certificate
@@ -30,11 +30,11 @@ func (opt mutualTLSEndpointOption) ApplyTLS(opts *tlsOptions) {
 	opts.MutualTLSCA = append(opts.MutualTLSCA, opt...)
 }
 
-func (cfg mutualTLSEndpointOption) toProtoConfig() *pb.MiddlewareConfiguration_MutualTLS {
+func (cfg mutualTLSEndpointOption) toProtoConfig() *mw.MiddlewareConfiguration_MutualTLS {
 	if cfg == nil {
 		return nil
 	}
-	opts := &pb.MiddlewareConfiguration_MutualTLS{}
+	opts := &mw.MiddlewareConfiguration_MutualTLS{}
 	for _, cert := range cfg {
 		opts.MutualTlsCa = append(opts.MutualTlsCa, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})...)
 	}

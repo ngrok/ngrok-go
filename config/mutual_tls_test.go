@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"golang.ngrok.com/ngrok/internal/pb"
+	"golang.ngrok.com/ngrok/internal/mw"
 	"golang.ngrok.com/ngrok/internal/tunnel/proto"
 
 	_ "embed"
@@ -18,7 +18,7 @@ var ngrokCA []byte
 
 func testMutualTLS[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 	makeOpts func(...OT) Tunnel,
-	getMTLS func(*O) *pb.MiddlewareConfiguration_MutualTLS,
+	getMTLS func(*O) *mw.MiddlewareConfiguration_MutualTLS,
 ) {
 	optsFunc := func(opts ...any) Tunnel {
 		return makeOpts(assertSlice[OT](opts)...)
@@ -54,10 +54,10 @@ func testMutualTLS[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 }
 
 func TestMutualTLS(t *testing.T) {
-	testMutualTLS[*httpOptions](t, HTTPEndpoint, func(opts *proto.HTTPEndpoint) *pb.MiddlewareConfiguration_MutualTLS {
+	testMutualTLS[*httpOptions](t, HTTPEndpoint, func(opts *proto.HTTPEndpoint) *mw.MiddlewareConfiguration_MutualTLS {
 		return opts.MutualTLSCA
 	})
-	testMutualTLS[*tlsOptions](t, TLSEndpoint, func(opts *proto.TLSEndpoint) *pb.MiddlewareConfiguration_MutualTLS {
+	testMutualTLS[*tlsOptions](t, TLSEndpoint, func(opts *proto.TLSEndpoint) *mw.MiddlewareConfiguration_MutualTLS {
 		return opts.MutualTLSAtEdge
 	})
 }

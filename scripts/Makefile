@@ -22,4 +22,5 @@ docs:
 
 .PHONY: gen-proto
 gen-proto:
-	protoc --go_out=. --go_opt=module=golang.ngrok.com/ngrok ./internal/pb/middleware.proto
+	protoc --go_out=. --go_opt=module=golang.ngrok.com/ngrok ./proto/middleware.proto
+	protoc --go_out=. --go_opt=module=golang.ngrok.com/ngrok ./proto/conn_header.proto

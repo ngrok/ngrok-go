@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"golang.ngrok.com/ngrok/internal/pb"
+	"golang.ngrok.com/ngrok/internal/mw"
 	"golang.ngrok.com/ngrok/internal/tunnel/proto"
 )
 
@@ -17,7 +17,7 @@ func TestBasicAuth(t *testing.T) {
 			expectOpts: func(t *testing.T, opts *proto.HTTPEndpoint) {
 				require.NotNil(t, opts.BasicAuth)
 				require.Len(t, opts.BasicAuth.Credentials, 1)
-				require.Contains(t, opts.BasicAuth.Credentials, &pb.MiddlewareConfiguration_BasicAuthCredential{
+				require.Contains(t, opts.BasicAuth.Credentials, &mw.MiddlewareConfiguration_BasicAuthCredential{
 					Username:          "foo",
 					CleartextPassword: "bar",
 				})
@@ -32,11 +32,11 @@ func TestBasicAuth(t *testing.T) {
 			expectOpts: func(t *testing.T, opts *proto.HTTPEndpoint) {
 				require.NotNil(t, opts.BasicAuth)
 				require.Len(t, opts.BasicAuth.Credentials, 2)
-				require.Contains(t, opts.BasicAuth.Credentials, &pb.MiddlewareConfiguration_BasicAuthCredential{
+				require.Contains(t, opts.BasicAuth.Credentials, &mw.MiddlewareConfiguration_BasicAuthCredential{
 					Username:          "foo",
 					CleartextPassword: "bar",
 				})
-				require.Contains(t, opts.BasicAuth.Credentials, &pb.MiddlewareConfiguration_BasicAuthCredential{
+				require.Contains(t, opts.BasicAuth.Credentials, &mw.MiddlewareConfiguration_BasicAuthCredential{
 					Username:          "spam",
 					CleartextPassword: "eggs",
 				})

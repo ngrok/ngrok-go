@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"golang.ngrok.com/ngrok/internal/pb"
+	"golang.ngrok.com/ngrok/internal/mw"
 	"golang.ngrok.com/ngrok/internal/tunnel/proto"
 )
 
@@ -20,7 +20,7 @@ func mustParseCIDR(cidr string) *net.IPNet {
 
 func testCIDRRestrictions[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 	makeOpts func(...OT) Tunnel,
-	getRestrictions func(*O) *pb.MiddlewareConfiguration_IPRestriction,
+	getRestrictions func(*O) *mw.MiddlewareConfiguration_IPRestriction,
 ) {
 	optsFunc := func(opts ...any) Tunnel {
 		return makeOpts(assertSlice[OT](opts)...)
@@ -123,15 +123,15 @@ func testCIDRRestrictions[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 
 func TestCIDRRestrictions(t *testing.T) {
 	testCIDRRestrictions[*httpOptions](t, HTTPEndpoint,
-		func(h *proto.HTTPEndpoint) *pb.MiddlewareConfiguration_IPRestriction {
+		func(h *proto.HTTPEndpoint) *mw.MiddlewareConfiguration_IPRestriction {
 			return h.IPRestriction
 		})
 	testCIDRRestrictions[*tcpOptions](t, TCPEndpoint,
-		func(h *proto.TCPEndpoint) *pb.MiddlewareConfiguration_IPRestriction {
+		func(h *proto.TCPEndpoint) *mw.MiddlewareConfiguration_IPRestriction {
 			return h.IPRestriction
 		})
 	testCIDRRestrictions[*tlsOptions](t, TLSEndpoint,
-		func(h *proto.TLSEndpoint) *pb.MiddlewareConfiguration_IPRestriction {
+		func(h *proto.TLSEndpoint) *mw.MiddlewareConfiguration_IPRestriction {
 			return h.IPRestriction
 		})
 }

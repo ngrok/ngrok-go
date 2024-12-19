@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package agent;
+
+option go_package = "golang.ngrok.com/ngrok/agent/";
+
+message ConnRequest {
+  string host = 1;
+  int64 port = 2;
+}
+
+message ConnResponse {
+  // only set on success
+  string endpoint_id = 1;
+  string proto = 2;
+
+  // only set on error
+  string error_code = 3;
+  string error_message = 4;
+}

@@ -1,7 +1,7 @@
 package config
 
 import (
-	"golang.ngrok.com/ngrok/internal/pb"
+	"golang.ngrok.com/ngrok/internal/mw"
 	"golang.ngrok.com/ngrok/internal/tunnel/proto"
 )
 
@@ -65,12 +65,12 @@ func WithOAuthScope(scope ...string) OAuthOption {
 	}
 }
 
-func (oauth *oauthOptions) toProtoConfig() *pb.MiddlewareConfiguration_OAuth {
+func (oauth *oauthOptions) toProtoConfig() *mw.MiddlewareConfiguration_OAuth {
 	if oauth == nil {
 		return nil
 	}
 
-	return &pb.MiddlewareConfiguration_OAuth{
+	return &mw.MiddlewareConfiguration_OAuth{
 		Provider:     string(oauth.Provider),
 		ClientId:     oauth.ClientID,
 		ClientSecret: oauth.ClientSecret.PlainText(),

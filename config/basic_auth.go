@@ -1,6 +1,6 @@
 package config
 
-import "golang.ngrok.com/ngrok/internal/pb"
+import "golang.ngrok.com/ngrok/internal/mw"
 
 // BasicAuth is a set of credentials for basic authentication.
 type basicAuth struct {
@@ -11,8 +11,8 @@ type basicAuth struct {
 	Password string
 }
 
-func (ba basicAuth) toProtoConfig() *pb.MiddlewareConfiguration_BasicAuthCredential {
-	return &pb.MiddlewareConfiguration_BasicAuthCredential{
+func (ba basicAuth) toProtoConfig() *mw.MiddlewareConfiguration_BasicAuthCredential {
+	return &mw.MiddlewareConfiguration_BasicAuthCredential{
 		CleartextPassword: ba.Password,
 		Username:          ba.Username,
 	}

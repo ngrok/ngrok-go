@@ -1,7 +1,7 @@
 package config
 
 import (
-	"golang.ngrok.com/ngrok/internal/pb"
+	"golang.ngrok.com/ngrok/internal/mw"
 	"golang.ngrok.com/ngrok/internal/tunnel/proto"
 )
 
@@ -13,11 +13,11 @@ type webhookVerification struct {
 	Secret proto.ObfuscatedString
 }
 
-func (wv *webhookVerification) toProtoConfig() *pb.MiddlewareConfiguration_WebhookVerification {
+func (wv *webhookVerification) toProtoConfig() *mw.MiddlewareConfiguration_WebhookVerification {
 	if wv == nil {
 		return nil
 	}
-	return &pb.MiddlewareConfiguration_WebhookVerification{
+	return &mw.MiddlewareConfiguration_WebhookVerification{
 		Provider: wv.Provider,
 		Secret:   wv.Secret.PlainText(),
 	}

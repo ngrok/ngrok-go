@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"golang.ngrok.com/ngrok/internal/pb"
+	"golang.ngrok.com/ngrok/internal/mw"
 )
 
 // HTTP Headers to modify at the ngrok edge.
@@ -15,12 +15,12 @@ type headers struct {
 	Removed []string
 }
 
-func (h *headers) toProtoConfig() *pb.MiddlewareConfiguration_Headers {
+func (h *headers) toProtoConfig() *mw.MiddlewareConfiguration_Headers {
 	if h == nil {
 		return nil
 	}
 
-	headers := &pb.MiddlewareConfiguration_Headers{
+	headers := &mw.MiddlewareConfiguration_Headers{
 		Remove: h.Removed,
 	}
 

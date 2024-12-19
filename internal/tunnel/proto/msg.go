@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"golang.ngrok.com/muxado/v2"
-	"golang.ngrok.com/ngrok/internal/pb"
+	"golang.ngrok.com/ngrok/internal/mw"
 )
 
 type ReqType muxado.StreamType
@@ -295,19 +295,19 @@ type HTTPEndpoint struct {
 	ProxyProto
 
 	// middleware
-	Compression           *pb.MiddlewareConfiguration_Compression
-	CircuitBreaker        *pb.MiddlewareConfiguration_CircuitBreaker
-	IPRestriction         *pb.MiddlewareConfiguration_IPRestriction
-	BasicAuth             *pb.MiddlewareConfiguration_BasicAuth
-	OAuth                 *pb.MiddlewareConfiguration_OAuth
-	OIDC                  *pb.MiddlewareConfiguration_OIDC
-	WebhookVerification   *pb.MiddlewareConfiguration_WebhookVerification
-	MutualTLSCA           *pb.MiddlewareConfiguration_MutualTLS
-	RequestHeaders        *pb.MiddlewareConfiguration_Headers
-	ResponseHeaders       *pb.MiddlewareConfiguration_Headers
-	WebsocketTCPConverter *pb.MiddlewareConfiguration_WebsocketTCPConverter
-	UserAgentFilter       *pb.MiddlewareConfiguration_UserAgentFilter
-	Policy                *pb.MiddlewareConfiguration_Policy
+	Compression           *mw.MiddlewareConfiguration_Compression
+	CircuitBreaker        *mw.MiddlewareConfiguration_CircuitBreaker
+	IPRestriction         *mw.MiddlewareConfiguration_IPRestriction
+	BasicAuth             *mw.MiddlewareConfiguration_BasicAuth
+	OAuth                 *mw.MiddlewareConfiguration_OAuth
+	OIDC                  *mw.MiddlewareConfiguration_OIDC
+	WebhookVerification   *mw.MiddlewareConfiguration_WebhookVerification
+	MutualTLSCA           *mw.MiddlewareConfiguration_MutualTLS
+	RequestHeaders        *mw.MiddlewareConfiguration_Headers
+	ResponseHeaders       *mw.MiddlewareConfiguration_Headers
+	WebsocketTCPConverter *mw.MiddlewareConfiguration_WebsocketTCPConverter
+	UserAgentFilter       *mw.MiddlewareConfiguration_UserAgentFilter
+	Policy                *mw.MiddlewareConfiguration_Policy
 	TrafficPolicy         string
 }
 
@@ -317,8 +317,8 @@ type TCPEndpoint struct {
 	ProxyProto
 
 	// middleware
-	IPRestriction *pb.MiddlewareConfiguration_IPRestriction
-	Policy        *pb.MiddlewareConfiguration_Policy
+	IPRestriction *mw.MiddlewareConfiguration_IPRestriction
+	Policy        *mw.MiddlewareConfiguration_Policy
 	TrafficPolicy string
 }
 
@@ -331,10 +331,10 @@ type TLSEndpoint struct {
 	MutualTLSAtAgent bool
 
 	// edge termination options
-	MutualTLSAtEdge *pb.MiddlewareConfiguration_MutualTLS
-	TLSTermination  *pb.MiddlewareConfiguration_TLSTermination
-	IPRestriction   *pb.MiddlewareConfiguration_IPRestriction
-	Policy          *pb.MiddlewareConfiguration_Policy
+	MutualTLSAtEdge *mw.MiddlewareConfiguration_MutualTLS
+	TLSTermination  *mw.MiddlewareConfiguration_TLSTermination
+	IPRestriction   *mw.MiddlewareConfiguration_IPRestriction
+	Policy          *mw.MiddlewareConfiguration_Policy
 	TrafficPolicy   string
 }
 

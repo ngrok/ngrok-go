@@ -5,13 +5,13 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"golang.ngrok.com/ngrok/internal/pb"
+	"golang.ngrok.com/ngrok/internal/mw"
 	"golang.ngrok.com/ngrok/internal/tunnel/proto"
 )
 
 func testUserAgentFilter[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 	makeOpts func(...OT) Tunnel,
-	getUserAgentFilter func(*O) *pb.MiddlewareConfiguration_UserAgentFilter,
+	getUserAgentFilter func(*O) *mw.MiddlewareConfiguration_UserAgentFilter,
 ) {
 	optsFunc := func(opts ...any) Tunnel {
 		return makeOpts(assertSlice[OT](opts)...)
@@ -85,7 +85,7 @@ func testUserAgentFilter[T tunnelConfigPrivate, O any, OT any](t *testing.T,
 
 func TestUserAgentFilter(t *testing.T) {
 	testUserAgentFilter[*httpOptions](t, HTTPEndpoint,
-		func(h *proto.HTTPEndpoint) *pb.MiddlewareConfiguration_UserAgentFilter {
+		func(h *proto.HTTPEndpoint) *mw.MiddlewareConfiguration_UserAgentFilter {
 			return h.UserAgentFilter
 		})
 }
