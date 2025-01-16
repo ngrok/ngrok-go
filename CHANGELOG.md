@@ -1,3 +1,10 @@
+## 1.12.0
+
+Breaking changes:
+
+- Renames pre-release option `WithAllowsPooling` to `WithPoolingEnabled`
+- 
+
 ## 1.11.0
 
 Enhancements:
