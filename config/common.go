@@ -38,7 +38,7 @@ type commonOpts struct {
 	Bindings []string
 
 	// Allows the endpoint to pool with other endpoints with the same host/port/binding
-	AllowsPooling bool
+	PoolingEnabled bool
 }
 
 type CommonOptionsFunc func(cfg *commonOpts)
