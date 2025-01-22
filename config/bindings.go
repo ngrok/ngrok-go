@@ -1,6 +1,6 @@
 package config
 
-type bindings string
+type binding string
 
 // WithBinding configures ingress for an endpoint
 //
@@ -10,17 +10,17 @@ func WithBinding(requestedBinding string) interface {
 	TLSEndpointOption
 	TCPEndpointOption
 } {
-	return bindings(requestedBinding)
+	return binding(requestedBinding)
 }
 
-func (b bindings) ApplyTLS(cfg *tlsOptions) {
+func (b binding) ApplyTLS(cfg *tlsOptions) {
 	cfg.Binding = string(b)
 }
 
-func (b bindings) ApplyTCP(cfg *tcpOptions) {
+func (b binding) ApplyTCP(cfg *tcpOptions) {
 	cfg.Binding = string(b)
 }
 
-func (b bindings) ApplyHTTP(cfg *httpOptions) {
+func (b binding) ApplyHTTP(cfg *httpOptions) {
 	cfg.Binding = string(b)
 }
