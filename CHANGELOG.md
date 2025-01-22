@@ -3,6 +3,7 @@
 Breaking changes:
 
 - Renames pre-release option `WithBindings` to `WithBinding`
+
 ## 1.12.0
 
 Breaking changes:
