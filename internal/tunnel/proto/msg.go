@@ -226,7 +226,7 @@ type BindExtra struct {
 	IPPolicyRef    string
 	Metadata       string
 	Description    string
-	Bindings       []string
+	Binding        string
 	PoolingEnabled bool
 }
 

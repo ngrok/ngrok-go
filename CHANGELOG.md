@@ -1,9 +1,14 @@
+## 1.13.0
+
+Breaking changes:
+
+- Renames pre-release option `WithBindings` to `WithBinding`
+
 ## 1.12.0
 
 Breaking changes:
 
 - Renames pre-release option `WithAllowsPooling` to `WithPoolingEnabled`
-- 
 
 ## 1.11.0
 
@@ -24,7 +29,7 @@ Enhancements:
 - Adds fasthttp example
 - Adds `WithBindings` option
 - Adds support for `TrafficPolicy` field
- 
+
 Changes:
 
 - Replace log adapter module license symlinks with full files
