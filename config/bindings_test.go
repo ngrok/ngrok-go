@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-func testBindings[T tunnelConfigPrivate, OT any](t *testing.T,
+func testBinding[T tunnelConfigPrivate, OT any](t *testing.T,
 	makeOpts func(...OT) Tunnel,
 ) {
 	optsFunc := func(opts ...any) Tunnel {
@@ -16,21 +16,21 @@ func testBindings[T tunnelConfigPrivate, OT any](t *testing.T,
 			name: "absent",
 			opts: optsFunc(),
 			expectExtra: &matchBindExtra{
-				Bindings: ptr([]string{}),
+				Binding: ptr(""),
 			},
 		},
 		{
 			name: "with bindings",
-			opts: optsFunc(WithBindings("public")),
+			opts: optsFunc(WithBinding("public")),
 			expectExtra: &matchBindExtra{
-				Bindings: ptr([]string{"public"}),
+				Binding: ptr("public"),
 			},
 		},
 		{
-			name: "with bindings with spread op",
-			opts: optsFunc(WithBindings([]string{"public"}...)),
+			name: "with bindings",
+			opts: optsFunc(WithBinding("internal")),
 			expectExtra: &matchBindExtra{
-				Bindings: ptr([]string{"public"}),
+				Binding: ptr("internal"),
 			},
 		},
 	}
@@ -38,8 +38,8 @@ func testBindings[T tunnelConfigPrivate, OT any](t *testing.T,
 	cases.runAll(t)
 }
 
-func TestBindings(t *testing.T) {
-	testBindings[*httpOptions](t, HTTPEndpoint)
-	testBindings[*tlsOptions](t, TLSEndpoint)
-	testBindings[*tcpOptions](t, TCPEndpoint)
+func TestBinding(t *testing.T) {
+	testBinding[*httpOptions](t, HTTPEndpoint)
+	testBinding[*tlsOptions](t, TLSEndpoint)
+	testBinding[*tcpOptions](t, TCPEndpoint)
 }

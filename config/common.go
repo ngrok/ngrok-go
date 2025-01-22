@@ -35,7 +35,7 @@ type commonOpts struct {
 	TrafficPolicy string
 
 	// Enables ingress for ngrok endpoints.
-	Bindings []string
+	Binding string
 
 	// Allows the endpoint to pool with other endpoints with the same host/port/binding
 	PoolingEnabled bool
