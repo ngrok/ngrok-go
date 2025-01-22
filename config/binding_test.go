@@ -20,14 +20,14 @@ func testBinding[T tunnelConfigPrivate, OT any](t *testing.T,
 			},
 		},
 		{
-			name: "with bindings",
+			name: "with public bindings",
 			opts: optsFunc(WithBinding("public")),
 			expectExtra: &matchBindExtra{
 				Binding: ptr("public"),
 			},
 		},
 		{
-			name: "with bindings",
+			name: "with internal bindings",
 			opts: optsFunc(WithBinding("internal")),
 			expectExtra: &matchBindExtra{
 				Binding: ptr("internal"),
