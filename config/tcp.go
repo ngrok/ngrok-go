@@ -74,7 +74,7 @@ func (cfg tcpOptions) Extra() proto.BindExtra {
 		Name:           cfg.Name,
 		Metadata:       cfg.Metadata,
 		Description:    cfg.Description,
-		Binding:        cfg.Binding,
+		Bindings:       cfg.Bindings,
 		PoolingEnabled: cfg.PoolingEnabled,
 	}
 }
