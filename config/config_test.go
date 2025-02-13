@@ -27,7 +27,7 @@ type matchBindExtra struct {
 	Token       *string
 	IPPolicyRef *string
 	Metadata    *string
-	Binding     *string
+	Bindings    *[]string
 }
 
 func (m matchBindExtra) RequireMatches(t *testing.T, actual proto.BindExtra) {
