@@ -269,7 +269,7 @@ func WithAuthtokenFromEnv() ConnectOption {
 //
 // See the [region parameter in the ngrok docs] for additional details.
 //
-// [full list of ngrok regions]: https://ngrok.com/docs/platform/pops
+// [full list of ngrok regions]: https://ngrok.com/docs/network-edge/#points-of-presence
 // [region parameter in the ngrok docs]: https://ngrok.com/docs/ngrok-agent/config#region
 func WithRegion(region string) ConnectOption {
 	return func(cfg *connectConfig) {
