@@ -1,3 +1,9 @@
+## 1.12.1
+
+Fixes:
+
+- Fix reported version of the ngrok-go sdk.
+
 ## 1.12.0
 
 Breaking changes:
