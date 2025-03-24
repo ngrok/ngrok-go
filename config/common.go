@@ -10,6 +10,16 @@ type commonOpts struct {
 	Metadata string
 	// Tunnel backend metadata. Viewable via the dashboard and API, but has no
 	// bearing on tunnel behavior.
+
+	// The URL to request for this endpoint
+	URL string
+
+	// user supplied description of the endpoint
+	Description string
+
+	// user supplied name for the endpoint
+	Name string
+
 	// If not set, defaults to a URI in the format `app://hostname/path/to/executable?pid=12345`
 	ForwardsTo string
 
@@ -26,6 +36,9 @@ type commonOpts struct {
 
 	// Enables ingress for ngrok endpoints.
 	Bindings []string
+
+	// Allows the endpoint to pool with other endpoints with the same host/port/binding
+	PoolingEnabled bool
 }
 
 type CommonOptionsFunc func(cfg *commonOpts)

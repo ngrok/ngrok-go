@@ -32,6 +32,7 @@ func TCPEndpoint(opts ...TCPEndpointOption) Tunnel {
 type tcpOptions struct {
 	// Common tunnel configuration options.
 	commonOpts
+
 	// The TCP address to request for this edge.
 	RemoteAddr string
 	// An HTTP Server to run traffic on
@@ -48,6 +49,7 @@ func WithRemoteAddr(addr string) TCPEndpointOption {
 
 func (cfg *tcpOptions) toProtoConfig() *proto.TCPEndpoint {
 	return &proto.TCPEndpoint{
+		URL:           cfg.URL,
 		Addr:          cfg.RemoteAddr,
 		IPRestriction: cfg.commonOpts.CIDRRestrictions.toProtoConfig(),
 		ProxyProto:    proto.ProxyProto(cfg.commonOpts.ProxyProto),
@@ -69,8 +71,11 @@ func (cfg *tcpOptions) WithForwardsTo(url *url.URL) {
 
 func (cfg tcpOptions) Extra() proto.BindExtra {
 	return proto.BindExtra{
-		Metadata: cfg.Metadata,
-		Bindings: cfg.Bindings,
+		Name:           cfg.Name,
+		Metadata:       cfg.Metadata,
+		Description:    cfg.Description,
+		Bindings:       cfg.Bindings,
+		PoolingEnabled: cfg.PoolingEnabled,
 	}
 }
 

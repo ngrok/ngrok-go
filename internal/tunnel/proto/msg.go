@@ -221,10 +221,13 @@ type Bind struct {
 }
 
 type BindExtra struct {
-	Token       string
-	IPPolicyRef string
-	Metadata    string
-	Bindings    []string
+	Name           string
+	Token          string
+	IPPolicyRef    string
+	Metadata       string
+	Description    string
+	Bindings       []string
+	PoolingEnabled bool
 }
 
 // The server responds with a BindResp message to notify the client of the
@@ -282,6 +285,7 @@ func ParseProxyProto(proxyProto string) (ProxyProto, bool) {
 }
 
 type HTTPEndpoint struct {
+	URL               string
 	Domain            string
 	Hostname          string // public hostname of the bind
 	Subdomain         string
@@ -308,6 +312,7 @@ type HTTPEndpoint struct {
 }
 
 type TCPEndpoint struct {
+	URL  string
 	Addr string
 	ProxyProto
 
@@ -318,6 +323,7 @@ type TCPEndpoint struct {
 }
 
 type TLSEndpoint struct {
+	URL       string
 	Domain    string
 	Hostname  string // public hostname of the bind
 	Subdomain string

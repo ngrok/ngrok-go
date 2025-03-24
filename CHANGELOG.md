@@ -1,3 +1,28 @@
+## 1.12.1
+
+Fixes:
+
+- Fix reported version of the ngrok-go sdk.
+
+## 1.12.0
+
+Breaking changes:
+
+- Renames pre-release option `WithAllowsPooling` to `WithPoolingEnabled`
+- 
+
+## 1.11.0
+
+Enhancements:
+
+- Adds `WithAllowsPooling` option, allowing the endpoint to pool with other endpoints with the same host/port/binding
+- Adds `WithURL` option, specifying a URL for the endpoint
+- Adds `WithTrafficPolicy` option, applying Traffic Policy to the endpoint
+
+Changes:
+
+- Deprecates `WithPolicyString` in favor of `WithTrafficPolicy`
+
 ## 1.10.0
 
 Enhancements:

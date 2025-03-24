@@ -13,11 +13,17 @@ jobs:
       NGROK_TEST_FLAKEY: 1
       NGROK_AUTHTOKEN: ${{ secrets.NGROK_AUTHTOKEN }}
     steps:
-    - uses: actions/checkout@v3
-    - uses: cachix/install-nix-action@v18
+    - uses: actions/checkout@v4
+    - uses: cachix/install-nix-action@v27
     - uses: HatsuneMiku3939/direnv-action@v1
     - name: direnv allow
       run: direnv allow .
+    - name: go mod tidy
+      run: direnv exec . go mod tidy
+    - name: exit if not tidy
+      run: |
+        git diff --exit-code go.mod
+        git diff --exit-code go.sum
     - name: Build
       run: direnv exec . go build -v ./...
     - name: Build Examples
