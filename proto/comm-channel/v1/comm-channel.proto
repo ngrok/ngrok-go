@@ -1,0 +1,210 @@
+syntax = "proto3";
+
+package sync_bridge;
+
+import "google/protobuf/duration.proto";
+
+// Allows bidirectional communication between clients and the ngrok platform. Usef 
+service CommChannelService {
+  rpc Stream(stream SignedClientMessage) returns (stream SignedServerMessage);
+}
+
+
+// =======================================================
+// Client Messages
+// =======================================================
+
+// Signed message from the client
+//
+// next-free-field: 3
+message SignedClientMessage {
+  bytes payload = 1;      // Deterministic serialization of ClientMessage
+  bytes signature = 2;    // Signature using client's private key
+}
+
+// Canonical payload (to be signed) from the client.
+//
+// next-free-field: 2
+message ClientMessage {
+  oneof kind {
+    K8sOperatorTelemetry k8s_operator_telemetry = 1;
+  }
+}
+
+// Telemetry report from the k8s operator
+//
+// next-free-field: 19
+message K8sOperatorTelemetry {
+  string region = 1;
+  string server_addr = 2;
+  string api_url = 3;
+  string ingress_watch_namespace = 4;
+  string cluster_domain = 5;
+  bool one_click_demo_mode = 6;
+  // next-free-field: 4
+  message BuildInfo {
+    string version = 1;
+    string git_commit = 2;
+    string go_version = 3;
+  }
+  BuildInfo build_info = 7;
+  // next-free-field: 6
+  message BindingsFeature {
+    bool enabled = 1;
+    repeated string endpoint_selectors = 2;
+    string service_annotations = 3;
+    string service_labels = 4;
+    string ingress_endpoint = 5;
+  }
+  BindingsFeature bindings_feature = 8;
+  // next-free-field: 6
+  message GatewayAPIFeature {
+    bool enabled = 1;
+    bool crds_installed = 2;
+    bool disable_gateway_reference_grants = 3;
+    bool tls_route_crd_installed = 4;
+    bool tcp_route_crd_installed = 5;
+  }
+  GatewayAPIFeature gateway_api_feature = 9;
+  // next-free-field: 2
+  message IngressFeature {
+    bool enabled = 1;
+  }
+  IngressFeature ingress_feature = 10;
+  // next-free-field: 7
+  message IngressSummary {
+    string name = 1;
+    string namespace = 2;
+    optional string traffic_policy_annotation = 3;
+    repeated string bindings_annotation = 4;
+    optional bool pooling_annotation = 5;
+    optional string mapping_strategy_annotation = 6;
+  }
+  repeated IngressSummary ingresses = 11;
+  // next-free-field: 7
+  message GatewaySummary {
+    string name = 1;
+    string namespace = 2;
+    optional string traffic_policy_annotation = 3;
+    repeated string bindings_annotation = 4;
+    optional bool pooling_annotation = 5;
+    optional string mapping_strategy_annotation = 6;
+  }
+  repeated GatewaySummary gateways = 12;
+  // next-free-field: 3
+  message HTTPRouteSummary {
+    string name = 1;
+    string namespace = 2;
+  }
+  repeated HTTPRouteSummary http_routes = 13;
+  // next-free-field: 3
+  message TCPRouteSummary {
+    string name = 1;
+    string namespace = 2;
+  }
+  repeated TCPRouteSummary tcp_routes = 14;
+  // next-free-field: 3
+  message TLSRouteSummary {
+    string name = 1;
+    string namespace = 2;
+  }
+  repeated TLSRouteSummary tls_routes = 15;
+  // next-free-field: 4
+  message TranslatedFromResource {
+    string kind = 1;
+    string name = 2;
+    string namespace = 3;
+  }
+  // next-free-field: 6
+  message AgentEndpointSummary {
+    string name = 1;
+    string namespace = 2;
+    repeated TranslatedFromResource translated_from_resources = 3;
+    repeated string bindings = 4;
+    enum TrafficPolicyKind {
+      NONE = 0;
+      INLINE = 1;
+      TARGET_REF = 2;
+    }
+    TrafficPolicyKind traffic_policy_kind = 5;
+  }
+  repeated AgentEndpointSummary agent_endpoints = 16;
+  // next-free-field: 7
+  message CloudEndpointSummary {
+    string name = 1;
+    string namespace = 2;
+    repeated TranslatedFromResource translated_from_resources = 3;
+    repeated string bindings = 4;
+    bool pooling_enabled = 5;
+    enum TrafficPolicyKind {
+      NONE = 0;
+      INLINE = 1;
+      TARGET_REF = 2;
+    }
+    TrafficPolicyKind traffic_policy_kind = 6;
+  }
+  repeated CloudEndpointSummary cloud_endpoints = 17;
+  // next-free-field: 3
+  message BoundEndpointSummary {
+    string name = 1;
+    // next-free-field: 3
+    message Status {
+      string hashed_name = 1;
+
+      // next-free-field: 3
+      message BindingEndpoint {
+        string id = 1;
+        string status = 2;
+      }
+      repeated BindingEndpoint endpoints = 2;
+    }
+    Status status = 2;
+  }
+  repeated BoundEndpointSummary bound_endpoints = 18;
+}
+
+// =======================================================
+// Server Messages
+// =======================================================
+
+// Signed message from the server
+//
+// next-free-field: 3
+message SignedServerMessage {
+  bytes payload = 1;      // Deterministic serialization of ServerMessage
+  bytes signature = 2;    // Signature using server's private key
+}
+
+// Canonical payload (to be signed) from the server.
+//
+// next-free-field: 2
+message ServerMessage {
+  oneof kind {
+    SetReportingInterval set_reporting_interval = 1;
+  }
+}
+
+// Specifies how often the client should send telemetry data.
+// If zero, telemetry reporting should be disabled.
+//
+// next-free-field: 4
+message SetReportingInterval {
+  google.protobuf.Duration min_interval = 1;
+  google.protobuf.Duration max_interval = 2;
+  ClientMessageKind message_kind = 3;
+}
+
+
+// Other examples of messages the server might want to send
+// StartSending: tell the client to begin/resume sending a specific message type
+// StopSending: tell client to stop sending a specific message type
+// SendNow: tell the client to send a specific message type as a one-off message now
+// Disconnect: tell the client to disconnect from the stream with or without reconnecting afterwards
+
+// Enum for identifying a client message kind
+//
+// next-free-field: 2
+enum ClientMessageKind {
+  TARGET_KIND_UNSPECIFIED = 0; // Default for backward compatibility
+  K8S_OPERATOR_TELEMETRY = 1;
+}

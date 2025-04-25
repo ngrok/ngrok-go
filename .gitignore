@@ -4,3 +4,4 @@
 *.swp
 cover.out
 .idea/*
+tools/bin/*
