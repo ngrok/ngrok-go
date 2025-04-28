@@ -74,7 +74,7 @@ message K8sOperatorTelemetry {
   }
   IngressFeature ingress_feature = 10;
   // next-free-field: 7
-  message RoutingResourceMetadata {
+  message IngressSummary {
     string name = 1;
     string namespace = 2;
     optional string traffic_policy_annotation = 3;
@@ -82,34 +82,57 @@ message K8sOperatorTelemetry {
     optional bool pooling_annotation = 5;
     optional string mapping_strategy_annotation = 6;
   }
-  repeated RoutingResourceMetadata ingresses = 11;
-  repeated RoutingResourceMetadata gateways = 12;
+  repeated IngressSummary ingresses = 11;
+  // next-free-field: 7
+  message GatewaySummary {
+    string name = 1;
+    string namespace = 2;
+    optional string traffic_policy_annotation = 3;
+    repeated string bindings_annotation = 4;
+    optional bool pooling_annotation = 5;
+    optional string mapping_strategy_annotation = 6;
+  }
+  repeated GatewaySummary gateways = 12;
   // next-free-field: 3
-  message HTTPRoute {
+  message HTTPRouteSummary {
     string name = 1;
     string namespace = 2;
   }
-  repeated HTTPRoute http_routes = 13;
+  repeated HTTPRouteSummary http_routes = 13;
   // next-free-field: 3
-  message TCPRoute {
+  message TCPRouteSummary {
     string name = 1;
     string namespace = 2;
   }
-  repeated TCPRoute tcp_routes = 14;
+  repeated TCPRouteSummary tcp_routes = 14;
   // next-free-field: 3
-  message TLSRoute {
+  message TLSRouteSummary {
     string name = 1;
     string namespace = 2;
   }
-  repeated TLSRoute tls_routes = 15;
+  repeated TLSRouteSummary tls_routes = 15;
   // next-free-field: 4
   message TranslatedFromResource {
     string kind = 1;
     string name = 2;
     string namespace = 3;
   }
-  // next-free-field: 9
-  message AgentEndpoint {
+  // next-free-field: 6
+  message AgentEndpointSummary {
+    string name = 1;
+    string namespace = 2;
+    repeated TranslatedFromResource translated_from_resources = 3;
+    repeated string bindings = 4;
+    enum TrafficPolicyKind {
+      NONE = 0;
+      INLINE = 1;
+      TARGET_REF = 2;
+    }
+    TrafficPolicyKind traffic_policy_kind = 5;
+  }
+  repeated AgentEndpointSummary agent_endpoints = 16;
+  // next-free-field: 7
+  message CloudEndpointSummary {
     string name = 1;
     string namespace = 2;
     repeated TranslatedFromResource translated_from_resources = 3;
@@ -121,29 +144,10 @@ message K8sOperatorTelemetry {
       TARGET_REF = 2;
     }
     TrafficPolicyKind traffic_policy_kind = 6;
-    int32 traffic_policy_rules = 7;
-    int32 traffic_policy_actions = 8;
   }
-  repeated AgentEndpoint agent_endpoints = 16;
-  // next-free-field: 9
-  message CloudEndpoint {
-    string name = 1;
-    string namespace = 2;
-    repeated TranslatedFromResource translated_from_resources = 3;
-    repeated string bindings = 4;
-    bool pooling_enabled = 5;
-    enum TrafficPolicyKind {
-      NONE = 0;
-      INLINE = 1;
-      TARGET_REF = 2;
-    }
-    TrafficPolicyKind traffic_policy_kind = 6;
-    int32 traffic_policy_rules = 7;
-    int32 traffic_policy_actions = 8;
-  }
-  repeated CloudEndpoint cloud_endpoints = 17;
+  repeated CloudEndpointSummary cloud_endpoints = 17;
   // next-free-field: 3
-  message BoundEndpoint {
+  message BoundEndpointSummary {
     string name = 1;
     // next-free-field: 3
     message BoundEndpointStatus {
@@ -152,7 +156,7 @@ message K8sOperatorTelemetry {
     }
     repeated BoundEndpointStatus status = 2;
   }
-  repeated BoundEndpoint bound_endpoints = 18;
+  repeated BoundEndpointSummary bound_endpoints = 18;
 }
 
 // =======================================================
@@ -185,6 +189,12 @@ message SetReportingInterval {
   google.protobuf.Duration max_interval = 2;
   ClientMessageKind message_kind = 3;
 }
+
+
+// TODO (alice) message StartSending
+// TODO (alice) message StopSending
+// TODO (alice) message SendNow
+// TODO (alice) message Disconnect
 
 
 // Enum for identifying a client message kind
