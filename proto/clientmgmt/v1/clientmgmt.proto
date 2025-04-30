@@ -1,13 +1,13 @@
 syntax = "proto3";
 
-package clientcomm.v1;
+package clientmgmt.v1;
 
 import "google/protobuf/duration.proto";
 
-option go_package = "golang.ngrok.com/ngrok/pkg/gen/clientcommpb";
+option go_package = "golang.ngrok.com/ngrok/pkg/gen/clientmgmtpb";
 
 // Bidirectional stream between client and server.
-service ClientCommService {
+service ClientMgmtService {
   rpc Stream(stream SignedClientMessage) returns (stream SignedServerMessage);
 }
 
