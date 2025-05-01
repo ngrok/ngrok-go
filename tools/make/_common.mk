@@ -10,24 +10,22 @@ ifndef ignore-not-found
   ignore-not-found = false
 endif
 
-# Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
-ifeq (,$(shell go env GOBIN))
-GOBIN=$(shell go env GOPATH)/bin
-else
-GOBIN=$(shell go env GOBIN)
-endif
-
 ## Location to install dependencies to
-LOCALBIN ?= $(shell pwd)/bin
-$(LOCALBIN):
-	mkdir -p $(LOCALBIN)
-
-## Tool Binaries
-BUF ?= $(LOCALBIN)/buf-$(BUF_VERSION)
-
+TOOLS_BIN_DIR ?= $(shell pwd)/tools/bin
+$(TOOLS_BIN_DIR):
+	mkdir -p $(TOOLS_BIN_DIR)
 
 ## Tool Versions
 BUF_VERSION ?= v1.52.1
+
+## Tool Binaries
+BUF ?= $(TOOLS_BIN_DIR)/buf-$(BUF_VERSION)
+# Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
+ifeq (,$(shell go env GOBIN))
+GOBIN=$(shell go env GOPATH)/${TOOLS_BIN_DIR}
+else
+GOBIN=$(shell go env GOBIN)
+endif
 
 
 # ==============================================

@@ -4,14 +4,14 @@ managed:
   enabled: true
   override:
     - file_option: go_package_prefix
-      value: golang.ngrok.com/ngrok/pkg
+      value: golang.ngrok.com/ngrok/pkg/pb
 plugins:
   - remote: buf.build/protocolbuffers/go:v1.31.0
-    out: pkg/gen
+    out: pkg/pb
     opt:
       - paths=source_relative
   - remote: buf.build/grpc/go:v1.3.0
-    out: pkg/gen
+    out: pkg/pb
     opt:
       - paths=source_relative
 inputs:

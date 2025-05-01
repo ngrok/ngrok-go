@@ -9,7 +9,7 @@ define go-install-tool
 set -e; \
 package=$(2)@$(3) ;\
 echo "Downloading $${package}" ;\
-GOBIN=$(LOCALBIN) go install $${package} ;\
+GOBIN=$(TOOLS_BIN_DIR) go install $${package} ;\
 mv "$$(echo "$(1)" | sed "s/-$(3)$$//")" $(1) ;\
 }
 endef
@@ -17,5 +17,5 @@ endef
 
 .PHONY: buf
 buf: $(BUF) ## Download buf locally if necessary.
-$(BUF): $(LOCALBIN)
+$(BUF): $(TOOLS_BIN_DIR)
 	$(call go-install-tool,$(BUF),github.com/bufbuild/buf/cmd/buf,$(BUF_VERSION))

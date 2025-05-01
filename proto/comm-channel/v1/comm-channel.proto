@@ -1,13 +1,11 @@
 syntax = "proto3";
 
-package clientmgmt.v1;
+package sync_bridge;
 
 import "google/protobuf/duration.proto";
 
-option go_package = "golang.ngrok.com/ngrok/pkg/gen/clientmgmtpb";
-
-// Bidirectional stream between client and server.
-service ClientMgmtService {
+// Allows bidirectional communication between clients and the ngrok platform. Usef 
+service CommChannelService {
   rpc Stream(stream SignedClientMessage) returns (stream SignedServerMessage);
 }
 
@@ -52,7 +50,7 @@ message K8sOperatorTelemetry {
   BuildInfo build_info = 7;
   // next-free-field: 6
   message BindingsFeature {
-    bool enable_feature_bindings = 1;
+    bool enabled = 1;
     repeated string endpoint_selectors = 2;
     string service_annotations = 3;
     string service_labels = 4;
@@ -61,7 +59,7 @@ message K8sOperatorTelemetry {
   BindingsFeature bindings_feature = 8;
   // next-free-field: 6
   message GatewayAPIFeature {
-    bool enable_feature_gateway = 1;
+    bool enabled = 1;
     bool crds_installed = 2;
     bool disable_gateway_reference_grants = 3;
     bool tls_route_crd_installed = 4;
@@ -150,11 +148,17 @@ message K8sOperatorTelemetry {
   message BoundEndpointSummary {
     string name = 1;
     // next-free-field: 3
-    message BoundEndpointStatus {
-      string id = 1;
-      string status = 2;
+    message Status {
+      string hashed_name = 1;
+
+      // next-free-field: 3
+      message BindingEndpoint {
+        string id = 1;
+        string status = 2;
+      }
+      repeated BindingEndpoint endpoints = 2;
     }
-    repeated BoundEndpointStatus status = 2;
+    Status status = 2;
   }
   repeated BoundEndpointSummary bound_endpoints = 18;
 }
@@ -191,11 +195,11 @@ message SetReportingInterval {
 }
 
 
-// TODO (alice) message StartSending
-// TODO (alice) message StopSending
-// TODO (alice) message SendNow
-// TODO (alice) message Disconnect
-
+// Other examples of messages the server might want to send
+// StartSending: tell the client to begin/resume sending a specific message type
+// StopSending: tell client to stop sending a specific message type
+// SendNow: tell the client to send a specific message type as a one-off message now
+// Disconnect: tell the client to disconnect from the stream with or without reconnecting afterwards
 
 // Enum for identifying a client message kind
 //
