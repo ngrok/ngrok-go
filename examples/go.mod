@@ -4,8 +4,8 @@ go 1.21
 
 require (
 	github.com/valyala/fasthttp v1.56.0
-	golang.ngrok.com/ngrok v1.11.0
-	golang.ngrok.com/ngrok/log/slog v0.0.0-20241014162652-57e91a614efd
+	golang.ngrok.com/ngrok/v2 v2.0.0
+	golang.ngrok.com/ngrok/v2/log/slog v0.0.0-20241014162652-57e91a614efd
 )
 
 require (
@@ -22,16 +22,14 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.ngrok.com/muxado/v2 v2.0.1 // indirect
 	golang.org/x/net v0.30.0 // indirect
-	golang.org/x/sync v0.8.0 // indirect
 	golang.org/x/sys v0.26.0 // indirect
 	golang.org/x/term v0.25.0 // indirect
 	google.golang.org/protobuf v1.35.1 // indirect
-	gopkg.in/yaml.v2 v2.4.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
 replace (
-	golang.ngrok.com/ngrok => ../
-	golang.ngrok.com/ngrok/log/log15 => ../log/log15
-	golang.ngrok.com/ngrok/log/slog => ../log/slog
+	golang.ngrok.com/ngrok/v2 => ../
+	golang.ngrok.com/ngrok/v2/log/log15 => ../log/log15
+	golang.ngrok.com/ngrok/v2/log/slog => ../log/slog
+	golang.ngrok.com/ngrok/v2/rpc => ../rpc
 )

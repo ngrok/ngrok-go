@@ -7,8 +7,7 @@ import (
 
 	"github.com/valyala/fasthttp"
 
-	"golang.ngrok.com/ngrok"
-	"golang.ngrok.com/ngrok/config"
+	"golang.ngrok.com/ngrok/v2"
 )
 
 func main() {
@@ -18,14 +17,11 @@ func main() {
 }
 
 func run(ctx context.Context) error {
-	tun, err := ngrok.Listen(ctx,
-		config.HTTPEndpoint(),
-		ngrok.WithAuthtokenFromEnv(),
-	)
+	ln, err := ngrok.Listen(ctx)
 	if err != nil {
 		return err
 	}
-	log.Println("tunnel created:", tun.URL())
+	log.Println("endpoint online", ln.URL())
 
 	var serv fasthttp.Server
 
@@ -33,7 +29,7 @@ func run(ctx context.Context) error {
 		fmt.Fprintf(ctx, "Hello! You're requesting %q", ctx.RequestURI())
 	}
 
-	err = serv.Serve(tun)
+	err = serv.Serve(ln)
 	if err != nil {
 		return err
 	}
