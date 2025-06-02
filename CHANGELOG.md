@@ -1,3 +1,27 @@
+## 2.0.0
+
+This is a breaking-change release that updates ngrok-go to a new, simplified
+API.
+
+Enhancements:
+- Dramatically simplified the API to remove many overlapping options, options
+  that are now deprecated, unnecessary convenience functions, and more.
+- Simplified the API by removing all protocol-specific behaviors (which have
+  all been moved to Traffic Policy).
+- Removed the config package. All of its options are now folded into the
+  top-level package or removed because they were migrated into Traffic Policy.
+- Updates the API to use new ngrok terminology of Agents, Endpoints Upstreams,
+  and Traffic Policy.
+- Removes functionality that is now deprecated (like labeled tunnels).
+- Added support for agent-based TLS termination and Mutual TLS termination.
+- Added support for full TLS control over forwarding to the upstream.
+- Added support for full control over dialing the upstream.
+- Removed a bespoke logging interface in favor of `log/slog`.
+- Removed the prototype policy package that was not well supported.
+- Separated out a concept of an Agent from its Session which were previously
+  co-mingled.
+- Added integration tests.
+
 ## 1.12.1
 
 Fixes:
@@ -9,7 +33,6 @@ Fixes:
 Breaking changes:
 
 - Renames pre-release option `WithAllowsPooling` to `WithPoolingEnabled`
-- 
 
 ## 1.11.0
 

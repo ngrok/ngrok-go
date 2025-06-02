@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"golang.ngrok.com/muxado/v2"
-	"golang.ngrok.com/ngrok/internal/tunnel/netx"
-	"golang.ngrok.com/ngrok/internal/tunnel/proto"
+	"golang.ngrok.com/ngrok/v2/internal/tunnel/netx"
+	"golang.ngrok.com/ngrok/v2/internal/tunnel/proto"
 
 	log "github.com/inconshreveable/log15/v3"
 	logext "github.com/inconshreveable/log15/v3/ext"

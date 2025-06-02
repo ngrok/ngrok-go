@@ -1,43 +1,51 @@
 # ngrok-go
 
-[![Go Reference](https://pkg.go.dev/badge/golang.ngrok.com/ngrok.svg)](https://pkg.go.dev/golang.ngrok.com/ngrok)
+[![Go Reference](https://pkg.go.dev/badge/golang.ngrok.com/ngrok/v2.svg)](https://pkg.go.dev/golang.ngrok.com/ngrok/v2)
 [![Go](https://github.com/ngrok/ngrok-go/actions/workflows/buildandtest.yml/badge.svg)](https://github.com/ngrok/ngrok-go/actions/workflows/buildandtest.yml)
-[![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/ngrok/ngrok-rust/blob/main/LICENSE-MIT)
+[![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/ngrok/ngrok-go/blob/main/LICENSE.txt)
 
 
-[ngrok](https://ngrok.com) is a simplified API-first ingress-as-a-service that adds connectivity, security, and observability to your apps.
+[ngrok](https://ngrok.com) is an API gateway cloud service that forwards to
+applications running anywhere.
 
-ngrok-go is an open source and idiomatic library for embedding ngrok networking directly into Go applications. If you’ve used ngrok before, you can think of ngrok-go as the ngrok agent packaged as a Go library.
+ngrok-go is an open source and idiomatic Go package for embedding ngrok
+networking directly into your Go applications. If you've used ngrok before, you
+can think of ngrok-go as the ngrok agent packaged as a Go library.
 
-ngrok-go lets developers serve Go apps on the internet in a single line of code without setting up low-level network primitives like IPs, certificates, load balancers and even ports! Applications using ngrok-go listen on ngrok’s global ingress network but they receive the same interface any Go app would expect (net.Listener) as if it listened on a local port by calling net.Listen(). This makes it effortless to integrate ngrok-go into any application that uses Go's net or net/http packages.
-
-See [`examples/http/main.go`](/examples/http/main.go) for example usage, or the tests in [`online_test.go`](/online_test.go).
+ngrok-go enables you to serve Go apps on the internet in a single line of code
+without setting up low-level network primitives like IPs, certificates, load
+balancers and even ports! Applications using ngrok-go listen on ngrok's global
+cloud service but, they receive connections using the same interface
+(net.Listener) that any Go app would expect if it listened on a local port.
 
 For working with the [ngrok API](https://ngrok.com/docs/api/), check out the [ngrok Go API Client Library](https://github.com/ngrok/ngrok-api-go).
 
 ## Installation
 
-The best way to install the ngrok agent SDK is through `go get`.
+Install ngrok-go with `go get`.
 
 ```sh
-go get golang.ngrok.com/ngrok
+go get golang.ngrok.com/ngrok/v2
 ```
 
 ## Documentation
 
-A full API reference is included in the [ngrok go sdk documentation on pkg.go.dev](https://pkg.go.dev/golang.ngrok.com/ngrok). Check out the [ngrok Documentation](https://ngrok.com/docs) for more information about what you can do with ngrok.
-
-For additional information, be sure to also check out the [ngrok-go launch announcement](https://ngrok.com/blog-post/ngrok-go)!
+- [ngrok-go API Reference](https://pkg.go.dev/golang.ngrok.com/ngrok/v2) on pkg.go.dev.
+- [ngrok Documentation](https://ngrok.com/docs) for what you can do with ngrok.
+- [Examples](./examples) are another great way to get started.
+- [ngrok-go launch announcement](https://ngrok.com/blog-post/ngrok-go) for more context on why we built it. The examples in the blog post may be out of date for the new API.
 
 ## Quickstart
 
-For more examples of using ngrok-go, check out the [/examples](/examples) folder.
+The following example starts a Go web server that receives traffic from an
+endpoint on ngrok's cloud service with a randomly-assigned URL. The ngrok URL
+provided when running this example is accessible by anyone with an internet
+connection.
 
-The following example uses ngrok to start an http endpoint with a random url that will route traffic to the handler. The ngrok URL provided when running this example is accessible by anyone with an internet connection.
+You need an ngrok authtoken to run the following example, which you can get from
+the [ngrok dashboard](https://dashboard.ngrok.com/get-started/your-authtoken).
 
-The ngrok authtoken is pulled from the `NGROK_AUTHTOKEN` environment variable. You can find your authtoken by logging into the [ngrok dashboard](https://dashboard.ngrok.com/get-started/your-authtoken).
-
-You can run this example with the following command:
+Run this example with the following command:
 
 ```sh
 NGROK_AUTHTOKEN=xxxx_xxxx go run examples/http/main.go
@@ -52,8 +60,7 @@ import (
 	"log"
 	"net/http"
 
-	"golang.ngrok.com/ngrok"
-	"golang.ngrok.com/ngrok/config"
+	"golang.ngrok.com/ngrok/v2"
 )
 
 func main() {
@@ -63,16 +70,16 @@ func main() {
 }
 
 func run(ctx context.Context) error {
-	ln, err := ngrok.Listen(ctx,
-		config.HTTPEndpoint(),
-		ngrok.WithAuthtokenFromEnv(),
-	)
+	// ngrok.Listen uses ngrok.DefaultAgent which uses the NGROK_AUTHTOKEN
+	// environment variable for auth
+	ln, err := ngrok.Listen(ctx)
 	if err != nil {
 		return err
 	}
 
-	log.Println("Ingress established at:", ln.URL())
+	log.Println("Endpoint online", ln.URL())
 
+	// Serve HTTP traffic on the ngrok endpoint
 	return http.Serve(ln, http.HandlerFunc(handler))
 }
 
@@ -80,6 +87,54 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, "Hello from ngrok-go!")
 }
 ```
+
+## Traffic Policy
+
+You can use ngrok's [Traffic Policy](https://ngrok.com/docs/traffic-policy/)
+engine to apply API Gateway behaviors at ngrok's cloud service to auth, route,
+block and rate-limit the traffic. For example:
+
+```go
+tp := `
+on_http_request:
+  - name: "rate limit by ip address"
+    actions:
+    - type: rate-limit
+      config:
+        name: client-ip-rate-limit
+        algorithm: sliding_window
+        capacity: 30
+        rate: 60s
+        bucket_key:
+          - conn.client_ip
+  - name: "federate to google for auth"
+    actions:
+    - type: oauth
+      config:
+        provider: google
+  - name: "block users without an 'example.com' domain"
+    expressions:
+      - "!actions.ngrok.oauth.identity.email.endsWith('@example.com')"
+    actions:
+      - type: custom-response
+        config:
+          status_code: 403
+          content: "${actions.ngrok.oauth.identity.name} is not allowed"
+`
+
+ln, err := ngrok.Listen(ctx, ngrok.WithTrafficPolicy(tp))
+if err != nil {
+	return err
+}
+```
+
+## Examples
+
+There are many more great examples you can reference to get started:
+
+- [Creating a TCP endpoint](./examples/tcp/) and handling TCP connections directly.
+- [Forwarding to another URL](./examples/forward/) instead of handling connections yourself.
+- [Adding Traffic Policy](./examples/traffic-policy/) in front of your app for authentication, rate limiting, etc.
 
 ## Support
 

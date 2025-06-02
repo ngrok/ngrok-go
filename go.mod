@@ -1,4 +1,4 @@
-module golang.ngrok.com/ngrok
+module golang.ngrok.com/ngrok/v2
 
 go 1.21
 
@@ -9,10 +9,7 @@ require (
 	go.uber.org/multierr v1.11.0
 	golang.ngrok.com/muxado/v2 v2.0.1
 	golang.org/x/net v0.30.0
-	golang.org/x/sync v0.8.0
 	google.golang.org/protobuf v1.35.1
-	gopkg.in/yaml.v2 v2.4.0
-	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -24,4 +21,5 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	golang.org/x/sys v0.26.0 // indirect
 	golang.org/x/term v0.25.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

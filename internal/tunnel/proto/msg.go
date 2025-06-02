@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"golang.ngrok.com/muxado/v2"
-	"golang.ngrok.com/ngrok/internal/pb"
+	"golang.ngrok.com/ngrok/v2/internal/pb"
 )
 
 type ReqType muxado.StreamType

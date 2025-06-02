@@ -1,5 +1,3 @@
-// A simple HTTP service.
-
 package main
 
 import (
@@ -8,8 +6,7 @@ import (
 	"log"
 	"net/http"
 
-	"golang.ngrok.com/ngrok"
-	"golang.ngrok.com/ngrok/config"
+	"golang.ngrok.com/ngrok/v2"
 )
 
 func main() {
@@ -19,16 +16,14 @@ func main() {
 }
 
 func run(ctx context.Context) error {
-	ln, err := ngrok.Listen(ctx,
-		config.HTTPEndpoint(),
-		ngrok.WithAuthtokenFromEnv(),
-	)
+	ln, err := ngrok.Listen(ctx)
 	if err != nil {
 		return err
 	}
 
-	log.Println("Ingress established at:", ln.URL())
+	log.Println("endpoint online", ln.URL())
 
+	// Serve HTTP traffic on the ngrok endpoint
 	return http.Serve(ln, http.HandlerFunc(handler))
 }
 

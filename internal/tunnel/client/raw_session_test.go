@@ -46,7 +46,9 @@ testloop:
 		}
 
 		ctx, cancel := context.WithCancel(ctx)
-		r := NewRawSession(log15.New(), muxado.Client(&dummyStream{}, nil), nil, nil)
+		logger := log15.New()
+		logger.SetHandler(log15.LvlFilterHandler(log15.LvlError, log15.StdoutHandler))
+		r := NewRawSession(logger, muxado.Client(&dummyStream{}, nil), nil, nil)
 
 		wg := sync.WaitGroup{}
 		wg.Add(1)

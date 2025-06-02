@@ -9,8 +9,7 @@ import (
 	"log"
 	"net"
 
-	"golang.ngrok.com/ngrok"
-	"golang.ngrok.com/ngrok/config"
+	"golang.ngrok.com/ngrok/v2"
 )
 
 func main() {
@@ -20,16 +19,11 @@ func main() {
 }
 
 func run(ctx context.Context) error {
-	ln, err := ngrok.Listen(ctx,
-		config.TCPEndpoint(),
-		ngrok.WithAuthtokenFromEnv(),
-	)
+	ln, err := ngrok.Listen(ctx, ngrok.WithURL("tcp://"))
 	if err != nil {
 		return err
 	}
-
-	log.Println("Ingress established at:", ln.URL())
-
+	log.Println("Endpoint online", ln.URL())
 	return runListener(ctx, ln)
 }
 
