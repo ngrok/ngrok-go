@@ -136,9 +136,10 @@ There are many more great examples you can reference to get started:
 - [Forwarding to another URL](./examples/forward/) instead of handling connections yourself.
 - [Adding Traffic Policy](./examples/traffic-policy/) in front of your app for authentication, rate limiting, etc.
 
-## Support
+## Contributing
 
-The best place to get support using ngrok-go is through the [ngrok Slack Community](https://ngrok.com/slack). If you find bugs or would like to contribute code, please follow the instructions in the [contributing guide](/CONTRIBUTING.md).
+If you find bugs or would like to contribute code, please follow the
+instructions in the [contributing guide](/CONTRIBUTING.md).
 
 ## Changelog
 
@@ -146,10 +147,10 @@ Changes to `ngrok-go` are tracked under [CHANGELOG.md](https://github.com/ngrok/
 
 ## Join the ngrok Community
 
-- Check out [our official docs](https://docs.ngrok.com)
+- Join our [Discord community](https://ngrok.com/discord)
+- Check out [our official docs](https://ngrok.com/docs)
 - Read about updates on [our blog](https://ngrok.com/blog)
 - Open an [issue](https://github.com/ngrok/ngrok-go/issues) or [pull request](https://github.com/ngrok/ngrok-go/pulls)
-- Join our [Slack community](https://ngrok.com/slack)
 - Follow us on [X / Twitter (@ngrokHQ)](https://twitter.com/ngrokhq)
 - Subscribe to our [Youtube channel (@ngrokHQ)](https://www.youtube.com/@ngrokhq)
 
