@@ -7,6 +7,7 @@ import (
 	_ "embed" // nolint
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -16,7 +17,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/inconshreveable/log15/v3"
 	"go.uber.org/multierr"
 	"golang.org/x/net/proxy"
 
@@ -169,7 +169,7 @@ type connectConfig struct {
 	remoteUpdateErr  *string
 
 	// The logger for the session to use.
-	Logger log15.Logger
+	Logger *slog.Logger
 }
 
 // WithMetadata configures the opaque, machine-readable metadata string for this
@@ -289,8 +289,7 @@ func WithHeartbeatInterval(interval time.Duration) ConnectOption {
 }
 
 // WithLogger configures a logger to receive log messages from the [Session].
-// Accepts a log15.Logger directly.
-func WithLogger(logger log15.Logger) ConnectOption {
+func WithLogger(logger *slog.Logger) ConnectOption {
 	return func(cfg *connectConfig) {
 		cfg.Logger = logger
 	}
@@ -701,7 +700,7 @@ type sessionInner struct {
 	DeprecationWarning *proto.AgentVersionDeprecated
 	ConnectAddresses   []proto.ConnectAddress
 
-	Logger log15.Logger
+	Logger *slog.Logger
 }
 
 func (s *sessionImpl) inner() *sessionInner {
@@ -809,7 +808,7 @@ func (s *sessionImpl) ConnectAddresses() []struct{ Region, ServerAddr string } {
 }
 
 type remoteCallbackHandler struct {
-	log15.Logger
+	*slog.Logger
 	sess           *sessionImpl
 	stopHandler    ServerCommandHandler
 	restartHandler ServerCommandHandler

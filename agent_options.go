@@ -147,10 +147,7 @@ func WithHeartbeatTolerance(tolerance time.Duration) AgentOption {
 func WithLogger(logger *slog.Logger) AgentOption {
 	return func(opts *agentOpts) {
 		opts.logger = logger
-
-		// Convert slog logger to log15 for the legacy API
-		log15Logger := legacy.SlogToLog15(logger)
-		opts.sessionOpts = append(opts.sessionOpts, legacy.WithLogger(log15Logger))
+		opts.sessionOpts = append(opts.sessionOpts, legacy.WithLogger(logger))
 	}
 }
 

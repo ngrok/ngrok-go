@@ -2,11 +2,11 @@ package client
 
 import (
 	"errors"
+	"log/slog"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	log "github.com/inconshreveable/log15/v3"
 	"github.com/jpillora/backoff"
 
 	"golang.ngrok.com/ngrok/v2/internal/tunnel/netx"
@@ -101,11 +101,13 @@ type reconnectingSession struct {
 	cb                ReconnectCallback
 	sessions          []*session
 	failPermanentOnce sync.Once
-	log.Logger
+	*slog.Logger
 }
 
-type RawSessionDialer func(legNumber uint32) (RawSession, error)
-type ReconnectCallback func(s Session, r RawSession, legNumber uint32) (int, error)
+type (
+	RawSessionDialer  func(legNumber uint32) (RawSession, error)
+	ReconnectCallback func(s Session, r RawSession, legNumber uint32) (int, error)
+)
 
 // Establish Session(s) that reconnect across temporary network failures. The
 // returned Session object uses the given dialer to reconnect whenever Accept
@@ -126,7 +128,7 @@ type ReconnectCallback func(s Session, r RawSession, legNumber uint32) (int, err
 //
 // When using MultiLeg, there will be multiple underlying Sessions which are kept
 // in sync. This struct will broadcast calls to all underlying Sessions.
-func NewReconnectingSession(logger log.Logger, dialer RawSessionDialer, stateChanges chan<- error, cb ReconnectCallback) Session {
+func NewReconnectingSession(logger *slog.Logger, dialer RawSessionDialer, stateChanges chan<- error, cb ReconnectCallback) Session {
 	s := &reconnectingSession{
 		dialer:       dialer,
 		stateChanges: stateChanges,
@@ -140,7 +142,7 @@ func NewReconnectingSession(logger log.Logger, dialer RawSessionDialer, stateCha
 	return s
 }
 
-func (s *reconnectingSession) createTunnelClientSession(logger log.Logger) {
+func (s *reconnectingSession) createTunnelClientSession(logger *slog.Logger) {
 	swapper := new(swapRaw)
 	tcs := &session{
 		swapper:   swapper,
@@ -388,7 +390,7 @@ func (s *reconnectingSession) connect(acceptErr error, connSession *session) err
 			// set up the next connection. additional sessions will
 			// continue to chain on from there until all legs are
 			// established
-			s.createTunnelClientSession(s)
+			s.createTunnelClientSession(s.Logger)
 			// not done with initial setup yet
 			sendStateChange = false
 		}

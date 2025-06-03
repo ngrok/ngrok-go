@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
+	"math/rand"
 	"net"
 	"reflect"
 	"sync"
@@ -12,9 +14,6 @@ import (
 	"golang.ngrok.com/muxado/v2"
 	"golang.ngrok.com/ngrok/v2/internal/tunnel/netx"
 	"golang.ngrok.com/ngrok/v2/internal/tunnel/proto"
-
-	log "github.com/inconshreveable/log15/v3"
-	logext "github.com/inconshreveable/log15/v3/ext"
 )
 
 type RawSession interface {
@@ -52,17 +51,17 @@ type rawSession struct {
 	latency    chan time.Duration
 	closed     bool
 	closedLock sync.RWMutex
-	log.Logger
+	*slog.Logger
 	remoteAddr net.Addr
 }
 
 // Creates a new client tunnel session with the given id
 // running over the given muxado session.
-func NewRawSession(logger log.Logger, mux muxado.Session, heartbeatConfig *muxado.HeartbeatConfig, handler SessionHandler) RawSession {
+func NewRawSession(logger *slog.Logger, mux muxado.Session, heartbeatConfig *muxado.HeartbeatConfig, handler SessionHandler) RawSession {
 	return newRawSession(mux, newLogger(logger), heartbeatConfig, handler)
 }
 
-func newRawSession(mux muxado.Session, logger log.Logger, heartbeatConfig *muxado.HeartbeatConfig, handler SessionHandler) RawSession {
+func newRawSession(mux muxado.Session, logger *slog.Logger, heartbeatConfig *muxado.HeartbeatConfig, handler SessionHandler) RawSession {
 	s := &rawSession{Logger: logger, handler: handler, latency: make(chan time.Duration), remoteAddr: mux.RemoteAddr()}
 	typed := muxado.NewTypedStreamSession(mux)
 	heart := muxado.NewHeartbeat(typed, s.onHeartbeat, heartbeatConfig)
@@ -87,7 +86,7 @@ func (s *rawSession) Auth(id string, extra proto.AuthExtra) (resp proto.AuthResp
 	// set client id / log tag only if it changed
 	if s.id != resp.ClientID {
 		s.id = resp.ClientID
-		s.Logger = s.Logger.New("clientid", s.id)
+		s.Logger = s.Logger.With("clientid", s.id)
 	}
 	return
 }
@@ -253,7 +252,7 @@ func (s *rawSession) Close() error {
 // type which allows the remote side to know in advance what type of payload to
 // deserialize.
 func (s *rawSession) rpc(reqtype proto.ReqType, req any, resp any) error {
-	l := s.New("reqtype", reqtype)
+	l := s.With("reqtype", reqtype)
 
 	stream, err := s.mux.OpenTypedStream(muxado.StreamType(reqtype))
 	l.Debug("open stream", "err", err)
@@ -303,6 +302,10 @@ func (s *rawSession) onHeartbeat(pingTime time.Duration, timeout bool) {
 	}
 }
 
-func newLogger(parent log.Logger) log.Logger {
-	return parent.New("obj", "csess", "id", logext.RandId(6))
+func newLogger(parent *slog.Logger) *slog.Logger {
+	id := rand.Uint64()
+	return parent.With(
+		"obj", "csess",
+		"id", fmt.Sprintf("%x", id),
+	)
 }

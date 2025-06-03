@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -12,47 +13,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/inconshreveable/log15/v3"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/websocket"
 
 	"golang.ngrok.com/ngrok/v2/internal/legacy/config"
 )
 
-// testLogger is a simple wrapper around log15.Logger that logs to the test's output
-func newTestLogger(t *testing.T) log15.Logger {
-	logger := log15.New()
-	// Create a custom handler that writes to test output
-	handler := log15.FuncHandler(func(r log15.Record) error {
-		// Add test name to context
-		ctx := append(r.Ctx, "test", t.Name())
-
-		// Format and log to test output
-		t.Logf("%s [%s] %s %v",
-			time.Now().Format(time.RFC3339),
-			r.Lvl,
-			r.Msg,
-			fmtLogContext(ctx))
-		return nil
-	})
-
-	logger.SetHandler(handler)
-	return logger
-}
-
-// Helper to format log context as a map for display
-func fmtLogContext(ctx []interface{}) map[string]interface{} {
-	result := make(map[string]interface{})
-	for i := 0; i < len(ctx); i += 2 {
-		if i+1 < len(ctx) {
-			key, ok := ctx[i].(string)
-			if !ok {
-				key = fmt.Sprintf("%v", ctx[i])
-			}
-			result[key] = ctx[i+1]
-		}
-	}
-	return result
+func newTestLogger(t *testing.T) *slog.Logger {
+	return slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	})).WithGroup(t.Name())
 }
 
 func expectChanError(t *testing.T, ch <-chan error, timeout time.Duration) {
