@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"net"
 	"strconv"
 	"sync"
@@ -11,8 +12,6 @@ import (
 
 	"golang.ngrok.com/ngrok/v2/internal/tunnel/netx"
 	"golang.ngrok.com/ngrok/v2/internal/tunnel/proto"
-
-	log "github.com/inconshreveable/log15/v3"
 
 	"golang.ngrok.com/muxado/v2"
 )
@@ -79,14 +78,14 @@ type session struct {
 	swapper *swapRaw
 	raw     RawSession
 	sync.RWMutex
-	log.Logger
+	*slog.Logger
 	tunnels   map[string]*tunnel
 	legNumber uint32
 }
 
 // NewSession starts a new go-tunnel client session running over the given
 // muxado session.
-func NewSession(logger log.Logger, mux muxado.Session, heartbeatConfig *muxado.HeartbeatConfig, handler SessionHandler) Session {
+func NewSession(logger *slog.Logger, mux muxado.Session, heartbeatConfig *muxado.HeartbeatConfig, handler SessionHandler) Session {
 	logger = newLogger(logger)
 	s := &session{
 		raw:     newRawSession(mux, logger, heartbeatConfig, handler),

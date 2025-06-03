@@ -1,23 +1,29 @@
 package netx
 
 import (
+	"fmt"
+	"log/slog"
+	"math/rand"
 	"net"
-
-	log "github.com/inconshreveable/log15/v3"
-	logext "github.com/inconshreveable/log15/v3/ext"
 )
 
 // LoggedConn is a connection with an embedded logger
 type LoggedConn interface {
 	net.Conn
-	log.Logger
+
+	// the subset of log methods from *slog.Logger that we use; feel free to add
+	// more
+
+	Info(msg string, args ...any)
+	Warn(msg string, args ...any)
+	Error(msg string, args ...any)
 
 	Unwrap() net.Conn
 }
 
 type logged struct {
 	net.Conn
-	log.Logger
+	*slog.Logger
 	id string
 }
 
@@ -37,12 +43,13 @@ func (c *logged) Unwrap() net.Conn {
 	return c.Conn
 }
 
-func NewLoggedConn(parent log.Logger, conn net.Conn, ctx ...any) LoggedConn {
+func NewLoggedConn(parent *slog.Logger, conn net.Conn, ctx ...any) LoggedConn {
+	id := rand.Uint64()
 	c := &logged{
 		Conn: conn,
-		id:   logext.RandId(6),
+		id:   fmt.Sprintf("%x", id),
 	}
-	c.Logger = parent.New(append([]any{"id", c.id}, ctx...)...)
+	c.Logger = parent.With(append([]any{"id", c.id}, ctx...)...)
 	if _, ok := conn.(closeReader); !ok {
 		return c
 	}

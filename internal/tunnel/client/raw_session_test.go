@@ -2,11 +2,10 @@ package client
 
 import (
 	"context"
+	"log/slog"
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/inconshreveable/log15/v3"
 
 	"golang.ngrok.com/muxado/v2"
 )
@@ -18,7 +17,7 @@ func (d *dummyStream) Write(bs []byte) (int, error) { return 0, nil }
 func (d *dummyStream) Close() error                 { return nil }
 
 func TestRawSessionDoubleClose(t *testing.T) {
-	r := NewRawSession(log15.New(), muxado.Client(&dummyStream{}, nil), nil, nil)
+	r := NewRawSession(slog.Default(), muxado.Client(&dummyStream{}, nil), nil, nil)
 
 	// Verify that closing the session twice doesn't cause a panic
 	r.Close()
@@ -26,7 +25,7 @@ func TestRawSessionDoubleClose(t *testing.T) {
 }
 
 func TestHeartbeatTimeout(t *testing.T) {
-	r := NewRawSession(log15.New(), muxado.Client(&dummyStream{}, nil), nil, nil)
+	r := NewRawSession(slog.Default(), muxado.Client(&dummyStream{}, nil), nil, nil)
 	// Make sure we don't deadlock
 	r.(*rawSession).onHeartbeat(1, true)
 }
@@ -46,8 +45,7 @@ testloop:
 		}
 
 		ctx, cancel := context.WithCancel(ctx)
-		logger := log15.New()
-		logger.SetHandler(log15.LvlFilterHandler(log15.LvlError, log15.StdoutHandler))
+		logger := slog.Default()
 		r := NewRawSession(logger, muxado.Client(&dummyStream{}, nil), nil, nil)
 
 		wg := sync.WaitGroup{}
