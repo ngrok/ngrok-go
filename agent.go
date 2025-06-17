@@ -125,6 +125,10 @@ func (a *agent) Connect(ctx context.Context) error {
 	// Hook up disconnect event
 	legacyOpts = append(legacyOpts, legacy.WithDisconnectHandler(func(_ context.Context, sess legacy.Session, err error) {
 		a.emitEvent(newAgentDisconnected(a, a.agentSession, err))
+
+		if !Retryable(err) {
+			sess.Close()
+		}
 	}))
 
 	// Hook up heartbeat event
