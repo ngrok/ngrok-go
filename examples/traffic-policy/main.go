@@ -7,7 +7,9 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
+	"os"
 
 	"golang.ngrok.com/ngrok/v2"
 )
@@ -20,29 +22,36 @@ func main() {
 
 const trafficPolicy = `
 on_http_request:
-  - actions:
-    - type: rate-limit
-	  config:
-		name: client-ip-limit
-		algorithm: sliding_window
-		capacity: 5
-		rate: "60s"
-		bucket_key:
-		- conn.client_ip
-	- type: basic-auth
-	  config:
-		credentials:
-		  - username1:some-secret-1
-		  - username2:some-secret-2
-	- type: add-headers
-	  config:
-	    headers:
-		  authenticated-user: "${actions.ngrok.basic_auth.credentials.username}"
+- actions:
+  - type: rate-limit
+    config:
+      name: client-ip-limit
+      algorithm: sliding_window
+      capacity: 5
+      rate: "60s"
+      bucket_key:
+      - conn.client_ip
+  - type: basic-auth
+    config:
+      credentials:
+      - username1:some-secret-1
+      - username2:some-secret-2
+  - type: add-headers
+    config:
+      headers:
+        authenticated-user: "${actions.ngrok.basic_auth.credentials.username}"
 `
 
 func run(ctx context.Context) error {
 	// Create an HTTP listener with the traffic policy
-	ln, err := ngrok.Listen(ctx,
+	agent, err := ngrok.NewAgent(
+		ngrok.WithAuthtoken(os.Getenv("NGROK_AUTHTOKEN")),
+		ngrok.WithLogger(slog.Default()),
+	)
+	if err != nil {
+		return err
+	}
+	ln, err := agent.Listen(ctx,
 		ngrok.WithTrafficPolicy(trafficPolicy),
 		ngrok.WithDescription("traffic policy example"),
 	)
