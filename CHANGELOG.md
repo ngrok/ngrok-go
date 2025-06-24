@@ -1,3 +1,9 @@
+## 2.1.0
+
+Enhancements:
+
+- Adds initial DisconnectHandler error handling to stop the session if the error is unrecoverable (which for now is just an auth error)
+
 ## 2.0.0
 
 This is a breaking-change release that updates ngrok-go to a new, simplified

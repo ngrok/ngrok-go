@@ -48,3 +48,12 @@ func TestNgrokErrorWrapping(t *testing.T) {
 
 	require.False(t, errors.As(nonNgrokErr, &nerr))
 }
+
+func TestNonRetryableErr(t *testing.T) {
+	authErr := errAuthFailed{true, errors.New("asplode")}
+	acceptErr := errAcceptFailed{errors.New("asplode")}
+
+	var nonRetryableErr NonRetryableError
+	require.True(t, errors.As(authErr, &nonRetryableErr))
+	require.False(t, errors.As(acceptErr, &nonRetryableErr))
+}

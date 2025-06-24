@@ -27,6 +27,11 @@ func (e *errorAdapter) Error() string {
 	return e.ngrokErr.Error()
 }
 
+func Retryable(err error) bool {
+	var nonRetryableErr legacy.NonRetryableError
+	return !errors.As(err, &nonRetryableErr)
+}
+
 // wrapError returns the original error or wraps it if it's a ngrok.Error
 
 func wrapError(err error) error {
