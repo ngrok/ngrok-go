@@ -1,6 +1,8 @@
 package ngrok
 
 import (
+	"context"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -61,4 +63,73 @@ func TestEventCreation(t *testing.T) {
 	assert.Equal(t, agent, heartbeatEvent.Agent)
 	assert.Equal(t, session, heartbeatEvent.Session)
 	assert.Equal(t, 100*time.Millisecond, heartbeatEvent.Latency)
+}
+
+func ExampleEventHandler() {
+	// Define an event handler that logs known event types. For unknown events,
+	// it logs a warning message with the event type.
+	// This is useful for debugging and understanding the flow of events.
+	// Note: the pointer to event types is used when using a type switch.
+	var handler EventHandler = func(e Event) {
+		switch v := e.(type) {
+		case *EventAgentHeartbeatReceived:
+			slog.Info("ngrok agent heartbeat received")
+		case *EventAgentConnectSucceeded:
+			slog.Info("ngrok agent connected")
+		case *EventAgentDisconnected:
+			slog.Error("ngrok agent disconnected", "error", v.Error)
+		default:
+			slog.Warn("Received unknown event", "type", e.EventType())
+		}
+	}
+
+	agent, err := NewAgent(WithEventHandler(handler))
+	if err != nil {
+		slog.Error("Failed to create ngrok agent", "error", err)
+		return
+	}
+
+	_ = agent.Connect(context.Background())
+}
+
+func ExampleEventHandler_withChannel() {
+	// Create a buffered channel to receive events.
+	eventChan := make(chan Event, 10)
+
+	// Start a goroutine to handle events from the channel.
+	go func() {
+		for e := range eventChan {
+			switch v := e.(type) {
+			case *EventAgentHeartbeatReceived:
+				slog.Info("ngrok agent heartbeat received", "latency", v.Latency)
+				// Some long potentially blocking operation here
+			case *EventAgentConnectSucceeded:
+				slog.Info("ngrok agent connected", "agent", v.Agent, "session", v.Session)
+				// Some long potentially blocking operation here
+			case *EventAgentDisconnected:
+				slog.Error("ngrok agent disconnected", "error", v.Error, "agent", v.Agent, "session", v.Session)
+				// Some long potentially blocking operation here
+			default:
+				slog.Warn("Received unknown event", "type", e.EventType())
+			}
+		}
+	}()
+
+	// The event handler will send events to the channel, if the channel is full,
+	// it will log a warning and drop the event to prevent blocking the agent's event processing.
+	var handler EventHandler = func(e Event) {
+		select {
+		case eventChan <- e:
+		default:
+			slog.Warn("Event channel is full, dropping event", "type", e.EventType())
+		}
+	}
+
+	agent, err := NewAgent(WithEventHandler(handler))
+	if err != nil {
+		slog.Error("Failed to create ngrok agent", "error", err)
+		return
+	}
+
+	_ = agent.Connect(context.Background())
 }
