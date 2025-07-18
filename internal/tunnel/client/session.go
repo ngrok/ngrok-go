@@ -238,8 +238,19 @@ func (s *session) handleProxy(proxy netx.LoggedConn) {
 
 	tunnel.shut.RLock()
 	defer tunnel.shut.RUnlock()
+
+	// Wrap the proxy conn so it has a proper RemoteAddr()
+	pconn := newProxyConn(proxy, proxyHdr)
+	s.Logger.Debug("handling connection",
+		"id", proxyHdr.ID,
+		"client.addr", pconn.Conn.RemoteAddr(),
+		"proxy.proto", proxyHdr.Proto,
+		"proxy.remote_addr", proxy.RemoteAddr(),
+		"proxy.local_addr", proxy.LocalAddr(),
+	)
+
 	// deliver proxy connection + wrap it so it has a proper RemoteAddr()
-	tunnel.handleConn(newProxyConn(proxy, proxyHdr))
+	tunnel.handleConn(pconn)
 }
 
 // Public so we can use it in lib/tunnel/server/functional_test.go
