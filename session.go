@@ -13,6 +13,7 @@ import (
 	"os"
 	"regexp"
 	"runtime"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -594,7 +595,17 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 
 		conn = tls.Client(conn, tlsConfig)
 
-		sess := muxado.Client(conn, &muxado.Config{})
+		config := &muxado.Config{}
+		switch {
+		case slices.Contains(tlsConfig.NextProtos, "muxado-1MB"):
+			config.MaxWindowSize = 1024 * 1024
+		case slices.Contains(tlsConfig.NextProtos, "muxado-2MB"):
+			config.MaxWindowSize = 2 * 1024 * 1024
+		case slices.Contains(tlsConfig.NextProtos, "muxado-5MB"):
+			config.MaxWindowSize = 5 * 1024 * 1024
+		}
+
+		sess := muxado.Client(conn, config)
 		return tunnel_client.NewRawSession(logger, sess, heartbeatConfig, callbackHandler), nil
 	}
 
