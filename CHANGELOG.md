@@ -1,3 +1,14 @@
+## 2.1.0
+
+Fixes:
+
+- fixed outdated readme content/links
+- updated traffic policy example
+
+Enhancements:
+
+- Remove all remaining log15 references, use slog.Logger everywhere
+
 ## 2.0.0
 
 This is a breaking-change release that updates ngrok-go to a new, simplified
