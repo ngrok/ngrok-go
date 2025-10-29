@@ -39,7 +39,7 @@ func TestUpstreamProtocolHTTP2(t *testing.T) {
 			w.Header().Set("Content-Type", "text/plain")
 			w.Header().Set("X-Protocol-Version", protoVer)
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(fmt.Sprintf("Server used %s", protoVer)))
+			_, _ = w.Write(fmt.Appendf(nil, "Server used %s", protoVer))
 		}))
 
 		// Configure TLS with HTTP/2 support
@@ -107,7 +107,7 @@ func TestUpstreamProtocolHTTP2(t *testing.T) {
 			w.Header().Set("Content-Type", "text/plain")
 			w.Header().Set("X-Protocol-Version", protoVer)
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(fmt.Sprintf("Server used %s", protoVer)))
+			_, _ = w.Write(fmt.Appendf(nil, "Server used %s", protoVer))
 		}))
 
 		// Configure TLS with HTTP/2 support

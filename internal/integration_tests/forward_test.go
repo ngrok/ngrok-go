@@ -39,7 +39,7 @@ func TestForward(t *testing.T) {
 		w.Header().Set("Content-Type", "text/plain")
 		w.Header().Set("X-Received", string(body))
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(fmt.Sprintf("Received: %s", string(body))))
+		_, _ = w.Write(fmt.Appendf(nil, "Received: %s", string(body)))
 	}))
 	defer server.Close()
 
