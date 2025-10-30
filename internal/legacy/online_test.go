@@ -130,7 +130,7 @@ type failPanic struct {
 	t *testing.T
 }
 
-func (f failPanic) Errorf(format string, args ...interface{}) {
+func (f failPanic) Errorf(format string, args ...any) {
 	f.t.Errorf(format, args...)
 }
 
