@@ -74,15 +74,13 @@ func (e *endpointForwarder) forwardLoop(ctx context.Context) {
 
 // handleConnection processes a single connection
 func (e *endpointForwarder) handleConnection(ctx context.Context, conn net.Conn) {
-	defer conn.Close()
-
 	// Connect to the backend server
 	backend, err := e.connectToBackend(ctx)
 	if err != nil {
+		conn.Close()
 		// Could log the error here
 		return
 	}
-	defer backend.Close()
 
 	// Copy data bidirectionally
 	e.join(conn, backend)
