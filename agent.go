@@ -117,19 +117,25 @@ func (a *agent) Connect(ctx context.Context) error {
 		legacyOpts = append(legacyOpts, legacy.WithDialer(dialer))
 	}
 
+	// Create our AgentSession wrapper early so we can capture it in closures
+	agentSession := &agentSession{
+		agent:     a,
+		startedAt: time.Now(),
+	}
+
 	// Hook up connect event
 	legacyOpts = append(legacyOpts, legacy.WithConnectHandler(func(_ context.Context, sess legacy.Session) {
-		a.emitEvent(newAgentConnectSucceeded(a, a.agentSession))
+		a.emitEvent(newAgentConnectSucceeded(a, agentSession))
 	}))
 
 	// Hook up disconnect event
 	legacyOpts = append(legacyOpts, legacy.WithDisconnectHandler(func(_ context.Context, sess legacy.Session, err error) {
-		a.emitEvent(newAgentDisconnected(a, a.agentSession, err))
+		a.emitEvent(newAgentDisconnected(a, agentSession, err))
 	}))
 
 	// Hook up heartbeat event
 	legacyOpts = append(legacyOpts, legacy.WithHeartbeatHandler(func(_ context.Context, sess legacy.Session, latency time.Duration) {
-		a.emitEvent(newAgentHeartbeatReceived(a, a.agentSession, latency))
+		a.emitEvent(newAgentHeartbeatReceived(a, agentSession, latency))
 	}))
 
 	// If an RPC handler is registered, hook up the command handlers
@@ -148,13 +154,12 @@ func (a *agent) Connect(ctx context.Context) error {
 		return wrapError(err)
 	}
 
-	// Create our AgentSession wrapper
+	// Complete the AgentSession wrapper with session-specific data
+	agentSession.warnings = sess.Warnings()
+
+	// Store in agent
 	a.sess = sess
-	a.agentSession = &agentSession{
-		warnings:  sess.Warnings(),
-		agent:     a,
-		startedAt: time.Now(),
-	}
+	a.agentSession = agentSession
 
 	return nil
 }
