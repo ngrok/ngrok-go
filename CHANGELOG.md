@@ -1,3 +1,10 @@
+## 2.1.1
+
+Fixes:
+
+- Don't close connections twice after join completes
+- Fixed a race condition by passing agentSession directly to event emitters instead of locked field
+
 ## 2.1.0
 
 Fixes:
