@@ -9,6 +9,8 @@ const (
 	EventTypeAgentConnectSucceeded EventType = iota
 	EventTypeAgentDisconnected
 	EventTypeAgentHeartbeatReceived
+	EventTypeConnectionOpened
+	EventTypeConnectionClosed
 )
 
 func (t EventType) String() string {
@@ -16,6 +18,8 @@ func (t EventType) String() string {
 		"AgentConnectSucceeded",
 		"AgentDisconnected",
 		"AgentHeartbeatReceived",
+		"ConnectionOpened",
+		"ConnectionClosed",
 	}[t]
 }
 
@@ -98,5 +102,49 @@ func newAgentHeartbeatReceived(agent Agent, session AgentSession, latency time.D
 		Agent:   agent,
 		Session: session,
 		Latency: latency,
+	}
+}
+
+// EventConnectionOpened is emitted when a new connection is accepted by a forwarder
+type EventConnectionOpened struct {
+	baseEvent
+	Endpoint   Endpoint
+	RemoteAddr string
+}
+
+// EventConnectionClosed is emitted when a forwarded connection is closed
+type EventConnectionClosed struct {
+	baseEvent
+	Endpoint Endpoint
+	RemoteAddr string
+	Duration   time.Duration
+	BytesIn    int64
+	BytesOut   int64
+}
+
+// newConnectionOpened creates a new EventConnectionOpened event
+func newConnectionOpened(endpoint Endpoint, remoteAddr string) *EventConnectionOpened {
+	return &EventConnectionOpened{
+		baseEvent: baseEvent{
+			Type:       EventTypeConnectionOpened,
+			OccurredAt: time.Now(),
+		},
+		Endpoint:   endpoint,
+		RemoteAddr: remoteAddr,
+	}
+}
+
+// newConnectionClosed creates a new EventConnectionClosed event
+func newConnectionClosed(endpoint Endpoint, remoteAddr string, duration time.Duration, bytesIn, bytesOut int64) *EventConnectionClosed {
+	return &EventConnectionClosed{
+		baseEvent: baseEvent{
+			Type:       EventTypeConnectionClosed,
+			OccurredAt: time.Now(),
+		},
+		Endpoint:   endpoint,
+		RemoteAddr: remoteAddr,
+		Duration:   duration,
+		BytesIn:    bytesIn,
+		BytesOut:   bytesOut,
 	}
 }
