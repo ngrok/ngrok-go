@@ -11,6 +11,7 @@ const (
 	EventTypeAgentHeartbeatReceived
 	EventTypeConnectionOpened
 	EventTypeConnectionClosed
+	EventTypeHTTPRequestComplete
 )
 
 func (t EventType) String() string {
@@ -20,6 +21,7 @@ func (t EventType) String() string {
 		"AgentHeartbeatReceived",
 		"ConnectionOpened",
 		"ConnectionClosed",
+		"HTTPRequestComplete",
 	}[t]
 }
 
@@ -115,7 +117,7 @@ type EventConnectionOpened struct {
 // EventConnectionClosed is emitted when a forwarded connection is closed
 type EventConnectionClosed struct {
 	baseEvent
-	Endpoint Endpoint
+	Endpoint   Endpoint
 	RemoteAddr string
 	Duration   time.Duration
 	BytesIn    int64
@@ -146,5 +148,29 @@ func newConnectionClosed(endpoint Endpoint, remoteAddr string, duration time.Dur
 		Duration:   duration,
 		BytesIn:    bytesIn,
 		BytesOut:   bytesOut,
+	}
+}
+
+// EventHTTPRequestComplete is emitted when an HTTP request/response cycle completes
+type EventHTTPRequestComplete struct {
+	baseEvent
+	Endpoint   Endpoint
+	Method     string
+	Path       string
+	StatusCode int
+	Duration   time.Duration
+}
+
+func newHTTPRequestComplete(endpoint Endpoint, method, path string, statusCode int, duration time.Duration) *EventHTTPRequestComplete {
+	return &EventHTTPRequestComplete{
+		baseEvent: baseEvent{
+			Type:       EventTypeHTTPRequestComplete,
+			OccurredAt: time.Now(),
+		},
+		Endpoint:   endpoint,
+		Method:     method,
+		Path:       path,
+		StatusCode: statusCode,
+		Duration:   duration,
 	}
 }

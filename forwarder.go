@@ -90,7 +90,11 @@ func (e *endpointForwarder) handleConnection(ctx context.Context, conn net.Conn)
 	proxyConn := &countingConn{Conn: conn}
 	backendConn := &countingConn{Conn: backend}
 
-	e.join(proxyConn, backendConn)
+	if e.isHTTP() {
+		e.httpJoin(proxyConn, backendConn)
+	} else {
+		e.join(proxyConn, backendConn)
+	}
 
 	e.emitConnectionEvent(newConnectionClosed(e, remoteAddr, time.Since(start), proxyConn.bytesRead.Load(), backendConn.bytesRead.Load()))
 }
@@ -98,6 +102,15 @@ func (e *endpointForwarder) handleConnection(ctx context.Context, conn net.Conn)
 func (e *endpointForwarder) emitConnectionEvent(evt Event) {
 	if a, ok := e.agent.(*agent); ok {
 		a.emitEvent(evt)
+	}
+}
+
+func (e *endpointForwarder) isHTTP() bool {
+	switch strings.ToLower(e.upstreamURL.Scheme) {
+	case "http", "https":
+		return true
+	default:
+		return false
 	}
 }
 
