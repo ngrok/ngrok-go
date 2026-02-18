@@ -1,6 +1,6 @@
 module golang.ngrok.com/ngrok/v2
 
-go 1.21
+go 1.25.7
 
 require (
 	github.com/jpillora/backoff v1.0.0
