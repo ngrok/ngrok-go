@@ -19,11 +19,15 @@ jobs:
     - name: direnv allow
       run: direnv allow .
     - name: go mod tidy
-      run: direnv exec . go mod tidy
+      run: |
+        direnv exec . go mod tidy
+        direnv exec . go mod tidy -C ./examples
     - name: exit if not tidy
       run: |
         git diff --exit-code go.mod
         git diff --exit-code go.sum
+        git diff --exit-code examples/go.mod
+        git diff --exit-code examples/go.sum
     - name: Build
       run: direnv exec . go build -v ./...
     - name: Build Examples
