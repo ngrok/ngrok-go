@@ -90,7 +90,7 @@ func (e *endpointForwarder) handleConnection(ctx context.Context, conn net.Conn)
 	proxyConn := &countingConn{Conn: conn}
 	backendConn := &countingConn{Conn: backend}
 
-	if e.isHTTP() {
+	if e.isHTTP() && e.upstreamProtocol != "http2" {
 		e.httpJoin(proxyConn, backendConn)
 	} else {
 		e.join(proxyConn, backendConn)
@@ -188,7 +188,12 @@ func (e *endpointForwarder) connectToBackend(ctx context.Context) (net.Conn, err
 			config.NextProtos = append(config.NextProtos, "h2", "http/1.1")
 		}
 
-		return tls.Client(conn, config), nil
+		tlsConn := tls.Client(conn, config)
+		if err := tlsConn.HandshakeContext(ctx); err != nil {
+			conn.Close()
+			return nil, err
+		}
+		return tlsConn, nil
 	}
 
 	return conn, nil
