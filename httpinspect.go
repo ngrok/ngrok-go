@@ -16,6 +16,9 @@ func (e *endpointForwarder) httpJoin(proxy, backend net.Conn) {
 	proxyBuf := bufio.NewReader(proxy)
 	backendBuf := bufio.NewReader(backend)
 
+	defer proxy.Close()
+	defer backend.Close()
+
 	for {
 		startTime := time.Now()
 
@@ -26,11 +29,11 @@ func (e *endpointForwarder) httpJoin(proxy, backend net.Conn) {
 		}
 
 		// Forward request to backend
-		if err := req.Write(backend); err != nil {
-			req.Body.Close()
+		err = req.Write(backend)
+		req.Body.Close()
+		if err != nil {
 			break
 		}
-		req.Body.Close()
 
 		// Read response from backend
 		resp, err := http.ReadResponse(backendBuf, req)
@@ -41,11 +44,11 @@ func (e *endpointForwarder) httpJoin(proxy, backend net.Conn) {
 		isUpgrade := resp.StatusCode == http.StatusSwitchingProtocols
 
 		// Forward response to proxy
-		if err := resp.Write(proxy); err != nil {
-			resp.Body.Close()
+		err = resp.Write(proxy)
+		resp.Body.Close()
+		if err != nil {
 			break
 		}
-		resp.Body.Close()
 
 		// Emit HTTP request complete event
 		e.emitConnectionEvent(newHTTPRequestComplete(
@@ -69,19 +72,16 @@ func (e *endpointForwarder) httpJoin(proxy, backend net.Conn) {
 // Used after WebSocket upgrade when there may be buffered data in the readers.
 func (e *endpointForwarder) joinBuffered(proxyBuf *bufio.Reader, proxy net.Conn, backendBuf *bufio.Reader, backend net.Conn) {
 	wg := &sync.WaitGroup{}
-	wg.Add(2)
 
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		defer backend.Close()
 		_, _ = io.Copy(backend, proxyBuf)
-	}()
+	})
 
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		defer proxy.Close()
 		_, _ = io.Copy(proxy, backendBuf)
-	}()
+	})
 
 	wg.Wait()
 }

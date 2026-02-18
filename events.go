@@ -69,7 +69,6 @@ type EventAgentHeartbeatReceived struct {
 	Latency time.Duration
 }
 
-// newAgentConnectSucceeded creates a new EventAgentConnectSucceeded event
 func newAgentConnectSucceeded(agent Agent, session AgentSession) *EventAgentConnectSucceeded {
 	return &EventAgentConnectSucceeded{
 		baseEvent: baseEvent{
@@ -81,7 +80,6 @@ func newAgentConnectSucceeded(agent Agent, session AgentSession) *EventAgentConn
 	}
 }
 
-// newAgentDisconnected creates a new EventAgentDisconnected event
 func newAgentDisconnected(agent Agent, session AgentSession, err error) *EventAgentDisconnected {
 	return &EventAgentDisconnected{
 		baseEvent: baseEvent{
@@ -94,7 +92,6 @@ func newAgentDisconnected(agent Agent, session AgentSession, err error) *EventAg
 	}
 }
 
-// newAgentHeartbeatReceived creates a new EventAgentHeartbeatReceived event
 func newAgentHeartbeatReceived(agent Agent, session AgentSession, latency time.Duration) *EventAgentHeartbeatReceived {
 	return &EventAgentHeartbeatReceived{
 		baseEvent: baseEvent{
@@ -124,7 +121,6 @@ type EventConnectionClosed struct {
 	BytesOut   int64
 }
 
-// newConnectionOpened creates a new EventConnectionOpened event
 func newConnectionOpened(endpoint Endpoint, remoteAddr string) *EventConnectionOpened {
 	return &EventConnectionOpened{
 		baseEvent: baseEvent{
@@ -136,7 +132,6 @@ func newConnectionOpened(endpoint Endpoint, remoteAddr string) *EventConnectionO
 	}
 }
 
-// newConnectionClosed creates a new EventConnectionClosed event
 func newConnectionClosed(endpoint Endpoint, remoteAddr string, duration time.Duration, bytesIn, bytesOut int64) *EventConnectionClosed {
 	return &EventConnectionClosed{
 		baseEvent: baseEvent{
