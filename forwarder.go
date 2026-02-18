@@ -142,12 +142,7 @@ func (e *endpointForwarder) connectToBackend(ctx context.Context) (net.Conn, err
 			config.NextProtos = append(config.NextProtos, "h2", "http/1.1")
 		}
 
-		tlsConn := tls.Client(conn, config)
-		if err := tlsConn.HandshakeContext(ctx); err != nil {
-			_ = conn.Close()
-			return nil, err
-		}
-		return tlsConn, nil
+		return tls.Client(conn, config), nil
 	}
 
 	return conn, nil
