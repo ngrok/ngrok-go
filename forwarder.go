@@ -90,7 +90,7 @@ func (e *endpointForwarder) handleConnection(ctx context.Context, conn net.Conn)
 	proxyConn := &countingConn{Conn: conn}
 	backendConn := &countingConn{Conn: backend}
 
-	if e.isHTTP() && e.upstreamProtocol != "http2" {
+	if e.isHTTP() {
 		e.httpJoin(proxyConn, backendConn)
 	} else {
 		e.join(proxyConn, backendConn)
