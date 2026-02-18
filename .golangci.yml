@@ -1,3 +1,5 @@
+version: "2"
+
 run:
-  skip-dirs:
+  exclude-dirs:
   - internal/muxado
