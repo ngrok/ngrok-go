@@ -54,8 +54,8 @@ func TestWrapConnWithTLS(t *testing.T) {
 
 	// Create a pipe for testing
 	serverConn, clientConn := net.Pipe()
-	defer serverConn.Close()
-	defer clientConn.Close()
+	defer serverConn.Close() //nolint:errcheck
+	defer clientConn.Close() //nolint:errcheck
 
 	// Apply TLS in a separate goroutine
 	go func() {
@@ -75,7 +75,7 @@ func TestWrapConnWithTLS(t *testing.T) {
 		}
 
 		// Close the client connection
-		clientTLS.Close()
+		_ = clientTLS.Close()
 	}()
 
 	// Wrap the server connection with TLS
@@ -101,8 +101,8 @@ func TestWrapConnWithTLS(t *testing.T) {
 func TestWrapConnWithTLSNil(t *testing.T) {
 	// Create a pipe for testing
 	conn1, conn2 := net.Pipe()
-	defer conn1.Close()
-	defer conn2.Close()
+	defer conn1.Close() //nolint:errcheck
+	defer conn2.Close() //nolint:errcheck
 
 	// Call wrapConnWithTLS with nil config
 	result := wrapConnWithTLS(conn1, nil)
