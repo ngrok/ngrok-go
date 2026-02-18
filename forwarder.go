@@ -77,7 +77,7 @@ func (e *endpointForwarder) handleConnection(ctx context.Context, conn net.Conn)
 	// Connect to the backend server
 	backend, err := e.connectToBackend(ctx)
 	if err != nil {
-		conn.Close()
+		_ = conn.Close()
 		// Could log the error here
 		return
 	}
@@ -156,14 +156,14 @@ func (e *endpointForwarder) join(left, right net.Conn) {
 	// Copy from left to right
 	go func() {
 		defer wg.Done()
-		defer right.Close()
+		defer right.Close() //nolint:errcheck
 		_, _ = io.Copy(right, left)
 	}()
 
 	// Copy from right to left
 	go func() {
 		defer wg.Done()
-		defer left.Close()
+		defer left.Close() //nolint:errcheck
 		_, _ = io.Copy(left, right)
 	}()
 

@@ -141,6 +141,10 @@ There are many more great examples you can reference to get started:
 If you find bugs or would like to contribute code, please follow the
 instructions in the [contributing guide](/CONTRIBUTING.md).
 
+## Go Version Policy
+
+We support the current and previous major releases of Go.
+
 ## Changelog
 
 Changes to `ngrok-go` are tracked under [CHANGELOG.md](https://github.com/ngrok/ngrok-go/blob/main/CHANGELOG.md).

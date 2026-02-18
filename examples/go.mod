@@ -1,6 +1,6 @@
 module golang.ngrok.com/ngrok/examples
 
-go 1.21
+go 1.25.7
 
 require (
 	github.com/valyala/fasthttp v1.56.0

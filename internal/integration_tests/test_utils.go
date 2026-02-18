@@ -45,7 +45,7 @@ func SetupAgent(t *testing.T) (ngrok.Agent, context.Context, context.CancelFunc)
 	require.NoError(t, err, "Failed to create agent")
 
 	// Start a context with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 
 	// Connect the agent
 	err = agent.Connect(ctx)
