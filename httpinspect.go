@@ -16,8 +16,8 @@ func (e *endpointForwarder) httpJoin(proxy, backend net.Conn) {
 	proxyBuf := bufio.NewReader(proxy)
 	backendBuf := bufio.NewReader(backend)
 
-	defer proxy.Close()
-	defer backend.Close()
+	defer func() { _ = proxy.Close() }()
+	defer func() { _ = backend.Close() }()
 
 	for {
 		startTime := time.Now()
@@ -30,7 +30,7 @@ func (e *endpointForwarder) httpJoin(proxy, backend net.Conn) {
 
 		// Forward request to backend
 		err = req.Write(backend)
-		req.Body.Close()
+		_ = req.Body.Close()
 		if err != nil {
 			break
 		}
@@ -45,7 +45,7 @@ func (e *endpointForwarder) httpJoin(proxy, backend net.Conn) {
 
 		// Forward response to proxy
 		err = resp.Write(proxy)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if err != nil {
 			break
 		}
@@ -74,12 +74,12 @@ func (e *endpointForwarder) joinBuffered(proxyBuf *bufio.Reader, proxy net.Conn,
 	wg := &sync.WaitGroup{}
 
 	wg.Go(func() {
-		defer backend.Close()
+		defer func() { _ = backend.Close() }()
 		_, _ = io.Copy(backend, proxyBuf)
 	})
 
 	wg.Go(func() {
-		defer proxy.Close()
+		defer func() { _ = proxy.Close() }()
 		_, _ = io.Copy(proxy, backendBuf)
 	})
 

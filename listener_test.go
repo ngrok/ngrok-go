@@ -101,8 +101,13 @@ func TestWrapConnWithTLS(t *testing.T) {
 func TestWrapConnWithTLSNil(t *testing.T) {
 	// Create a pipe for testing
 	conn1, conn2 := net.Pipe()
+<<<<<<< HEAD
 	defer conn1.Close() //nolint:errcheck
 	defer conn2.Close() //nolint:errcheck
+=======
+	defer func() { _ = conn1.Close() }()
+	defer func() { _ = conn2.Close() }()
+>>>>>>> 8424646 (satisfy lint by checking errors from conn close calls)
 
 	// Call wrapConnWithTLS with nil config
 	result := wrapConnWithTLS(conn1, nil)

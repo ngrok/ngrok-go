@@ -82,7 +82,7 @@ func (e *endpointForwarder) handleConnection(ctx context.Context, conn net.Conn)
 
 	backend, err := e.connectToBackend(ctx)
 	if err != nil {
-		conn.Close()
+		_ = conn.Close()
 		e.emitConnectionEvent(newConnectionClosed(e, remoteAddr, time.Since(start), 0, 0))
 		return
 	}
@@ -190,7 +190,7 @@ func (e *endpointForwarder) connectToBackend(ctx context.Context) (net.Conn, err
 
 		tlsConn := tls.Client(conn, config)
 		if err := tlsConn.HandshakeContext(ctx); err != nil {
-			conn.Close()
+			_ = conn.Close()
 			return nil, err
 		}
 		return tlsConn, nil
