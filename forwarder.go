@@ -82,7 +82,7 @@ func (e *endpointForwarder) handleConnection(ctx context.Context, conn net.Conn)
 
 	backend, err := e.connectToBackend(ctx)
 	if err != nil {
-		_ = conn.Close()
+		conn.Close() //nolint:errcheck
 		e.emitConnectionEvent(newConnectionClosed(e, remoteAddr, time.Since(start), 0, 0))
 		return
 	}

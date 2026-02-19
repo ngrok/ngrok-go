@@ -16,8 +16,8 @@ func (e *endpointForwarder) httpJoin(proxy, backend net.Conn) {
 	proxyBuf := bufio.NewReader(proxy)
 	backendBuf := bufio.NewReader(backend)
 
-	defer func() { _ = proxy.Close() }()
-	defer func() { _ = backend.Close() }()
+	defer proxy.Close()   //nolint:errcheck
+	defer backend.Close() //nolint:errcheck
 
 	for {
 		startTime := time.Now()
