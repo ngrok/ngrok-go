@@ -80,23 +80,24 @@ func (e *endpointForwarder) handleConnection(ctx context.Context, conn net.Conn)
 
 	e.emitConnectionEvent(newConnectionOpened(e, remoteAddr))
 
-	backend, err := e.connectToBackend(ctx)
-	if err != nil {
-		conn.Close() //nolint:errcheck
-		e.emitConnectionEvent(newConnectionClosed(e, remoteAddr, time.Since(start), 0, 0))
-		return
-	}
-
 	proxyConn := &countingConn{Conn: conn}
-	backendConn := &countingConn{Conn: backend}
 
-	if e.isHTTP() && e.upstreamProtocol != "http2" {
-		e.httpJoin(proxyConn, backendConn)
+	if e.isHTTP() {
+		e.httpServe(proxyConn)
+		e.emitConnectionEvent(newConnectionClosed(e, remoteAddr, time.Since(start), proxyConn.bytesRead.Load(), proxyConn.bytesWritten.Load()))
 	} else {
+		// for non http connections, do the same bidirectional copy
+		// we were already doing
+		backend, err := e.connectToBackend(ctx)
+		if err != nil {
+			conn.Close() //nolint:errcheck
+			e.emitConnectionEvent(newConnectionClosed(e, remoteAddr, time.Since(start), 0, 0))
+			return
+		}
+		backendConn := &countingConn{Conn: backend}
 		e.join(proxyConn, backendConn)
+		e.emitConnectionEvent(newConnectionClosed(e, remoteAddr, time.Since(start), proxyConn.bytesRead.Load(), backendConn.bytesRead.Load()))
 	}
-
-	e.emitConnectionEvent(newConnectionClosed(e, remoteAddr, time.Since(start), proxyConn.bytesRead.Load(), backendConn.bytesRead.Load()))
 }
 
 func (e *endpointForwarder) emitConnectionEvent(evt Event) {
