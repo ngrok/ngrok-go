@@ -1,21 +1,24 @@
 package ngrok
 
 import (
-	"bufio"
+	"context"
 	"crypto/tls"
-	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httputil"
-	"sync"
 	"time"
+
+	"golang.ngrok.com/ngrok/v2/internal/httpx"
 )
 
 // httpServe uses httputil.ReverseProxy to forward HTTP traffic from the proxy
-// connection to the upstream backend
+// connection to the upstream backend.
+//
+// It creates an http.Server with a handler that wraps ReverseProxy and a
+// statusCaptureWriter for event emission, then uses httpx.ServeConnServer
+// to serve the single proxy connection without needing a real net.Listener.
 func (e *endpointForwarder) httpServe(proxyConn net.Conn) {
-	listener := newSingleConnListener(proxyConn)
-
 	target := e.upstreamURL
 	transport := e.buildHTTPTransport()
 
@@ -41,20 +44,15 @@ func (e *endpointForwarder) httpServe(proxyConn net.Conn) {
 		))
 	})
 
-	// server uses http.Server to parse HTTP off the raw net.Conn and
-	// provide the (ResponseWriter, *Request) pair that ReverseProxy needs.
-	// ConnState closes the listener when the connection finishes, which
-	// unblocks the second Accept() call and lets Serve() return.
 	server := &http.Server{
 		Handler: handler,
-		ConnState: func(_ net.Conn, state http.ConnState) {
-			if state == http.StateClosed || state == http.StateHijacked {
-				listener.Close() //nolint:errcheck
-			}
-		},
 	}
 
-	server.Serve(listener) //nolint:errcheck
+	srv := httpx.NewServeConnServer(server, slog.Default())
+
+	go srv.ListenAndServe() //nolint:errcheck
+
+	srv.ServeConn(context.Background(), proxyConn, nil) //nolint:errcheck
 }
 
 // buildHTTPTransport creates an http.Transport configured with the
@@ -82,52 +80,10 @@ func (e *endpointForwarder) buildHTTPTransport() *http.Transport {
 	return transport
 }
 
-// singleConnListener wraps a single net.Conn as a net.Listener.
-// This is needed because http.Server.Serve() only accepts a net.Listener,
-// but we already have an established connection (from ngrok's muxado session)
-// rather than a port to listen on. This adapter feeds that one connection
-// to Serve(), then blocks until the connection is done before letting
-// Serve() exit.
-type singleConnListener struct {
-	conn    net.Conn
-	once    sync.Once
-	closeCh chan struct{}
-}
-
-func newSingleConnListener(conn net.Conn) *singleConnListener {
-	return &singleConnListener{
-		conn:    conn,
-		closeCh: make(chan struct{}),
-	}
-}
-
-func (l *singleConnListener) Accept() (net.Conn, error) {
-	var accepted bool
-	l.once.Do(func() { accepted = true })
-	if accepted {
-		return l.conn, nil
-	}
-	// Block until the connection is closed
-	<-l.closeCh
-	return nil, net.ErrClosed
-}
-
-func (l *singleConnListener) Close() error {
-	select {
-	case <-l.closeCh:
-		// already closed
-	default:
-		close(l.closeCh)
-	}
-	return nil
-}
-
-func (l *singleConnListener) Addr() net.Addr {
-	return l.conn.LocalAddr()
-}
-
 // statusCaptureWriter wraps an http.ResponseWriter to capture the status code
-// for event emission. The Hijack and Flusher functions are preserved
+// for event emission. Unwrap() is provided so that http.ResponseController
+// can discover optional interfaces (Flusher, Hijacker, etc.) on the
+// underlying ResponseWriter.
 type statusCaptureWriter struct {
 	http.ResponseWriter
 	statusCode  int
@@ -148,22 +104,6 @@ func (w *statusCaptureWriter) Write(b []byte) (int, error) {
 		w.wroteHeader = true
 	}
 	return w.ResponseWriter.Write(b)
-}
-
-func (w *statusCaptureWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	hj, ok := w.ResponseWriter.(http.Hijacker)
-	if !ok {
-		return nil, nil, fmt.Errorf("upstream ResponseWriter does not implement http.Hijacker")
-	}
-	return hj.Hijack()
-}
-
-func (w *statusCaptureWriter) Flush() {
-	fl, ok := w.ResponseWriter.(http.Flusher)
-	if ok {
-		fl.Flush()
-	}
-	// todo: maybe log an error?
 }
 
 // Unwrap returns the underlying ResponseWriter for interface detection.
