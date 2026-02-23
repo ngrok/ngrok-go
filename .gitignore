@@ -1,6 +1,6 @@
-/go.work.sum
-.env
-.direnv
 *.swp
-cover.out
+.direnv
+.env
 .idea/*
+/go.work.sum
+cover.out
