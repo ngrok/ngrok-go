@@ -1,4 +1,5 @@
 *.swp
+.claude/settings.local.json
 .direnv
 .env
 .idea/*
