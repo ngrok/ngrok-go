@@ -1,87 +1,112 @@
 package ngrok
 
 import (
-	"bufio"
-	"io"
+	"context"
+	"crypto/tls"
+	"log/slog"
 	"net"
 	"net/http"
-	"sync"
+	"net/http/httputil"
 	"time"
+
+	"golang.ngrok.com/ngrok/v2/internal/httpx"
 )
 
-// httpJoin performs HTTP-aware bidirectional copying between proxy and backend.
-// It parses HTTP request/response cycles and emits EventHTTPRequestComplete for each one.
-// For non-HTTP traffic (e.g. after WebSocket upgrade), it falls back to raw copying.
-func (e *endpointForwarder) httpJoin(proxy, backend net.Conn) {
-	proxyBuf := bufio.NewReader(proxy)
-	backendBuf := bufio.NewReader(backend)
+// httpServe uses httputil.ReverseProxy to forward HTTP traffic from the proxy
+// connection to the upstream backend.
+//
+// It creates an http.Server with a handler that wraps ReverseProxy and a
+// statusCaptureWriter for event emission, then uses httpx.ServeConnServer
+// to serve the single proxy connection without needing a real net.Listener.
+func (e *endpointForwarder) httpServe(proxyConn net.Conn) {
+	target := e.upstreamURL
+	transport := e.buildHTTPTransport()
 
-	defer proxy.Close()   //nolint:errcheck
-	defer backend.Close() //nolint:errcheck
-
-	for {
-		startTime := time.Now()
-
-		// Read request from proxy
-		req, err := http.ReadRequest(proxyBuf)
-		if err != nil {
-			break
-		}
-
-		// Forward request to backend
-		err = req.Write(backend)
-		_ = req.Body.Close()
-		if err != nil {
-			break
-		}
-
-		// Read response from backend
-		resp, err := http.ReadResponse(backendBuf, req)
-		if err != nil {
-			break
-		}
-
-		isUpgrade := resp.StatusCode == http.StatusSwitchingProtocols
-
-		// Forward response to proxy
-		err = resp.Write(proxy)
-		_ = resp.Body.Close()
-		if err != nil {
-			break
-		}
-
-		// Emit HTTP request complete event
-		e.emitConnectionEvent(newHTTPRequestComplete(
-			e, req.Method, req.URL.RequestURI(), resp.StatusCode, time.Since(startTime),
-		))
-
-		// After protocol upgrade (e.g. WebSocket), fall back to raw copy
-		if isUpgrade {
-			e.joinBuffered(proxyBuf, proxy, backendBuf, backend)
-			return
-		}
-
-		// Check if connection should close
-		if resp.Close {
-			break
-		}
+	rp := &httputil.ReverseProxy{
+		Rewrite: func(pr *httputil.ProxyRequest) {
+			pr.SetURL(&target)
+			// Preserve the original Host header from the inbound request
+			pr.Out.Host = pr.In.Host
+		},
+		Transport: transport,
 	}
+
+	// handler wraps the ReverseProxy to capture per-request metrics.
+	// We use a statusCaptureWriter to intercept the status code written
+	// by ReverseProxy so we can emit EventHTTPRequestComplete with the
+	// method, path, status, and duration of each request/response cycle.
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		sw := &statusCaptureWriter{ResponseWriter: w}
+		rp.ServeHTTP(sw, r)
+		e.emitConnectionEvent(newHTTPRequestComplete(
+			e, r.Method, r.URL.RequestURI(), sw.statusCode, time.Since(start),
+		))
+	})
+
+	server := &http.Server{
+		Handler: handler,
+	}
+
+	srv := httpx.NewServeConnServer(server, slog.Default())
+
+	go srv.ListenAndServe() //nolint:errcheck
+
+	srv.ServeConn(context.Background(), proxyConn, nil) //nolint:errcheck
 }
 
-// joinBuffered performs raw bidirectional copy using buffered readers.
-// Used after WebSocket upgrade when there may be buffered data in the readers.
-func (e *endpointForwarder) joinBuffered(proxyBuf *bufio.Reader, proxy net.Conn, backendBuf *bufio.Reader, backend net.Conn) {
-	wg := &sync.WaitGroup{}
+// buildHTTPTransport creates an http.Transport configured with the
+// endpoint's upstream settings
+func (e *endpointForwarder) buildHTTPTransport() *http.Transport {
+	tlsConfig := &tls.Config{
+		ServerName: e.upstreamURL.Hostname(),
+	}
+	if e.upstreamTLSClientConfig != nil {
+		tlsConfig = e.upstreamTLSClientConfig.Clone()
+		if tlsConfig.ServerName == "" {
+			tlsConfig.ServerName = e.upstreamURL.Hostname()
+		}
+	}
 
-	wg.Go(func() {
-		defer func() { _ = backend.Close() }()
-		_, _ = io.Copy(backend, proxyBuf)
-	})
+	transport := &http.Transport{
+		TLSClientConfig:   tlsConfig,
+		ForceAttemptHTTP2: e.upstreamProtocol == "http2",
+	}
 
-	wg.Go(func() {
-		defer func() { _ = proxy.Close() }()
-		_, _ = io.Copy(proxy, backendBuf)
-	})
+	if e.upstreamDialer != nil {
+		transport.DialContext = e.upstreamDialer.DialContext
+	}
 
-	wg.Wait()
+	return transport
+}
+
+// statusCaptureWriter wraps an http.ResponseWriter to capture the status code
+// for event emission. Unwrap() is provided so that http.ResponseController
+// can discover optional interfaces (Flusher, Hijacker, etc.) on the
+// underlying ResponseWriter.
+type statusCaptureWriter struct {
+	http.ResponseWriter
+	statusCode  int
+	wroteHeader bool
+}
+
+func (w *statusCaptureWriter) WriteHeader(code int) {
+	if !w.wroteHeader {
+		w.statusCode = code
+		w.wroteHeader = true
+	}
+	w.ResponseWriter.WriteHeader(code)
+}
+
+func (w *statusCaptureWriter) Write(b []byte) (int, error) {
+	if !w.wroteHeader {
+		w.statusCode = http.StatusOK
+		w.wroteHeader = true
+	}
+	return w.ResponseWriter.Write(b)
+}
+
+// Unwrap returns the underlying ResponseWriter for interface detection.
+func (w *statusCaptureWriter) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
 }
