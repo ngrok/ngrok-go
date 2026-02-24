@@ -1,6 +1,7 @@
-/go.work.sum
-.env
-.direnv
 *.swp
-cover.out
+.claude/settings.local.json
+.direnv
+.env
 .idea/*
+/go.work.sum
+cover.out

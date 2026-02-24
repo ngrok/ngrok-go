@@ -31,6 +31,9 @@ type Endpoint interface {
 	// Done returns a channel that is closed when the endpoint stops.
 	Done() <-chan struct{}
 
+	// Wait blocks until the endpoint stops.
+	Wait()
+
 	// ID returns the unique endpoint identifier assigned by the ngrok cloud service.
 	ID() string
 
@@ -84,6 +87,10 @@ func (e *baseEndpoint) Description() string {
 
 func (e *baseEndpoint) Done() <-chan struct{} {
 	return e.doneChannel
+}
+
+func (e *baseEndpoint) Wait() {
+	<-e.doneChannel
 }
 
 func (e *baseEndpoint) ID() string {
