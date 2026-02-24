@@ -53,6 +53,7 @@ func (e *endpointForwarder) httpServe(proxyConn net.Conn) {
 	go srv.ListenAndServe() //nolint:errcheck
 
 	srv.ServeConn(context.Background(), proxyConn, nil) //nolint:errcheck
+	server.Close()                                      //nolint:errcheck
 }
 
 // buildHTTPTransport creates an http.Transport configured with the
