@@ -13,10 +13,10 @@ jobs:
     name: lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 2
-      - uses: cachix/install-nix-action@v18
+      - uses: cachix/install-nix-action@v27
       - uses: HatsuneMiku3939/direnv-action@v1
       - name: direnv allow
         run: direnv allow .
