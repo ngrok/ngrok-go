@@ -4,11 +4,11 @@ go 1.25.7
 
 require (
 	github.com/jpillora/backoff v1.0.0
-	github.com/stretchr/testify v1.8.4
+	github.com/stretchr/testify v1.11.1
 	go.uber.org/multierr v1.11.0
 	golang.ngrok.com/muxado/v2 v2.0.1
-	golang.org/x/net v0.30.0
-	google.golang.org/protobuf v1.35.1
+	golang.org/x/net v0.50.0
+	google.golang.org/protobuf v1.36.11
 )
 
 require (
