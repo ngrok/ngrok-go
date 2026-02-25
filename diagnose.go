@@ -36,11 +36,11 @@ type DiagnoseResult struct {
 	FailedStep string
 }
 
-// Diagnosable is implemented by Agent types that support pre-connection
+// Diagnoser is implemented by Agent types that support pre-connection
 // diagnostic probing. Use a type assertion to access it:
 //
-//	d, ok := agent.(ngrok.Diagnosable)
-type Diagnosable interface {
+//	d, ok := agent.(ngrok.Diagnoser)
+type Diagnoser interface {
 	// Diagnose tests connectivity to the configured tunnel server by probing
 	// each address in addrs independently through TCP, TLS, and the Muxado
 	// tunnel protocol. It uses the Agent's configured TLS settings, CA roots,

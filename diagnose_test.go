@@ -35,7 +35,7 @@ func TestDiagnoseTCPFailure(t *testing.T) {
 	a, err := NewAgent()
 	require.NoError(t, err)
 
-	d, ok := a.(Diagnosable)
+	d, ok := a.(Diagnoser)
 	require.True(t, ok, "agent should implement Diagnosable")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -70,7 +70,7 @@ func TestDiagnoseTLSFailure(t *testing.T) {
 	a, err := NewAgent(WithAgentConnectURL(l.Addr().String()))
 	require.NoError(t, err)
 
-	d := a.(Diagnosable)
+	d := a.(Diagnoser)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -145,7 +145,7 @@ func TestDiagnoseMuxadoSuccess(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	d := a.(Diagnosable)
+	d := a.(Diagnoser)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -189,7 +189,7 @@ func TestDiagnoseMultipleAddrs(t *testing.T) {
 	a, err := NewAgent(WithAgentConnectURL(lTCP.Addr().String()))
 	require.NoError(t, err)
 
-	d := a.(Diagnosable)
+	d := a.(Diagnoser)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -228,7 +228,7 @@ func TestDiagnoseOnline(t *testing.T) {
 	a, err := NewAgent(agentOpts...)
 	require.NoError(t, err)
 
-	d, ok := a.(Diagnosable)
+	d, ok := a.(Diagnoser)
 	require.True(t, ok)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
