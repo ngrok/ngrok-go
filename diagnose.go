@@ -1,6 +1,7 @@
 package ngrok
 
 import (
+	"cmp"
 	"context"
 	"crypto/tls"
 	"fmt"
@@ -77,10 +78,7 @@ func (a *agent) Diagnose(ctx context.Context, addrs []string) ([]DiagnoseResult,
 		return nil, err
 	}
 
-	logger := a.opts.logger
-	if logger == nil {
-		logger = slog.Default()
-	}
+	logger := cmp.Or(a.opts.logger, slog.Default())
 
 	results := make([]DiagnoseResult, 0, len(addrs))
 	for _, addr := range addrs {
@@ -92,10 +90,7 @@ func (a *agent) Diagnose(ctx context.Context, addrs []string) ([]DiagnoseResult,
 // buildDiagnosticDialer returns the effective dialer for probes, applying
 // proxy configuration without mutating agent state.
 func (a *agent) buildDiagnosticDialer() (Dialer, error) {
-	baseDialer := a.opts.dialer
-	if baseDialer == nil {
-		baseDialer = &net.Dialer{}
-	}
+	baseDialer := cmp.Or(a.opts.dialer, Dialer(&net.Dialer{}))
 	if a.opts.proxyURL == "" {
 		return baseDialer, nil
 	}
