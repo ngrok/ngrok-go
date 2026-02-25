@@ -14,7 +14,7 @@ import (
 	muxado "golang.ngrok.com/muxado/v2"
 
 	"golang.ngrok.com/ngrok/v2/internal/legacy"
-	tunnel_client "golang.ngrok.com/ngrok/v2/internal/tunnel/client"
+	tunnelclient "golang.ngrok.com/ngrok/v2/internal/tunnel/client"
 	"golang.ngrok.com/ngrok/v2/internal/tunnel/proto"
 )
 
@@ -158,7 +158,7 @@ func (a *agent) probeAddr(ctx context.Context, logger *slog.Logger, dialer Diale
 
 	// Muxado + SrvInfo
 	muxSess := muxado.Client(tlsConn, nil)
-	raw := tunnel_client.NewRawSession(logger, muxSess, nil, nopSessionHandler{})
+	raw := tunnelclient.NewRawSession(logger, muxSess, nil, nopSessionHandler{})
 	defer raw.Close() //nolint:errcheck
 
 	start := time.Now()
@@ -179,7 +179,7 @@ func (a *agent) probeAddr(ctx context.Context, logger *slog.Logger, dialer Diale
 // dispatch to these methods.
 type nopSessionHandler struct{}
 
-func (nopSessionHandler) OnStop(*proto.Stop, tunnel_client.HandlerRespFunc)             {}
-func (nopSessionHandler) OnRestart(*proto.Restart, tunnel_client.HandlerRespFunc)       {}
-func (nopSessionHandler) OnUpdate(*proto.Update, tunnel_client.HandlerRespFunc)         {}
-func (nopSessionHandler) OnStopTunnel(*proto.StopTunnel, tunnel_client.HandlerRespFunc) {}
+func (nopSessionHandler) OnStop(*proto.Stop, tunnelclient.HandlerRespFunc)             {}
+func (nopSessionHandler) OnRestart(*proto.Restart, tunnelclient.HandlerRespFunc)       {}
+func (nopSessionHandler) OnUpdate(*proto.Update, tunnelclient.HandlerRespFunc)         {}
+func (nopSessionHandler) OnStopTunnel(*proto.StopTunnel, tunnelclient.HandlerRespFunc) {}
