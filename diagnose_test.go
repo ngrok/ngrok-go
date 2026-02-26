@@ -27,7 +27,7 @@ import (
 // is reported as a TCP step failure.
 func TestDiagnoseTCPFailure(t *testing.T) {
 	// Bind and immediately close a listener so the port is unreachable.
-	l, err := net.Listen("tcp", "127.0.0.1:0")
+	l, err := net.Listen("tcp", "localhost:0")
 	require.NoError(t, err)
 	addr := l.Addr().String()
 	_ = l.Close()
@@ -47,7 +47,7 @@ func TestDiagnoseTCPFailure(t *testing.T) {
 // TestDiagnoseTLSFailure verifies that a TCP-only server (no TLS) is reported
 // as a TLS step failure.
 func TestDiagnoseTLSFailure(t *testing.T) {
-	l, err := net.Listen("tcp", "127.0.0.1:0")
+	l, err := net.Listen("tcp", "localhost:0")
 	require.NoError(t, err)
 	defer l.Close() //nolint:errcheck
 
@@ -82,7 +82,7 @@ func TestDiagnoseMuxadoSuccess(t *testing.T) {
 		Subject:      pkix.Name{CommonName: "diagnose-test"},
 		NotBefore:    time.Now().Add(-time.Hour),
 		NotAfter:     time.Now().Add(24 * time.Hour),
-		IPAddresses:  []net.IP{net.ParseIP("127.0.0.1")},
+		DNSNames:     []string{"localhost"},
 	}
 	certDER, err := x509.CreateCertificate(rand.Reader, template, template, &priv.PublicKey, priv)
 	require.NoError(t, err)
@@ -91,7 +91,7 @@ func TestDiagnoseMuxadoSuccess(t *testing.T) {
 		Certificates: []tls.Certificate{{Certificate: [][]byte{certDER}, PrivateKey: priv}},
 	}
 
-	l, err := tls.Listen("tcp", "127.0.0.1:0", tlsServerCfg)
+	l, err := tls.Listen("tcp", "localhost:0", tlsServerCfg)
 	require.NoError(t, err)
 	defer l.Close() //nolint:errcheck
 
