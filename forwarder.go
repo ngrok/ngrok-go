@@ -1,6 +1,7 @@
 package ngrok
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/binary"
@@ -96,8 +97,10 @@ func (e *endpointForwarder) handleConnection(ctx context.Context, conn net.Conn)
 		// pre-TLS preamble it expects.
 		var proxyHeader []byte
 		if e.proxyProtocol != "" && usesTLS(e.upstreamURL.Scheme) {
+			_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
 			var err error
 			proxyHeader, err = readProxyProtocolHeader(conn)
+			_ = conn.SetReadDeadline(time.Time{})
 			if err != nil {
 				conn.Close() //nolint:errcheck
 				e.emitConnectionEvent(newConnectionClosed(e, remoteAddr, time.Since(start), 0, 0))
@@ -191,7 +194,7 @@ func (e *endpointForwarder) connectToBackend(ctx context.Context, proxyHeader []
 	// Write the PROXY protocol header to the raw TCP connection before TLS so
 	// the backend sees it as a plaintext preamble preceding the handshake.
 	if len(proxyHeader) > 0 {
-		if _, err := conn.Write(proxyHeader); err != nil {
+		if _, err := io.Copy(conn, bytes.NewReader(proxyHeader)); err != nil {
 			conn.Close() //nolint:errcheck
 			return nil, fmt.Errorf("write proxy protocol header: %w", err)
 		}
@@ -333,6 +336,14 @@ func readProxyV1Tail(r io.Reader) ([]byte, error) {
 	return nil, fmt.Errorf("proxy protocol v1: header exceeds maximum length")
 }
 
+// proxyV2SigTail is the remaining 11 bytes of the PROXY v2 signature after the
+// leading 0x0D byte that was already consumed by the caller.
+var proxyV2SigTail = []byte{0x0A, 0x0D, 0x0A, 0x00, 0x0D, 0x0A, 0x51, 0x55, 0x49, 0x54, 0x0A}
+
+// maxProxyV2AddrLen caps the address+TLV block to prevent large allocations
+// from attacker-controlled length fields.
+const maxProxyV2AddrLen = 2048
+
 // readProxyV2Tail reads the remainder of a PROXY v2 header after the leading
 // 0x0D byte. The fixed header is 16 bytes total; the address block length is
 // the big-endian uint16 at bytes 14-15.
@@ -342,9 +353,28 @@ func readProxyV2Tail(r io.Reader) ([]byte, error) {
 	if _, err := io.ReadFull(r, fixed); err != nil {
 		return nil, fmt.Errorf("proxy protocol v2 fixed header: %w", err)
 	}
+
+	// Validate the remaining 11 bytes of the 12-byte signature.
+	if !bytes.Equal(fixed[0:11], proxyV2SigTail) {
+		return nil, fmt.Errorf("proxy protocol v2: invalid signature")
+	}
+
+	// Validate version (high nibble must be 0x2) and command (low nibble
+	// must be LOCAL=0x0 or PROXY=0x1).
+	verCmd := fixed[11]
+	if verCmd>>4 != 0x2 {
+		return nil, fmt.Errorf("proxy protocol v2: unsupported version %d", verCmd>>4)
+	}
+	if cmd := verCmd & 0x0F; cmd != 0x0 && cmd != 0x1 {
+		return nil, fmt.Errorf("proxy protocol v2: unsupported command %d", cmd)
+	}
+
 	// Bytes 14-15 of the full header are at indices 13-14 of `fixed`
 	// (we already consumed byte 0).
 	addrLen := binary.BigEndian.Uint16(fixed[13:15])
+	if addrLen > maxProxyV2AddrLen {
+		return nil, fmt.Errorf("proxy protocol v2: addr length %d exceeds maximum %d", addrLen, maxProxyV2AddrLen)
+	}
 	addr := make([]byte, addrLen)
 	if _, err := io.ReadFull(r, addr); err != nil {
 		return nil, fmt.Errorf("proxy protocol v2 address data: %w", err)
