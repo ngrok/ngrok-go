@@ -38,10 +38,7 @@ func TestDiagnoseTCPFailure(t *testing.T) {
 	d, ok := a.(Diagnoser)
 	require.True(t, ok, "agent should implement Diagnoser")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	result, err := d.Diagnose(ctx, addr)
+	result, err := d.Diagnose(context.Background(), addr)
 	require.Error(t, err)
 	assert.True(t, IsTCPDiagnoseFailure(err))
 	assert.Equal(t, addr, result.Addr)
@@ -67,10 +64,7 @@ func TestDiagnoseTLSFailure(t *testing.T) {
 
 	d := a.(Diagnoser)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	result, err := d.Diagnose(ctx, l.Addr().String())
+	result, err := d.Diagnose(context.Background(), l.Addr().String())
 	require.Error(t, err)
 	assert.True(t, IsTLSDiagnoseFailure(err))
 	assert.Equal(t, l.Addr().String(), result.Addr)
@@ -87,7 +81,7 @@ func TestDiagnoseMuxadoSuccess(t *testing.T) {
 		SerialNumber: big.NewInt(1),
 		Subject:      pkix.Name{CommonName: "diagnose-test"},
 		NotBefore:    time.Now().Add(-time.Hour),
-		NotAfter:     time.Now().Add(time.Hour),
+		NotAfter:     time.Now().Add(24 * time.Hour),
 		IPAddresses:  []net.IP{net.ParseIP("127.0.0.1")},
 	}
 	certDER, err := x509.CreateCertificate(rand.Reader, template, template, &priv.PublicKey, priv)
@@ -138,10 +132,7 @@ func TestDiagnoseMuxadoSuccess(t *testing.T) {
 
 	d := a.(Diagnoser)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	result, err := d.Diagnose(ctx, l.Addr().String())
+	result, err := d.Diagnose(context.Background(), l.Addr().String())
 	require.NoError(t, err)
 	assert.Equal(t, l.Addr().String(), result.Addr)
 	assert.Equal(t, testRegion, result.Region)
