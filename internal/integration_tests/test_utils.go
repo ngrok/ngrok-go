@@ -90,8 +90,8 @@ func MakeHTTPRequest(t *testing.T, ctx context.Context, url string, message stri
 
 // WaitForForwarderReady polls the forwarder endpoint until it responds or times out
 func WaitForForwarderReady(t *testing.T, url string) {
-	client := &http.Client{Timeout: 2 * time.Second}
-	for start := time.Now(); time.Since(start) < 10*time.Second; {
+	client := &http.Client{Timeout: 100 * time.Millisecond}
+	for start := time.Now(); time.Since(start) < 500*time.Millisecond; {
 		resp, err := client.Get(url)
 		if err == nil {
 			resp.Body.Close()
