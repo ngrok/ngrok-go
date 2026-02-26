@@ -118,8 +118,8 @@ func TestDiagnoseMuxadoSuccess(t *testing.T) {
 			if streamType == proto.SrvInfoReq {
 				var req proto.SrvInfo
 				_ = json.NewDecoder(stream).Decode(&req)
-				_ = json.NewEncoder(stream).Encode(proto.SrvInfoResp{Region: testRegion})
-				_ = stream.Close()
+				assert.NoError(t, json.NewEncoder(stream).Encode(proto.SrvInfoResp{Region: testRegion}))
+				assert.NoError(t, stream.Close())
 				return
 			}
 			// Drain any other stream types (e.g. heartbeat).
