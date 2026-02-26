@@ -30,37 +30,37 @@ type DiagnoseResult struct {
 	Latency time.Duration
 }
 
-// DiagnoseError is returned by [Diagnoser.Diagnose] when a probe step fails.
+// diagnoseError is returned by [Diagnoser.Diagnose] when a probe step fails.
 // Use [IsTCPDiagnoseFailure], [IsTLSDiagnoseFailure], or
 // [IsMuxadoDiagnoseFailure] to determine which step failed.
-type DiagnoseError struct {
+type diagnoseError struct {
 	// Step is the probe step that failed: "tcp", "tls", or "muxado".
 	Step string
 	// Err is the underlying error.
 	Err error
 }
 
-func (e *DiagnoseError) Error() string {
+func (e *diagnoseError) Error() string {
 	return fmt.Sprintf("diagnose %s: %v", e.Step, e.Err)
 }
 
-func (e *DiagnoseError) Unwrap() error { return e.Err }
+func (e *diagnoseError) Unwrap() error { return e.Err }
 
 // IsTCPDiagnoseFailure reports whether err is a TCP-level probe failure.
 func IsTCPDiagnoseFailure(err error) bool {
-	var de *DiagnoseError
+	var de *diagnoseError
 	return errors.As(err, &de) && de.Step == "tcp"
 }
 
 // IsTLSDiagnoseFailure reports whether err is a TLS-level probe failure.
 func IsTLSDiagnoseFailure(err error) bool {
-	var de *DiagnoseError
+	var de *diagnoseError
 	return errors.As(err, &de) && de.Step == "tls"
 }
 
 // IsMuxadoDiagnoseFailure reports whether err is a muxado-level probe failure.
 func IsMuxadoDiagnoseFailure(err error) bool {
-	var de *DiagnoseError
+	var de *diagnoseError
 	return errors.As(err, &de) && de.Step == "muxado"
 }
 
@@ -138,7 +138,7 @@ func (a *agent) probeAddr(ctx context.Context, logger *slog.Logger, dialer Diale
 	// TCP
 	conn, err := dialer.DialContext(ctx, "tcp", addr)
 	if err != nil {
-		return result, &DiagnoseError{Step: "tcp", Err: err}
+		return result, &diagnoseError{Step: "tcp", Err: err}
 	}
 	defer conn.Close() //nolint:errcheck
 
@@ -163,7 +163,7 @@ func (a *agent) probeAddr(ctx context.Context, logger *slog.Logger, dialer Diale
 	}
 	tlsConn := tls.Client(conn, tlsCfg)
 	if err := tlsConn.HandshakeContext(ctx); err != nil {
-		return result, &DiagnoseError{Step: "tls", Err: err}
+		return result, &diagnoseError{Step: "tls", Err: err}
 	}
 
 	// Muxado + SrvInfo
@@ -174,7 +174,7 @@ func (a *agent) probeAddr(ctx context.Context, logger *slog.Logger, dialer Diale
 	start := time.Now()
 	info, err := raw.SrvInfo()
 	if err != nil {
-		return result, &DiagnoseError{Step: "muxado", Err: err}
+		return result, &diagnoseError{Step: "muxado", Err: err}
 	}
 	result.Region = info.Region
 	result.Latency = time.Since(start)
