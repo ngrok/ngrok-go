@@ -113,6 +113,87 @@ func TestReadProxyProtocolHeaderUnknown(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestReadProxyProtocolHeaderV2_InvalidSignature(t *testing.T) {
+	// Starts with 0x0D but the rest of the signature is wrong.
+	bad := make([]byte, 16)
+	bad[0] = 0x0D
+	// Fill remaining with garbage instead of the real signature tail.
+	for i := 1; i < 16; i++ {
+		bad[i] = 0xFF
+	}
+	r := bytes.NewReader(bad)
+	_, err := readProxyProtocolHeader(r)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid signature")
+}
+
+func TestReadProxyProtocolHeaderV2_BadVersion(t *testing.T) {
+	// Valid signature but version nibble = 0x1 instead of 0x2.
+	sig := []byte{0x0D, 0x0A, 0x0D, 0x0A, 0x00, 0x0D, 0x0A, 0x51, 0x55, 0x49, 0x54, 0x0A}
+	verCmd := byte(0x11) // version 1, PROXY command
+	fam := byte(0x11)
+	lenBuf := [2]byte{0x00, 0x04}
+	var header []byte
+	header = append(header, sig...)
+	header = append(header, verCmd, fam)
+	header = append(header, lenBuf[:]...)
+	header = append(header, 0, 0, 0, 0) // dummy addr data
+	r := bytes.NewReader(header)
+	_, err := readProxyProtocolHeader(r)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unsupported version")
+}
+
+func TestReadProxyProtocolHeaderV2_BadCommand(t *testing.T) {
+	// Valid signature, version 2, but command = 0xF (invalid).
+	sig := []byte{0x0D, 0x0A, 0x0D, 0x0A, 0x00, 0x0D, 0x0A, 0x51, 0x55, 0x49, 0x54, 0x0A}
+	verCmd := byte(0x2F) // version 2, command 0xF
+	fam := byte(0x11)
+	lenBuf := [2]byte{0x00, 0x04}
+	var header []byte
+	header = append(header, sig...)
+	header = append(header, verCmd, fam)
+	header = append(header, lenBuf[:]...)
+	header = append(header, 0, 0, 0, 0)
+	r := bytes.NewReader(header)
+	_, err := readProxyProtocolHeader(r)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unsupported command")
+}
+
+func TestReadProxyProtocolHeaderV2_AddrLenExceedsMax(t *testing.T) {
+	sig := []byte{0x0D, 0x0A, 0x0D, 0x0A, 0x00, 0x0D, 0x0A, 0x51, 0x55, 0x49, 0x54, 0x0A}
+	verCmd := byte(0x21) // version 2, PROXY command
+	fam := byte(0x11)
+	lenBuf := [2]byte{}
+	binary.BigEndian.PutUint16(lenBuf[:], 0xFFFF) // 65535, way over cap
+	var header []byte
+	header = append(header, sig...)
+	header = append(header, verCmd, fam)
+	header = append(header, lenBuf[:]...)
+	r := bytes.NewReader(header)
+	_, err := readProxyProtocolHeader(r)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exceeds maximum")
+}
+
+func TestReadProxyProtocolHeaderV2_LocalCommand(t *testing.T) {
+	// LOCAL command (0x20) should be accepted.
+	sig := []byte{0x0D, 0x0A, 0x0D, 0x0A, 0x00, 0x0D, 0x0A, 0x51, 0x55, 0x49, 0x54, 0x0A}
+	verCmd := byte(0x20) // version 2, LOCAL command
+	fam := byte(0x00)    // AF_UNSPEC for LOCAL
+	lenBuf := [2]byte{0x00, 0x00}
+	var header []byte
+	header = append(header, sig...)
+	header = append(header, verCmd, fam)
+	header = append(header, lenBuf[:]...)
+
+	r := bytes.NewReader(header)
+	got, err := readProxyProtocolHeader(r)
+	require.NoError(t, err)
+	assert.Equal(t, header, got)
+}
+
 // --- end-to-end: PROXY header delivered before TLS ---
 
 // TestConnectToBackendWritesProxyHeaderBeforeTLS verifies that when
