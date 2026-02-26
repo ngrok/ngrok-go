@@ -42,6 +42,8 @@ type DiagnoseResult struct {
 //
 //	d, ok := agent.(ngrok.Diagnoser)
 type Diagnoser interface {
+	Agent
+
 	// Diagnose tests connectivity to the configured tunnel server by probing
 	// each address in addrs independently through TCP, TLS, and the Muxado
 	// tunnel protocol. It uses the Agent's configured TLS settings, CA roots,
