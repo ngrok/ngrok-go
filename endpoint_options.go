@@ -164,11 +164,6 @@ func configureHTTPEndpoint(endpointOpts *endpointOpts) (config.Tunnel, error) {
 		configOpts = append(configOpts, config.WithProxyProto(endpointOpts.proxyProtoVersion))
 	}
 
-	// Set upstream protocol if specified (maps to AppProtocol in the SDK)
-	if endpointOpts.upstreamProtocol != "" {
-		configOpts = append(configOpts, config.WithAppProtocol(endpointOpts.upstreamProtocol))
-	}
-
 	// Note: upstreamVerifyTLSCAs is not currently supported in the legacy SDK
 	// We'll need to implement this in a future version
 

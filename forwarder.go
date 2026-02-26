@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -74,16 +75,60 @@ func (e *endpointForwarder) forwardLoop(ctx context.Context) {
 
 // handleConnection processes a single connection
 func (e *endpointForwarder) handleConnection(ctx context.Context, conn net.Conn) {
-	// Connect to the backend server
-	backend, err := e.connectToBackend(ctx)
-	if err != nil {
-		_ = conn.Close()
-		// Could log the error here
-		return
-	}
+	start := time.Now()
+	remoteAddr := conn.RemoteAddr().String()
 
-	// Copy data bidirectionally - join will close both connections
-	e.join(conn, backend)
+	e.emitConnectionEvent(newConnectionOpened(e, remoteAddr))
+
+	proxyConn := &countingConn{Conn: conn}
+
+	if e.isHTTP() {
+		e.httpServe(proxyConn)
+		e.emitConnectionEvent(newConnectionClosed(e, remoteAddr, time.Since(start), proxyConn.bytesRead.Load(), proxyConn.bytesWritten.Load()))
+	} else {
+		backend, err := e.connectToBackend(ctx)
+		if err != nil {
+			conn.Close() //nolint:errcheck
+			e.emitConnectionEvent(newConnectionClosed(e, remoteAddr, time.Since(start), 0, 0))
+			return
+		}
+		backendConn := &countingConn{Conn: backend}
+		e.join(proxyConn, backendConn)
+		e.emitConnectionEvent(newConnectionClosed(e, remoteAddr, time.Since(start), proxyConn.bytesRead.Load(), backendConn.bytesRead.Load()))
+	}
+}
+
+func (e *endpointForwarder) emitConnectionEvent(evt Event) {
+	if a, ok := e.agent.(*agent); ok {
+		a.emitEvent(evt)
+	}
+}
+
+func (e *endpointForwarder) isHTTP() bool {
+	switch strings.ToLower(e.upstreamURL.Scheme) {
+	case "http", "https":
+		return true
+	default:
+		return false
+	}
+}
+
+type countingConn struct {
+	net.Conn
+	bytesRead    atomic.Int64
+	bytesWritten atomic.Int64
+}
+
+func (c *countingConn) Read(p []byte) (int, error) {
+	n, err := c.Conn.Read(p)
+	c.bytesRead.Add(int64(n))
+	return n, err
+}
+
+func (c *countingConn) Write(p []byte) (int, error) {
+	n, err := c.Conn.Write(p)
+	c.bytesWritten.Add(int64(n))
+	return n, err
 }
 
 // connectToBackend establishes a connection to the upstream URL

@@ -9,6 +9,9 @@ const (
 	EventTypeAgentConnectSucceeded EventType = iota
 	EventTypeAgentDisconnected
 	EventTypeAgentHeartbeatReceived
+	EventTypeConnectionOpened
+	EventTypeConnectionClosed
+	EventTypeHTTPRequestComplete
 )
 
 func (t EventType) String() string {
@@ -16,6 +19,9 @@ func (t EventType) String() string {
 		"AgentConnectSucceeded",
 		"AgentDisconnected",
 		"AgentHeartbeatReceived",
+		"ConnectionOpened",
+		"ConnectionClosed",
+		"HTTPRequestComplete",
 	}[t]
 }
 
@@ -63,7 +69,6 @@ type EventAgentHeartbeatReceived struct {
 	Latency time.Duration
 }
 
-// newAgentConnectSucceeded creates a new EventAgentConnectSucceeded event
 func newAgentConnectSucceeded(agent Agent, session AgentSession) *EventAgentConnectSucceeded {
 	return &EventAgentConnectSucceeded{
 		baseEvent: baseEvent{
@@ -75,7 +80,6 @@ func newAgentConnectSucceeded(agent Agent, session AgentSession) *EventAgentConn
 	}
 }
 
-// newAgentDisconnected creates a new EventAgentDisconnected event
 func newAgentDisconnected(agent Agent, session AgentSession, err error) *EventAgentDisconnected {
 	return &EventAgentDisconnected{
 		baseEvent: baseEvent{
@@ -88,7 +92,6 @@ func newAgentDisconnected(agent Agent, session AgentSession, err error) *EventAg
 	}
 }
 
-// newAgentHeartbeatReceived creates a new EventAgentHeartbeatReceived event
 func newAgentHeartbeatReceived(agent Agent, session AgentSession, latency time.Duration) *EventAgentHeartbeatReceived {
 	return &EventAgentHeartbeatReceived{
 		baseEvent: baseEvent{
@@ -98,5 +101,71 @@ func newAgentHeartbeatReceived(agent Agent, session AgentSession, latency time.D
 		Agent:   agent,
 		Session: session,
 		Latency: latency,
+	}
+}
+
+// EventConnectionOpened is emitted when a new connection is accepted by a forwarder
+type EventConnectionOpened struct {
+	baseEvent
+	Endpoint   Endpoint
+	RemoteAddr string
+}
+
+// EventConnectionClosed is emitted when a forwarded connection is closed
+type EventConnectionClosed struct {
+	baseEvent
+	Endpoint   Endpoint
+	RemoteAddr string
+	Duration   time.Duration
+	BytesIn    int64
+	BytesOut   int64
+}
+
+func newConnectionOpened(endpoint Endpoint, remoteAddr string) *EventConnectionOpened {
+	return &EventConnectionOpened{
+		baseEvent: baseEvent{
+			Type:       EventTypeConnectionOpened,
+			OccurredAt: time.Now(),
+		},
+		Endpoint:   endpoint,
+		RemoteAddr: remoteAddr,
+	}
+}
+
+func newConnectionClosed(endpoint Endpoint, remoteAddr string, duration time.Duration, bytesIn, bytesOut int64) *EventConnectionClosed {
+	return &EventConnectionClosed{
+		baseEvent: baseEvent{
+			Type:       EventTypeConnectionClosed,
+			OccurredAt: time.Now(),
+		},
+		Endpoint:   endpoint,
+		RemoteAddr: remoteAddr,
+		Duration:   duration,
+		BytesIn:    bytesIn,
+		BytesOut:   bytesOut,
+	}
+}
+
+// EventHTTPRequestComplete is emitted when an HTTP request/response cycle completes
+type EventHTTPRequestComplete struct {
+	baseEvent
+	Endpoint   Endpoint
+	Method     string
+	Path       string
+	StatusCode int
+	Duration   time.Duration
+}
+
+func newHTTPRequestComplete(endpoint Endpoint, method, path string, statusCode int, duration time.Duration) *EventHTTPRequestComplete {
+	return &EventHTTPRequestComplete{
+		baseEvent: baseEvent{
+			Type:       EventTypeHTTPRequestComplete,
+			OccurredAt: time.Now(),
+		},
+		Endpoint:   endpoint,
+		Method:     method,
+		Path:       path,
+		StatusCode: statusCode,
+		Duration:   duration,
 	}
 }
