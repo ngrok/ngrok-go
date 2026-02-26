@@ -98,7 +98,10 @@ func TestDiagnoseMuxadoSuccess(t *testing.T) {
 	const testRegion = "test-us"
 
 	// Run a minimal Muxado server that responds to a single SrvInfo RPC.
+	muxadoDone := make(chan struct{})
+	defer func() { <-muxadoDone }()
 	go func() {
+		defer close(muxadoDone)
 		conn, err := l.Accept()
 		if err != nil {
 			return
