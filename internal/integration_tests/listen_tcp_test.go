@@ -61,6 +61,7 @@ func TestListenAndTCPConnection(t *testing.T) {
 		// Signal that the request is complete
 		requestComplete.Signal()
 	}()
+	t.Cleanup(func() { <-done })
 
 	// Wait for the handler to be ready to accept connections
 	handlerReady.Wait(t)

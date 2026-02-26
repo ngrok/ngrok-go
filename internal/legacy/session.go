@@ -50,6 +50,14 @@ type Session interface {
 //go:embed ngrok.ca.crt
 var defaultCACert []byte
 
+// DefaultCAPool returns an [x509.CertPool] containing ngrok's default CA
+// certificate. It is used as the fallback when no custom CA pool is provided.
+func DefaultCAPool() *x509.CertPool {
+	pool := x509.NewCertPool()
+	pool.AppendCertsFromPEM(defaultCACert)
+	return pool
+}
+
 const defaultServer = "connect.ngrok-agent.com:443"
 
 var leastLatencyServer = regexp.MustCompile(`^connect\.([a-z]+?-)?ngrok-agent\.com(\.lan)?:443`)
@@ -407,8 +415,7 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 	}
 
 	if cfg.CAPool == nil {
-		cfg.CAPool = x509.NewCertPool()
-		cfg.CAPool.AppendCertsFromPEM(defaultCACert)
+		cfg.CAPool = DefaultCAPool()
 	}
 
 	if cfg.ServerAddr == "" {
