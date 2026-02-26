@@ -123,10 +123,11 @@ func (a *agent) probeAddr(ctx context.Context, logger *slog.Logger, dialer Diale
 	}
 	defer conn.Close() //nolint:errcheck
 
-	// Propagate context deadline to all subsequent I/O on this connection.
-	if deadline, ok := ctx.Deadline(); ok {
-		conn.SetDeadline(deadline) //nolint:errcheck
-	}
+	// Interrupt I/O if the context is cancelled or expires.
+	stop := context.AfterFunc(ctx, func() {
+		conn.SetDeadline(time.Now()) //nolint:errcheck
+	})
+	defer stop()
 
 	result.CompletedSteps = append(result.CompletedSteps, "tcp")
 
