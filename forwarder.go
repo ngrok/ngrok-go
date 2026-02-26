@@ -86,8 +86,6 @@ func (e *endpointForwarder) handleConnection(ctx context.Context, conn net.Conn)
 		e.httpServe(proxyConn)
 		e.emitConnectionEvent(newConnectionClosed(e, remoteAddr, time.Since(start), proxyConn.bytesRead.Load(), proxyConn.bytesWritten.Load()))
 	} else {
-		// for non http connections, do the same bidirectional copy
-		// we were already doing
 		backend, err := e.connectToBackend(ctx)
 		if err != nil {
 			conn.Close() //nolint:errcheck
