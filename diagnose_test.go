@@ -36,24 +36,19 @@ func TestDiagnoseTCPFailure(t *testing.T) {
 	require.NoError(t, err)
 
 	d, ok := a.(Diagnoser)
-	require.True(t, ok, "agent should implement Diagnosable")
+	require.True(t, ok, "agent should implement Diagnoser")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	results, err := d.Diagnose(ctx, []string{addr})
-	require.NoError(t, err)
-	require.Len(t, results, 1)
-
-	r := results[0]
-	assert.Equal(t, addr, r.Addr)
-	assert.Equal(t, "tcp", r.FailedStep)
-	assert.NotNil(t, r.Err)
-	assert.Empty(t, r.CompletedSteps)
+	result, err := d.Diagnose(ctx, addr)
+	require.Error(t, err)
+	assert.True(t, IsTCPDiagnoseFailure(err))
+	assert.Equal(t, addr, result.Addr)
 }
 
 // TestDiagnoseTLSFailure verifies that a TCP-only server (no TLS) is reported
-// as a TLS step failure with TCP marked as succeeded.
+// as a TLS step failure.
 func TestDiagnoseTLSFailure(t *testing.T) {
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
@@ -75,14 +70,10 @@ func TestDiagnoseTLSFailure(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	results, err := d.Diagnose(ctx, []string{l.Addr().String()})
-	require.NoError(t, err)
-	require.Len(t, results, 1)
-
-	r := results[0]
-	assert.Equal(t, []string{"tcp"}, r.CompletedSteps)
-	assert.Equal(t, "tls", r.FailedStep)
-	assert.NotNil(t, r.Err)
+	result, err := d.Diagnose(ctx, l.Addr().String())
+	require.Error(t, err)
+	assert.True(t, IsTLSDiagnoseFailure(err))
+	assert.Equal(t, l.Addr().String(), result.Addr)
 }
 
 // TestDiagnoseMuxadoSuccess verifies the full happy path: TCP → TLS → Muxado
@@ -150,60 +141,11 @@ func TestDiagnoseMuxadoSuccess(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	results, err := d.Diagnose(ctx, []string{l.Addr().String()})
+	result, err := d.Diagnose(ctx, l.Addr().String())
 	require.NoError(t, err)
-	require.Len(t, results, 1)
-
-	r := results[0]
-	assert.Empty(t, r.FailedStep)
-	assert.Nil(t, r.Err)
-	assert.Equal(t, []string{"tcp", "tls", "muxado"}, r.CompletedSteps)
-	assert.Equal(t, testRegion, r.Region)
-	assert.Greater(t, r.Latency, time.Duration(0))
-}
-
-// TestDiagnoseMultipleAddrs verifies that Diagnose probes each address
-// independently and returns a result per address.
-func TestDiagnoseMultipleAddrs(t *testing.T) {
-	// One reachable TCP listener (TLS failure is expected — no TLS server).
-	lTCP, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	defer lTCP.Close() //nolint:errcheck
-
-	go func() {
-		for {
-			conn, err := lTCP.Accept()
-			if err != nil {
-				return
-			}
-			_ = conn.Close()
-		}
-	}()
-
-	// One closed port (TCP failure expected).
-	lClosed, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	closedAddr := lClosed.Addr().String()
-	_ = lClosed.Close()
-
-	a, err := NewAgent(WithAgentConnectURL(lTCP.Addr().String()))
-	require.NoError(t, err)
-
-	d := a.(Diagnoser)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	addrs := []string{lTCP.Addr().String(), closedAddr}
-	results, err := d.Diagnose(ctx, addrs)
-	require.NoError(t, err)
-	require.Len(t, results, 2)
-
-	assert.Equal(t, lTCP.Addr().String(), results[0].Addr)
-	assert.Equal(t, "tls", results[0].FailedStep)
-
-	assert.Equal(t, closedAddr, results[1].Addr)
-	assert.Equal(t, "tcp", results[1].FailedStep)
+	assert.Equal(t, l.Addr().String(), result.Addr)
+	assert.Equal(t, testRegion, result.Region)
+	assert.Greater(t, result.Latency, time.Duration(0))
 }
 
 // TestDiagnoseOnline connects to a live tunnel server and verifies the full
@@ -234,17 +176,9 @@ func TestDiagnoseOnline(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	results, err := d.Diagnose(ctx, []string{serverAddr})
+	result, err := d.Diagnose(ctx, serverAddr)
 	require.NoError(t, err)
-	require.Len(t, results, 1)
-
-	r := results[0]
-	t.Logf("addr=%s steps=%v region=%s latency=%s err=%v",
-		r.Addr, r.CompletedSteps, r.Region, r.Latency, r.Err)
-
-	assert.Empty(t, r.FailedStep)
-	assert.Nil(t, r.Err)
-	assert.Equal(t, []string{"tcp", "tls", "muxado"}, r.CompletedSteps)
-	assert.NotEmpty(t, r.Region)
-	assert.Greater(t, r.Latency, time.Duration(0))
+	t.Logf("addr=%s region=%s latency=%s", result.Addr, result.Region, result.Latency)
+	assert.NotEmpty(t, result.Region)
+	assert.Greater(t, result.Latency, time.Duration(0))
 }

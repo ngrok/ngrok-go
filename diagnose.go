@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -19,22 +20,48 @@ import (
 	"golang.ngrok.com/ngrok/v2/internal/tunnel/proto"
 )
 
-// DiagnoseResult holds the outcome of a single diagnostic probe against one
-// tunnel server address.
+// DiagnoseResult holds the outcome of a successful diagnostic probe.
 type DiagnoseResult struct {
 	// The address that was tested (ip:port or host:port).
 	Addr string
-	// Which steps succeeded, in order attempted: "tcp", "tls", "muxado".
-	CompletedSteps []string
-	// Region reported by SrvInfo (empty if the muxado step did not complete).
+	// Region reported by SrvInfo.
 	Region string
-	// Round-trip latency of the SrvInfo call (zero if the muxado step did not
-	// complete).
+	// Round-trip latency of the SrvInfo call.
 	Latency time.Duration
-	// First error encountered, nil if all steps passed.
+}
+
+// DiagnoseError is returned by [Diagnoser.Diagnose] when a probe step fails.
+// Use [IsTCPDiagnoseFailure], [IsTLSDiagnoseFailure], or
+// [IsMuxadoDiagnoseFailure] to determine which step failed.
+type DiagnoseError struct {
+	// Step is the probe step that failed: "tcp", "tls", or "muxado".
+	Step string
+	// Err is the underlying error.
 	Err error
-	// The step that failed: "tcp", "tls", or "muxado". Empty if all passed.
-	FailedStep string
+}
+
+func (e *DiagnoseError) Error() string {
+	return fmt.Sprintf("diagnose %s: %v", e.Step, e.Err)
+}
+
+func (e *DiagnoseError) Unwrap() error { return e.Err }
+
+// IsTCPDiagnoseFailure reports whether err is a TCP-level probe failure.
+func IsTCPDiagnoseFailure(err error) bool {
+	var de *DiagnoseError
+	return errors.As(err, &de) && de.Step == "tcp"
+}
+
+// IsTLSDiagnoseFailure reports whether err is a TLS-level probe failure.
+func IsTLSDiagnoseFailure(err error) bool {
+	var de *DiagnoseError
+	return errors.As(err, &de) && de.Step == "tls"
+}
+
+// IsMuxadoDiagnoseFailure reports whether err is a muxado-level probe failure.
+func IsMuxadoDiagnoseFailure(err error) bool {
+	var de *DiagnoseError
+	return errors.As(err, &de) && de.Step == "muxado"
 }
 
 // Diagnoser is implemented by Agent types that support pre-connection
@@ -44,26 +71,22 @@ type DiagnoseResult struct {
 type Diagnoser interface {
 	Agent
 
-	// Diagnose tests connectivity to the configured tunnel server by probing
-	// each address in addrs independently through TCP, TLS, and the Muxado
+	// Diagnose tests connectivity to addr by probing TCP, TLS, and the Muxado
 	// tunnel protocol. It uses the Agent's configured TLS settings, CA roots,
 	// and proxy/dialer settings.
 	//
-	// If addrs is nil or empty, the configured server address is probed as-is.
+	// If addr is empty, the configured server address is probed.
 	//
 	// This method does NOT establish a persistent session or call Auth. It is
 	// safe to call without affecting any existing connection.
-	Diagnose(ctx context.Context, addrs []string) ([]DiagnoseResult, error)
+	Diagnose(ctx context.Context, addr string) (DiagnoseResult, error)
 }
 
-// Diagnose implements Diagnosable.
-func (a *agent) Diagnose(ctx context.Context, addrs []string) ([]DiagnoseResult, error) {
-	connectAddr := a.opts.connectURL
-	if connectAddr == "" {
-		connectAddr = "connect.ngrok-agent.com:443"
-	}
-	if len(addrs) == 0 {
-		addrs = []string{connectAddr}
+// Diagnose implements Diagnoser.
+func (a *agent) Diagnose(ctx context.Context, addr string) (DiagnoseResult, error) {
+	connectAddr := cmp.Or(a.opts.connectURL, "connect.ngrok-agent.com:443")
+	if addr == "" {
+		addr = connectAddr
 	}
 
 	// Derive the TLS ServerName from the configured connect hostname, not from
@@ -77,16 +100,12 @@ func (a *agent) Diagnose(ctx context.Context, addrs []string) ([]DiagnoseResult,
 
 	dialer, err := a.buildDiagnosticDialer()
 	if err != nil {
-		return nil, err
+		return DiagnoseResult{}, err
 	}
 
 	logger := cmp.Or(a.opts.logger, slog.Default())
 
-	results := make([]DiagnoseResult, 0, len(addrs))
-	for _, addr := range addrs {
-		results = append(results, a.probeAddr(ctx, logger, dialer, serverName, addr))
-	}
-	return results, nil
+	return a.probeAddr(ctx, logger, dialer, serverName, addr)
 }
 
 // buildDiagnosticDialer returns the effective dialer for probes, applying
@@ -111,17 +130,15 @@ func (a *agent) buildDiagnosticDialer() (Dialer, error) {
 	return dialer, nil
 }
 
-// probeAddr runs TCP → TLS → Muxado → SrvInfo for a single address and
-// returns a DiagnoseResult recording which steps passed.
-func (a *agent) probeAddr(ctx context.Context, logger *slog.Logger, dialer Dialer, serverName, addr string) DiagnoseResult {
+// probeAddr runs TCP → TLS → Muxado → SrvInfo for addr and returns a
+// DiagnoseResult on success, or a *DiagnoseError indicating which step failed.
+func (a *agent) probeAddr(ctx context.Context, logger *slog.Logger, dialer Dialer, serverName, addr string) (DiagnoseResult, error) {
 	result := DiagnoseResult{Addr: addr}
 
 	// TCP
 	conn, err := dialer.DialContext(ctx, "tcp", addr)
 	if err != nil {
-		result.Err = err
-		result.FailedStep = "tcp"
-		return result
+		return result, &DiagnoseError{Step: "tcp", Err: err}
 	}
 	defer conn.Close() //nolint:errcheck
 
@@ -130,8 +147,6 @@ func (a *agent) probeAddr(ctx context.Context, logger *slog.Logger, dialer Diale
 		conn.SetDeadline(time.Now()) //nolint:errcheck
 	})
 	defer stop()
-
-	result.CompletedSteps = append(result.CompletedSteps, "tcp")
 
 	// TLS
 	rootCAs := a.opts.connectCAs
@@ -148,11 +163,8 @@ func (a *agent) probeAddr(ctx context.Context, logger *slog.Logger, dialer Diale
 	}
 	tlsConn := tls.Client(conn, tlsCfg)
 	if err := tlsConn.HandshakeContext(ctx); err != nil {
-		result.Err = err
-		result.FailedStep = "tls"
-		return result
+		return result, &DiagnoseError{Step: "tls", Err: err}
 	}
-	result.CompletedSteps = append(result.CompletedSteps, "tls")
 
 	// Muxado + SrvInfo
 	muxSess := muxado.Client(tlsConn, nil)
@@ -162,14 +174,11 @@ func (a *agent) probeAddr(ctx context.Context, logger *slog.Logger, dialer Diale
 	start := time.Now()
 	info, err := raw.SrvInfo()
 	if err != nil {
-		result.Err = err
-		result.FailedStep = "muxado"
-		return result
+		return result, &DiagnoseError{Step: "muxado", Err: err}
 	}
-	result.CompletedSteps = append(result.CompletedSteps, "muxado")
 	result.Region = info.Region
 	result.Latency = time.Since(start)
-	return result
+	return result, nil
 }
 
 // nopSessionHandler is a minimal SessionHandler that ignores all server RPCs.
