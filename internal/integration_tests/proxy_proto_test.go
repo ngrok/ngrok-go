@@ -312,7 +312,6 @@ func TestProxyProtoIntegration(t *testing.T) {
 			// Setup agent
 			agent, ctx, cancel := SetupAgent(t)
 			defer cancel()
-			defer func() { _ = agent.Disconnect() }()
 
 			// Create synchronization points
 			handlerReady := testutil.NewSyncPoint()

@@ -54,7 +54,6 @@ func TestUpstreamDialer(t *testing.T) {
 	// Setup agent
 	agent, ctx, cancel := SetupAgent(t)
 	defer cancel()
-	defer func() { _ = agent.Disconnect() }()
 
 	// Create a custom dialer that returns an error and has synchronization
 	customDialer := newErroringDialer()

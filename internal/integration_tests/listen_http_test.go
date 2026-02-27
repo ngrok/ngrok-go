@@ -17,7 +17,6 @@ func TestListenAndHTTPRequest(t *testing.T) {
 	// Setup agent
 	agent, ctx, cancel := SetupAgent(t)
 	defer cancel()
-	defer func() { _ = agent.Disconnect() }()
 
 	// Setup listener
 	listener := SetupListener(t, agent, ctx)

@@ -26,7 +26,6 @@ func TestUpstreamProtocolHTTP2(t *testing.T) {
 		// Setup agent for this test
 		agent, ctx, cancel := SetupAgent(t)
 		defer cancel()
-		defer func() { _ = agent.Disconnect() }()
 
 		// Set up a test HTTP/2 server
 		srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -94,7 +93,6 @@ func TestUpstreamProtocolHTTP2(t *testing.T) {
 		// Setup agent for this test
 		agent, ctx, cancel := SetupAgent(t)
 		defer cancel()
-		defer func() { _ = agent.Disconnect() }()
 
 		// Set up a test HTTP/2 server
 		srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
