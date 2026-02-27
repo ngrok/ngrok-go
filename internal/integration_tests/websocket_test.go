@@ -20,7 +20,6 @@ func TestWebSocketUpgrade(t *testing.T) {
 
 	agent, ctx, cancel := SetupAgent(t)
 	defer cancel()
-	defer agent.Disconnect() //nolint:errcheck
 
 	// Start an upstream WebSocket server.
 	server := httptest.NewServer(websocket.Handler(func(ws *websocket.Conn) {

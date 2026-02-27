@@ -25,7 +25,6 @@ func TestListenWithURLAndPooling(t *testing.T) {
 	// Setup agent
 	agent, ctx, cancel := SetupAgent(t)
 	defer cancel()
-	defer func() { _ = agent.Disconnect() }()
 
 	// Common URL for both endpoints - IMPORTANT: the exact same string must be used for both listeners
 	sharedURL := "https://test-lb.ngrok.io"

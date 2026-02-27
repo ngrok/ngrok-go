@@ -50,6 +50,11 @@ func SetupAgent(t *testing.T) (ngrok.Agent, context.Context, context.CancelFunc)
 	// Connect the agent
 	err = agent.Connect(ctx)
 	require.NoError(t, err, "Failed to connect agent")
+	t.Cleanup(func() {
+		if err := agent.Disconnect(); err != nil {
+			t.Error("Agent disconnect:", err)
+		}
+	})
 
 	return agent, ctx, cancel
 }

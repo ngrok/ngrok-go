@@ -24,7 +24,6 @@ func TestAgentTLSTerminationIntegration(t *testing.T) {
 	// Setup agent
 	agent, ctx, cancel := SetupAgent(t)
 	defer cancel()
-	defer func() { _ = agent.Disconnect() }()
 
 	// Setup synchronization primitives
 	handlerReady := testutil.NewSyncPoint()
