@@ -23,8 +23,7 @@ func TestListenWithURLAndPooling(t *testing.T) {
 	t.Parallel()
 
 	// Setup agent
-	agent, ctx, cancel := SetupAgent(t)
-	defer cancel()
+	agent, ctx := SetupAgent(t)
 	defer func() { _ = agent.Disconnect() }()
 
 	// Common URL for both endpoints - IMPORTANT: the exact same string must be used for both listeners
