@@ -19,7 +19,6 @@ func TestForward(t *testing.T) {
 	t.Parallel()
 	// Setup agent
 	agent, ctx := SetupAgent(t)
-	defer func() { _ = agent.Disconnect() }()
 
 	// Create a channel to signal when the server is ready
 	serverReady := testutil.NewSyncPoint()

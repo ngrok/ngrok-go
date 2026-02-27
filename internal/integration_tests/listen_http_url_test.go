@@ -17,7 +17,6 @@ func TestListenWithHTTPURL(t *testing.T) {
 	t.Parallel()
 	// Setup agent
 	agent, ctx := SetupAgent(t)
-	defer func() { _ = agent.Disconnect() }()
 
 	// Setup listener with HTTP URL
 	httpURL := "http://test-http.ngrok.io"
