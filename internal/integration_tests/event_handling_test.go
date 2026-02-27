@@ -1,7 +1,6 @@
 package integration_tests
 
 import (
-	"context"
 	"os"
 	"testing"
 	"time"
@@ -9,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.ngrok.com/ngrok/v2"
+	"golang.ngrok.com/ngrok/v2/internal/testcontext"
 )
 
 // TestEventHandlingIntegration tests that events are properly emitted and received
@@ -60,8 +60,7 @@ func TestEventHandlingIntegration(t *testing.T) {
 	require.NoError(t, err, "Failed to create agent")
 
 	// Create a context with timeout for the test
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	ctx := testcontext.ForTB(t)
 
 	// Connect the agent (should trigger a connect event)
 	t.Log("Connecting agent...")

@@ -22,8 +22,7 @@ func TestAgentTLSTerminationIntegration(t *testing.T) {
 	cert := CreateTestCertificate(t)
 
 	// Setup agent
-	agent, ctx, cancel := SetupAgent(t)
-	defer cancel()
+	agent, ctx := SetupAgent(t)
 	defer func() { _ = agent.Disconnect() }()
 
 	// Setup synchronization primitives

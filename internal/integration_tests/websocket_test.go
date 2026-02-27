@@ -18,8 +18,7 @@ import (
 func TestWebSocketUpgrade(t *testing.T) {
 	t.Parallel()
 
-	agent, ctx, cancel := SetupAgent(t)
-	defer cancel()
+	agent, ctx := SetupAgent(t)
 	defer agent.Disconnect() //nolint:errcheck
 
 	// Start an upstream WebSocket server.

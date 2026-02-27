@@ -17,6 +17,7 @@ import (
 	"golang.org/x/net/websocket"
 
 	"golang.ngrok.com/ngrok/v2/internal/legacy/config"
+	"golang.ngrok.com/ngrok/v2/internal/testcontext"
 )
 
 func newTestLogger(t *testing.T) *slog.Logger {
@@ -86,7 +87,7 @@ func serveHTTP(ctx context.Context, t *testing.T, connectOpts []ConnectOption, o
 }
 
 func TestTunnel(t *testing.T) {
-	ctx := context.Background()
+	ctx := testcontext.ForTB(t)
 	sess := setupSession(ctx, t)
 
 	tun := startTunnel(ctx, t, sess, config.HTTPEndpoint(
@@ -101,7 +102,7 @@ func TestTunnel(t *testing.T) {
 }
 
 func TestTunnelConnMetadata(t *testing.T) {
-	ctx := context.Background()
+	ctx := testcontext.ForTB(t)
 	sess := setupSession(ctx, t)
 
 	tun := startTunnel(ctx, t, sess, config.HTTPEndpoint())
@@ -141,7 +142,7 @@ func (f failPanic) FailNow() {
 
 func TestTCP(t *testing.T) {
 	onlineTest(t)
-	ctx := context.Background()
+	ctx := testcontext.ForTB(t)
 
 	opts := config.TCPEndpoint()
 
@@ -168,7 +169,7 @@ func TestConnectionCallbacks(t *testing.T) {
 	// Don't run this one by default - it's timing-sensitive and prone to flakes
 	skipUnless(t, "NGROK_TEST_FLAKEY", "Skipping flakey network test")
 
-	ctx := context.Background()
+	ctx := testcontext.ForTB(t)
 	connects := 0
 	disconnectErrs := 0
 	disconnectNils := 0
@@ -201,7 +202,7 @@ type sketchyDialer struct {
 }
 
 func (sd *sketchyDialer) Dial(network, addr string) (net.Conn, error) {
-	return sd.DialContext(context.Background(), network, addr)
+	return sd.DialContext(context.TODO(), network, addr)
 }
 
 func (sd *sketchyDialer) DialContext(ctx context.Context, network, addr string) (net.Conn, error) {
@@ -217,7 +218,7 @@ func TestHeartbeatCallback(t *testing.T) {
 	// Don't run this one by default - it's long
 	skipUnless(t, "NGROK_TEST_LONG", "Skipping long network test")
 
-	ctx := context.Background()
+	ctx := testcontext.ForTB(t)
 	heartbeats := 0
 	sess := setupSession(ctx, t,
 		WithHeartbeatHandler(func(ctx context.Context, sess Session, latency time.Duration) {
@@ -235,7 +236,7 @@ func TestHeartbeatCallback(t *testing.T) {
 func TestPermanentErrors(t *testing.T) {
 	onlineTest(t)
 	var err error
-	ctx := context.Background()
+	ctx := testcontext.ForTB(t)
 	token := os.Getenv("NGROK_AUTHTOKEN")
 
 	sess, err := Connect(ctx, WithAuthtoken(token))
@@ -252,7 +253,7 @@ func TestRetryableErrors(t *testing.T) {
 	onlineTest(t)
 	var err error
 	// Set global context with a longer timeout just to prevent test from hanging forever
-	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	ctx, cancel := context.WithTimeout(testcontext.ForTB(t), 8*time.Second)
 	defer cancel()
 
 	// Create a custom dialer with short timeout for invalid addresses
@@ -279,7 +280,7 @@ func TestRetryableErrors(t *testing.T) {
 }
 
 func TestNonExported(t *testing.T) {
-	ctx := context.Background()
+	ctx := testcontext.ForTB(t)
 
 	sess := setupSession(ctx, t)
 
@@ -293,7 +294,7 @@ func echo(ws *websocket.Conn) {
 func TestWebsockets(t *testing.T) {
 	onlineTest(t)
 
-	ctx := context.Background()
+	ctx := testcontext.ForTB(t)
 
 	srv := &http.ServeMux{}
 	srv.Handle("/", helloHandler)

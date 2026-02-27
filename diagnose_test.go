@@ -1,7 +1,6 @@
 package ngrok
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -20,6 +19,7 @@ import (
 
 	muxado "golang.ngrok.com/muxado/v2"
 
+	"golang.ngrok.com/ngrok/v2/internal/testcontext"
 	"golang.ngrok.com/ngrok/v2/internal/tunnel/proto"
 )
 
@@ -38,7 +38,7 @@ func TestDiagnoseTCPFailure(t *testing.T) {
 	d, ok := a.(Diagnoser)
 	require.True(t, ok, "agent should implement Diagnoser")
 
-	result, err := d.Diagnose(context.Background(), addr)
+	result, err := d.Diagnose(testcontext.ForTB(t), addr)
 	require.Error(t, err)
 	assert.True(t, IsTCPDiagnoseFailure(err))
 	assert.Equal(t, addr, result.Addr)
@@ -64,7 +64,7 @@ func TestDiagnoseTLSFailure(t *testing.T) {
 
 	d := a.(Diagnoser)
 
-	result, err := d.Diagnose(context.Background(), l.Addr().String())
+	result, err := d.Diagnose(testcontext.ForTB(t), l.Addr().String())
 	require.Error(t, err)
 	assert.True(t, IsTLSDiagnoseFailure(err))
 	assert.Equal(t, l.Addr().String(), result.Addr)
@@ -135,7 +135,7 @@ func TestDiagnoseMuxadoSuccess(t *testing.T) {
 
 	d := a.(Diagnoser)
 
-	result, err := d.Diagnose(context.Background(), l.Addr().String())
+	result, err := d.Diagnose(testcontext.ForTB(t), l.Addr().String())
 	require.NoError(t, err)
 	assert.Equal(t, l.Addr().String(), result.Addr)
 	assert.Equal(t, testRegion, result.Region)
@@ -167,8 +167,7 @@ func TestDiagnoseOnline(t *testing.T) {
 	d, ok := a.(Diagnoser)
 	require.True(t, ok)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	ctx := testcontext.ForTB(t)
 
 	result, err := d.Diagnose(ctx, serverAddr)
 	require.NoError(t, err)

@@ -24,8 +24,7 @@ func TestUpstreamProtocolHTTP2(t *testing.T) {
 		t.Parallel()
 
 		// Setup agent for this test
-		agent, ctx, cancel := SetupAgent(t)
-		defer cancel()
+		agent, ctx := SetupAgent(t)
 		defer func() { _ = agent.Disconnect() }()
 
 		// Set up a test HTTP/2 server
@@ -92,8 +91,7 @@ func TestUpstreamProtocolHTTP2(t *testing.T) {
 		t.Parallel()
 
 		// Setup agent for this test
-		agent, ctx, cancel := SetupAgent(t)
-		defer cancel()
+		agent, ctx := SetupAgent(t)
 		defer func() { _ = agent.Disconnect() }()
 
 		// Set up a test HTTP/2 server
