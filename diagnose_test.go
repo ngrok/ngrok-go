@@ -1,14 +1,8 @@
 package ngrok
 
 import (
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
 	"crypto/tls"
-	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/json"
-	"math/big"
 	"net"
 	"os"
 	"testing"
@@ -20,6 +14,7 @@ import (
 	muxado "golang.ngrok.com/muxado/v2"
 
 	"golang.ngrok.com/ngrok/v2/internal/testcontext"
+	"golang.ngrok.com/ngrok/v2/internal/tlstest"
 	"golang.ngrok.com/ngrok/v2/internal/tunnel/proto"
 )
 
@@ -73,22 +68,12 @@ func TestDiagnoseTLSFailure(t *testing.T) {
 // TestDiagnoseMuxadoSuccess verifies the full happy path: TCP → TLS → Muxado
 // → SrvInfo all succeed against a local test server.
 func TestDiagnoseMuxadoSuccess(t *testing.T) {
-	// Generate a self-signed TLS certificate for the test server.
-	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	require.NoError(t, err)
-
-	template := &x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		Subject:      pkix.Name{CommonName: "diagnose-test"},
-		NotBefore:    time.Now().Add(-time.Hour),
-		NotAfter:     time.Now().Add(24 * time.Hour),
-		DNSNames:     []string{"localhost"},
+	cert, err := tlstest.CreateCertificate()
+	if err != nil {
+		t.Fatal(err)
 	}
-	certDER, err := x509.CreateCertificate(rand.Reader, template, template, &priv.PublicKey, priv)
-	require.NoError(t, err)
-
 	tlsServerCfg := &tls.Config{
-		Certificates: []tls.Certificate{{Certificate: [][]byte{certDER}, PrivateKey: priv}},
+		Certificates: []tls.Certificate{*cert},
 	}
 
 	l, err := tls.Listen("tcp", "localhost:0", tlsServerCfg)
