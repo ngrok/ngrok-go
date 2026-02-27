@@ -16,8 +16,7 @@ func TestListenWithHTTPSURL(t *testing.T) {
 	// Mark this test for parallel execution
 	t.Parallel()
 	// Setup agent
-	agent, ctx, cancel := SetupAgent(t)
-	defer cancel()
+	agent, ctx := SetupAgent(t)
 	defer func() { _ = agent.Disconnect() }()
 
 	// Setup listener with HTTPS URL

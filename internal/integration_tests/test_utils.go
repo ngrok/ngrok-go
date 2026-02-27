@@ -20,6 +20,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"golang.ngrok.com/ngrok/v2"
+	"golang.ngrok.com/ngrok/v2/internal/testcontext"
 )
 
 // SkipIfOffline skips the test if NGROK_TEST_ONLINE environment variable is not set
@@ -30,7 +31,7 @@ func SkipIfOffline(t *testing.T) {
 }
 
 // SetupAgent creates and connects a new agent for testing
-func SetupAgent(t *testing.T) (ngrok.Agent, context.Context, context.CancelFunc) {
+func SetupAgent(t *testing.T) (ngrok.Agent, context.Context) {
 	// Skip if not running online tests
 	SkipIfOffline(t)
 
@@ -44,14 +45,13 @@ func SetupAgent(t *testing.T) (ngrok.Agent, context.Context, context.CancelFunc)
 	)
 	require.NoError(t, err, "Failed to create agent")
 
-	// Start a context with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx := testcontext.ForTB(t)
 
 	// Connect the agent
 	err = agent.Connect(ctx)
 	require.NoError(t, err, "Failed to connect agent")
 
-	return agent, ctx, cancel
+	return agent, ctx
 }
 
 // SetupListener sets up an ngrok listener with the specified options
