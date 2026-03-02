@@ -19,8 +19,7 @@ func TestListenAndTCPConnection(t *testing.T) {
 	agent, ctx := SetupAgent(t)
 
 	// Setup TCP listener using the TCP scheme
-	listener := SetupListener(t, agent, ctx, ngrok.WithURL("tcp://"))
-	defer listener.Close()
+	listener := SetupListener(ctx, t, agent, ngrok.WithURL("tcp://"))
 
 	// Expected message
 	expectedMessage := "Hello, TCP!"

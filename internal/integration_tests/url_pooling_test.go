@@ -33,12 +33,10 @@ func TestListenWithURLAndPooling(t *testing.T) {
 	requestedFinished := testutil.NewSyncPoint()
 
 	// Setup first listener with pooling enabled
-	listener1 := SetupListener(t, agent, ctx, ngrok.WithURL(sharedURL), ngrok.WithPoolingEnabled(true))
-	defer listener1.Close()
+	listener1 := SetupListener(ctx, t, agent, ngrok.WithURL(sharedURL), ngrok.WithPoolingEnabled(true))
 
 	// Setup second listener with the same URL and pooling enabled
-	listener2 := SetupListener(t, agent, ctx, ngrok.WithURL(sharedURL), ngrok.WithPoolingEnabled(true))
-	defer listener2.Close()
+	listener2 := SetupListener(ctx, t, agent, ngrok.WithURL(sharedURL), ngrok.WithPoolingEnabled(true))
 
 	// Log URLs for debugging
 	t.Logf("Listener1 URL: %s, Pooling: %v", listener1.URL().String(), listener1.PoolingEnabled())

@@ -18,8 +18,7 @@ func TestListenAndHTTPRequest(t *testing.T) {
 	agent, ctx := SetupAgent(t)
 
 	// Setup listener
-	listener := SetupListener(t, agent, ctx)
-	defer listener.Close()
+	listener := SetupListener(ctx, t, agent)
 
 	// Expected message
 	expectedMessage := "Hello, ngrok!"

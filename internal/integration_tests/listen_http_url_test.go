@@ -20,8 +20,7 @@ func TestListenWithHTTPURL(t *testing.T) {
 
 	// Setup listener with HTTP URL
 	httpURL := "http://test-http.ngrok.io"
-	listener := SetupListener(t, agent, ctx, ngrok.WithURL(httpURL))
-	defer listener.Close()
+	listener := SetupListener(ctx, t, agent, ngrok.WithURL(httpURL))
 
 	// Verify the URL scheme is http
 	assert.Equal(t, "http", listener.URL().Scheme, "URL scheme should be http")
