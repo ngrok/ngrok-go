@@ -30,7 +30,8 @@ const (
 	StopTunnelReq ReqType = 9
 
 	// sent from client to the server
-	SrvInfoReq ReqType = 8
+	SrvInfoReq    ReqType = 8
+	UpdateBindReq ReqType = 10
 )
 
 var Version = []string{"3", "2"} // integers in priority order
@@ -362,6 +363,20 @@ type Unbind struct {
 type UnbindResp struct {
 	Error string // an error, if the unbind failed
 	Extra any    // application-defined
+}
+
+// A client sends this message to the server over a new stream to request
+// updating an existing bind's mutable fields.
+type UpdateBind struct {
+	ClientID       string  `json:"Id"`                       // Id of the bind to update
+	Description    *string `json:"Description,omitempty"`    // new description, nil means no change
+	Metadata       *string `json:"Metadata,omitempty"`       // new metadata, nil means no change
+	TrafficPolicy  *string `json:"TrafficPolicy,omitempty"`  // new traffic policy, nil means no change
+	PoolingEnabled *bool   `json:"PoolingEnabled,omitempty"` // new pooling setting, nil means no change
+}
+
+type UpdateBindResp struct {
+	Error string // error message if the server failed to update
 }
 
 type EdgeType int32

@@ -49,6 +49,9 @@ type Endpoint interface {
 	// TrafficPolicy returns the traffic policy for the endpoint.
 	TrafficPolicy() string
 
+	// Update modifies the endpoint's mutable fields. Nil values are not changed.
+	Update(ctx context.Context, opts ...UpdateEndpointOption) error
+
 	// URL returns the Endpoint's URL
 	URL() *url.URL
 }

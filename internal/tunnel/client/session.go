@@ -58,6 +58,9 @@ type Session interface {
 	// ListenTLS listens on a remote TLS endpoint
 	ListenTLS(opts *proto.TLSEndpoint, extra proto.BindExtra, forwardsTo string) (Tunnel, error)
 
+	// UpdateBind updates the mutable fields of an existing bind/tunnel.
+	UpdateBind(clientID string, description, metadata, trafficPolicy *string, poolingEnabled *bool) error
+
 	SrvInfo() (proto.SrvInfoResp, error)
 
 	// Send a muxado heartbeat and record the latency
@@ -175,6 +178,17 @@ func (s *session) ListenTLS(opts *proto.TLSEndpoint, extra proto.BindExtra, forw
 
 func (s *session) ListenSSH(opts *proto.SSHOptions, extra proto.BindExtra, forwardsTo string) (Tunnel, error) {
 	return s.Listen("ssh", opts, extra, forwardsTo, "")
+}
+
+func (s *session) UpdateBind(clientID string, description, metadata, trafficPolicy *string, poolingEnabled *bool) error {
+	resp, err := s.raw.UpdateBind(clientID, description, metadata, trafficPolicy, poolingEnabled)
+	if err != nil {
+		return err
+	}
+	if resp.Error != "" {
+		return proto.StringError(resp.Error)
+	}
+	return nil
 }
 
 func (s *session) SrvInfo() (proto.SrvInfoResp, error) {

@@ -39,6 +39,9 @@ type Session interface {
 	// connections. The returned Tunnel object is a net.Listener.
 	Listen(ctx context.Context, cfg config.Tunnel) (Tunnel, error)
 
+	// UpdateBind updates the mutable fields of an existing bind/tunnel.
+	UpdateBind(clientID string, description, metadata, trafficPolicy *string, poolingEnabled *bool) error
+
 	// Warnings returns a list of warnings generated for the session on connect/auth
 	Warnings() []error
 
@@ -717,6 +720,10 @@ func (s *sessionImpl) closeTunnel(clientID string, err error) error {
 
 func (s *sessionImpl) Close() error {
 	return s.inner().Close()
+}
+
+func (s *sessionImpl) UpdateBind(clientID string, description, metadata, trafficPolicy *string, poolingEnabled *bool) error {
+	return s.inner().UpdateBind(clientID, description, metadata, trafficPolicy, poolingEnabled)
 }
 
 func (s *sessionImpl) Warnings() []error {
