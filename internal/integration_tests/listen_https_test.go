@@ -1,7 +1,6 @@
 package integration_tests
 
 import (
-	"net/http"
 	"testing"
 	"time"
 
@@ -67,7 +66,10 @@ func TestListenWithHTTPSURL(t *testing.T) {
 	handlerReady.Wait(t)
 
 	// Make HTTP request
-	resp := MakeHTTPRequest(t, ctx, listener.URL().String(), expectedMessage)
+	resp, err := MakeHTTPRequest(ctx, t, listener.URL().String(), expectedMessage)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer resp.Body.Close()
 
 	// Wait for the message to be received with timeout
@@ -81,9 +83,6 @@ func TestListenWithHTTPSURL(t *testing.T) {
 
 	// Check that the message received matches what was sent
 	assert.Equal(t, expectedMessage, actualMessage, "Message should match what was sent")
-
-	// Verify response status
-	assert.Equal(t, http.StatusOK, resp.StatusCode, "HTTP status should be 200 OK")
 
 	// Wait for the request to complete
 	requestComplete.Wait(t)

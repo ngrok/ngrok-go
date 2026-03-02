@@ -210,8 +210,7 @@ func TestListenWithURLAndPooling(t *testing.T) {
 
 	// Create a channel to signal when both endpoints have received at least one request
 	bothEndpointsHit := make(chan struct{})
-	maxRequests := 20 // Safety limit to prevent infinite loop
-	requestCount := 0
+	maxRequests := 20               // Safety limit to prevent infinite loop
 	url := listener1.URL().String() // Both listeners have the same URL
 
 	// Start a goroutine to monitor when both endpoints have been hit
@@ -231,7 +230,7 @@ func TestListenWithURLAndPooling(t *testing.T) {
 	}()
 
 	// Send requests until both endpoints have been hit or we reach max requests
-	for requestCount < maxRequests {
+	for requestCount := range maxRequests {
 		select {
 		case <-bothEndpointsHit:
 			// Both endpoints have received at least one request
@@ -239,20 +238,26 @@ func TestListenWithURLAndPooling(t *testing.T) {
 			goto testComplete
 		default:
 			// Send another request
-			requestCount++
 			message := fmt.Sprintf("Request %d", requestCount)
 
 			// Make HTTP request with a new connection each time
-			resp := MakeHTTPRequest(t, ctx, url, message)
-
-			// Read the response to see which endpoint responded
-			body, err := io.ReadAll(resp.Body)
+			resp, err := MakeHTTPRequest(ctx, t, url, message)
 			if err != nil {
-				t.Errorf("Failed to read response body: %v", err)
+				t.Errorf("Request %d: %v", requestCount, err)
+				goto sleepUntilNextRequest
 			}
-			t.Logf("Response %d: %s, Header: %s", requestCount, string(body), resp.Header.Get("X-Endpoint"))
+			// Read the response to see which endpoint responded
+			{
+				body, err := io.ReadAll(resp.Body)
+				resp.Body.Close()
+				if err != nil {
+					t.Errorf("Request %d: read response body: %v", requestCount, err)
+					goto sleepUntilNextRequest
+				}
+				t.Logf("Response %d: %s, Header: %s", requestCount, string(body), resp.Header.Get("X-Endpoint"))
+			}
 
-			resp.Body.Close()
+		sleepUntilNextRequest:
 			time.Sleep(50 * time.Millisecond) // Small delay between requests
 		}
 	}

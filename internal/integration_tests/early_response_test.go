@@ -48,13 +48,18 @@ func TestEarlyResponseLargeUpload(t *testing.T) {
 	t.Logf("Forwarder URL: %s", ngrokURL)
 
 	t.Run("small body succeeds", func(t *testing.T) {
-		resp := MakeHTTPRequest(t, ctx, ngrokURL, "small payload")
+		resp, err := MakeHTTPRequest(ctx, t, ngrokURL, "small payload")
+		if err != nil {
+			t.Fatal(err)
+		}
 		defer resp.Body.Close()
-
-		assert.Equal(t, http.StatusOK, resp.StatusCode)
 		body, err := io.ReadAll(resp.Body)
-		require.NoError(t, err)
-		assert.Equal(t, "OK", string(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, want := string(body), "OK"; got != want {
+			t.Errorf("%s response body = %q: %q", body, got, want)
+		}
 	})
 
 	t.Run("large body returns 413", func(t *testing.T) {
