@@ -60,6 +60,13 @@ func (s *swapRaw) Unlisten(url string) (resp proto.UnbindResp, err error) {
 	return proto.UnbindResp{}, ErrSessionNotReady
 }
 
+func (s *swapRaw) UpdateBind(id string, description, metadata, trafficPolicy *string, poolingEnabled *bool) (resp proto.UpdateBindResp, err error) {
+	if raw := s.get(); raw != nil {
+		return raw.UpdateBind(id, description, metadata, trafficPolicy, poolingEnabled)
+	}
+	return proto.UpdateBindResp{}, ErrSessionNotReady
+}
+
 func (s *swapRaw) SrvInfo() (resp proto.SrvInfoResp, err error) {
 	if raw := s.get(); raw != nil {
 		return raw.SrvInfo()
@@ -211,6 +218,13 @@ func (s *reconnectingSession) listenTunnel(listen func(*session) (Tunnel, error)
 		return tun, nil
 	}
 	return nil, ErrSessionNotReady
+}
+
+func (s *reconnectingSession) UpdateBind(clientID string, description, metadata, trafficPolicy *string, poolingEnabled *bool) error {
+	if sess := s.firstSession(); sess != nil {
+		return sess.UpdateBind(clientID, description, metadata, trafficPolicy, poolingEnabled)
+	}
+	return ErrSessionNotReady
 }
 
 func (s *reconnectingSession) SrvInfo() (resp proto.SrvInfoResp, err error) {

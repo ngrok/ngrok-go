@@ -41,6 +41,8 @@ type Session interface {
 
 	// AgentSessionID returns the server-assigned ID for this agent session
 	AgentSessionID() string
+	// UpdateBind updates the mutable fields of an existing bind/tunnel.
+	UpdateBind(clientID string, description, metadata, trafficPolicy *string, poolingEnabled *bool) error
 
 	// Warnings returns a list of warnings generated for the session on connect/auth
 	Warnings() []error
@@ -731,8 +733,13 @@ func (s *sessionImpl) Close() error {
 	return s.inner().Close()
 }
 
+<<<<<<< HEAD
 func (s *sessionImpl) AgentSessionID() string {
 	return s.inner().AgentSessionID
+=======
+func (s *sessionImpl) UpdateBind(clientID string, description, metadata, trafficPolicy *string, poolingEnabled *bool) error {
+	return s.inner().UpdateBind(clientID, description, metadata, trafficPolicy, poolingEnabled)
+>>>>>>> ce6f88c (add support for updating endpoint objects)
 }
 
 func (s *sessionImpl) Warnings() []error {

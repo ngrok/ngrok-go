@@ -21,6 +21,7 @@ type RawSession interface {
 	Listen(proto string, opts any, extra proto.BindExtra, id string, forwardsTo string, forwardsProto string) (proto.BindResp, error)
 	ListenLabel(labels map[string]string, metadata string, forwardsTo string, forwardsProto string) (proto.StartTunnelWithLabelResp, error)
 	Unlisten(id string) (proto.UnbindResp, error)
+	UpdateBind(id string, description, metadata, trafficPolicy *string, poolingEnabled *bool) (proto.UpdateBindResp, error)
 	Accept() (netx.LoggedConn, error)
 
 	SrvInfo() (proto.SrvInfoResp, error)
@@ -134,6 +135,18 @@ func (s *rawSession) ListenLabel(labels map[string]string, metadata string, forw
 func (s *rawSession) Unlisten(id string) (resp proto.UnbindResp, err error) {
 	req := proto.Unbind{ClientID: id}
 	err = s.rpc(proto.UnbindReq, &req, &resp)
+	return
+}
+
+func (s *rawSession) UpdateBind(id string, description, metadata, trafficPolicy *string, poolingEnabled *bool) (resp proto.UpdateBindResp, err error) {
+	req := proto.UpdateBind{
+		ClientID:       id,
+		Description:    description,
+		Metadata:       metadata,
+		TrafficPolicy:  trafficPolicy,
+		PoolingEnabled: poolingEnabled,
+	}
+	err = s.rpc(proto.UpdateBindReq, &req, &resp)
 	return
 }
 
