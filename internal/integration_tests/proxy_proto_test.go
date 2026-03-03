@@ -221,10 +221,10 @@ func handleTCPConnection(t *testing.T, conn net.Conn, reader *bufio.Reader, srcA
 }
 
 // connectHTTPSClient connects to an HTTPS endpoint using an HTTP client
-func connectHTTPSClient(t *testing.T, endpointURL string) {
+func connectHTTPSClient(ctx context.Context, t *testing.T, endpointURL string) {
 	// Use MakeHTTPRequest to send test message
 	message := "Test message for PROXY protocol"
-	resp := MakeHTTPRequest(t, context.Background(), endpointURL, message)
+	resp := MakeHTTPRequest(t, ctx, endpointURL, message)
 	defer resp.Body.Close()
 
 	// Read the response
@@ -234,13 +234,13 @@ func connectHTTPSClient(t *testing.T, endpointURL string) {
 }
 
 // connectTCPClient connects to a TCP endpoint using a direct TCP connection
-func connectTCPClient(t *testing.T, endpointURL string) {
+func connectTCPClient(ctx context.Context, t *testing.T, endpointURL string) {
 	// For TCP, use direct TCP connection
 	u, err := url.Parse(endpointURL)
 	require.NoError(t, err, "Failed to parse URL")
 
 	// Connect to the endpoint using MakeTCPConnection
-	clientConn, err := MakeTCPConnection(t, context.Background(), u.Host)
+	clientConn, err := MakeTCPConnection(t, ctx, u.Host)
 	require.NoError(t, err, "Failed to connect to TCP endpoint")
 	defer clientConn.Close()
 
@@ -310,8 +310,7 @@ func TestProxyProtoIntegration(t *testing.T) {
 			t.Parallel()
 
 			// Setup agent
-			agent, ctx, cancel := SetupAgent(t)
-			defer cancel()
+			agent, ctx := SetupAgent(t)
 			defer func() { _ = agent.Disconnect() }()
 
 			// Create synchronization points
@@ -408,11 +407,11 @@ func TestProxyProtoIntegration(t *testing.T) {
 			// Connect to the endpoint with appropriate client based on scheme
 			switch {
 			case strings.HasPrefix(scheme, "https"):
-				connectHTTPSClient(t, endpointURL)
+				connectHTTPSClient(ctx, t, endpointURL)
 			case strings.HasPrefix(scheme, "tls"):
 				connectTLSClient(t, endpointURL)
 			default: // TCP
-				connectTCPClient(t, endpointURL)
+				connectTCPClient(ctx, t, endpointURL)
 			}
 
 			// Wait for the client address with timeout

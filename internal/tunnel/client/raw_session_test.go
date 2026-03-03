@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"golang.ngrok.com/muxado/v2"
+	"golang.ngrok.com/ngrok/v2/internal/testcontext"
 )
 
 type dummyStream struct{}
@@ -31,7 +32,7 @@ func TestHeartbeatTimeout(t *testing.T) {
 }
 
 func TestRawSessionCloseRace(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
+	ctx, cancel := context.WithTimeout(testcontext.ForTB(t), time.Second*1)
 	defer cancel()
 
 	// Since this is a race condition, run the test as many times as we can

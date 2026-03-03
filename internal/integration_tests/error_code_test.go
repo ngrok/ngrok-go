@@ -13,8 +13,7 @@ func TestErrorCode(t *testing.T) {
 	SkipIfOffline(t)
 	t.Parallel()
 
-	agent, ctx, cancel := SetupAgent(t)
-	defer cancel()
+	agent, ctx := SetupAgent(t)
 
 	// Create an endpoint with an invalid character ('@') in its URL
 	_, err := agent.Listen(ctx,
