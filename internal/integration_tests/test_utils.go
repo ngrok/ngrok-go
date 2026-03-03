@@ -59,15 +59,26 @@ func SetupAgent(t *testing.T) (ngrok.Agent, context.Context) {
 	return agent, ctx
 }
 
-// SetupListener sets up an ngrok listener with the specified options
-func SetupListener(t *testing.T, agent ngrok.Agent, ctx context.Context, opts ...ngrok.EndpointOption) ngrok.EndpointListener {
+// SetupListener sets up an ngrok listener with the specified options.
+// SetupListener must be called from the goroutine running the test or benchmark.
+// The returned listener will be closed when the test or benchmark function returns.
+func SetupListener(ctx context.Context, tb testing.TB, agent ngrok.Agent, opts ...ngrok.EndpointOption) ngrok.EndpointListener {
+	tb.Helper()
+
 	// Create a listener endpoint
 	listener, err := agent.Listen(ctx, opts...)
-	require.NoError(t, err, "Failed to create listener")
+	if err != nil {
+		tb.Fatal(err)
+	}
 
 	// Get the URL of the endpoint
 	endpointURL := listener.URL().String()
-	t.Logf("Endpoint URL: %s", endpointURL)
+	tb.Logf("Endpoint URL: %s", endpointURL)
+	tb.Cleanup(func() {
+		if err := listener.Close(); err != nil {
+			tb.Error("Closing listener:", err)
+		}
+	})
 
 	return listener
 }

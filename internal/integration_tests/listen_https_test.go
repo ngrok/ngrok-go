@@ -20,8 +20,7 @@ func TestListenWithHTTPSURL(t *testing.T) {
 
 	// Setup listener with HTTPS URL
 	httpsURL := "https://test-https.ngrok.io"
-	listener := SetupListener(t, agent, ctx, ngrok.WithURL(httpsURL))
-	defer listener.Close()
+	listener := SetupListener(ctx, t, agent, ngrok.WithURL(httpsURL))
 
 	// Verify the URL scheme is https
 	assert.Equal(t, "https", listener.URL().Scheme, "URL scheme should be https")
