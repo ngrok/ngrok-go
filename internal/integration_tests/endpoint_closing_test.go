@@ -16,7 +16,6 @@ func TestEndpointClosingIntegration(t *testing.T) {
 
 	// Setup agent
 	agent, ctx := SetupAgent(t)
-	defer func() { _ = agent.Disconnect() }()
 
 	// Create a listener endpoint
 	listener, err := agent.Listen(ctx)

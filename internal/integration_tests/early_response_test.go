@@ -19,7 +19,6 @@ func TestEarlyResponseLargeUpload(t *testing.T) {
 	t.Parallel()
 
 	agent, ctx := SetupAgent(t)
-	defer func() { _ = agent.Disconnect() }()
 
 	const maxBodySize = 1024
 
