@@ -1,56 +1,20 @@
 package ngrok
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
 	"crypto/tls"
-	"crypto/x509"
-	"crypto/x509/pkix"
-	"math/big"
 	"net"
 	"testing"
-	"time"
+
+	"golang.ngrok.com/ngrok/v2/internal/tlstest"
 )
-
-// createTestCertificate creates a self-signed certificate for testing
-func createTestCertificate(t *testing.T) *tls.Certificate {
-	// Generate a private key
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatalf("Failed to generate private key: %v", err)
-	}
-
-	// Create a certificate template
-	template := x509.Certificate{
-		SerialNumber:          big.NewInt(1),
-		Subject:               pkix.Name{CommonName: "localhost"},
-		NotBefore:             time.Now(),
-		NotAfter:              time.Now().Add(time.Hour * 24), // Valid for 24 hours
-		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		BasicConstraintsValid: true,
-	}
-
-	// Create a self-signed certificate
-	certBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
-	if err != nil {
-		t.Fatalf("Failed to create certificate: %v", err)
-	}
-
-	// Create a TLS certificate
-	cert := &tls.Certificate{
-		Certificate: [][]byte{certBytes},
-		PrivateKey:  privateKey,
-		Leaf:        &template,
-	}
-
-	return cert
-}
 
 // TestWrapConnWithTLS tests the TLS connection wrapper
 func TestWrapConnWithTLS(t *testing.T) {
 	// Create a test certificate
-	cert := createTestCertificate(t)
+	cert, err := tlstest.CreateCertificate()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Create a pipe for testing
 	serverConn, clientConn := net.Pipe()

@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.ngrok.com/ngrok/v2"
 	"golang.ngrok.com/ngrok/v2/internal/testutil"
+	"golang.ngrok.com/ngrok/v2/internal/tlstest"
 )
 
 // parseProxyProtocolHeader extracts client and server information from a PROXY protocol header.
@@ -132,7 +133,10 @@ func verifyClientAddr(t *testing.T, clientAddr net.Addr) {
 // handleTLSConnection handles a TLS connection with PROXY protocol already read
 func handleTLSConnection(t *testing.T, conn net.Conn, reader *bufio.Reader, srcAddr net.Addr) {
 	// Create a server TLS certificate for the handshake
-	servCert := CreateTestCertificate(t)
+	servCert, err := tlstest.CreateCertificate()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Create TLS configuration for server
 	config := &tls.Config{

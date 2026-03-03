@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.ngrok.com/ngrok/v2"
 	"golang.ngrok.com/ngrok/v2/internal/testutil"
+	"golang.ngrok.com/ngrok/v2/internal/tlstest"
 )
 
 // TestAgentTLSTerminationIntegration tests agent-based TLS termination with custom certificates
@@ -19,7 +20,10 @@ func TestAgentTLSTerminationIntegration(t *testing.T) {
 	t.Parallel()
 
 	// Generate test certificate
-	cert := CreateTestCertificate(t)
+	cert, err := tlstest.CreateCertificate()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Setup agent
 	agent, ctx := SetupAgent(t)

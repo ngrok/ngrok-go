@@ -3,14 +3,9 @@ package integration_tests
 import (
 	"bufio"
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
 	"crypto/tls"
-	"crypto/x509"
-	"crypto/x509/pkix"
 	"fmt"
 	"io"
-	"math/big"
 	"net"
 	"net/http"
 	"os"
@@ -116,36 +111,6 @@ func WaitForForwarderReady(t *testing.T, url string) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	t.Logf("Forwarder endpoint didn't become ready in expected time, continuing anyway")
-}
-
-// CreateTestCertificate creates a certificate for testing
-func CreateTestCertificate(t *testing.T) *tls.Certificate {
-	// Generate a self-signed certificate for testing
-	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	require.NoError(t, err, "Failed to generate private key")
-
-	templ := x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		Subject: pkix.Name{
-			CommonName: "localhost",
-		},
-		NotBefore:             time.Now(),
-		NotAfter:              time.Now().Add(time.Hour),
-		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		BasicConstraintsValid: true,
-		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1")},
-	}
-
-	certDER, err := x509.CreateCertificate(rand.Reader, &templ, &templ, &privKey.PublicKey, privKey)
-	require.NoError(t, err, "Failed to create certificate")
-
-	cert := tls.Certificate{
-		Certificate: [][]byte{certDER},
-		PrivateKey:  privKey,
-	}
-
-	return &cert
 }
 
 // MakeTCPConnection establishes a TCP connection to the given address
