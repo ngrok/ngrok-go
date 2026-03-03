@@ -68,11 +68,11 @@ func TestUpstreamProtocolHTTP2(t *testing.T) {
 
 		// Send a request to the ngrok URL
 		message := "Testing HTTP version"
-		resp := MakeHTTPRequest(t, ctx, ngrokURL, message)
+		resp, err := MakeHTTPRequest(ctx, t, ngrokURL, message)
+		if err != nil {
+			t.Fatal(err)
+		}
 		defer resp.Body.Close()
-
-		// Check the status code
-		assert.Equal(t, http.StatusOK, resp.StatusCode, "HTTP status should be 200 OK")
 
 		// Read the response body
 		body, err := io.ReadAll(resp.Body)
@@ -137,11 +137,11 @@ func TestUpstreamProtocolHTTP2(t *testing.T) {
 
 		// Send a request to the ngrok URL
 		message := "Testing HTTP2"
-		resp := MakeHTTPRequest(t, ctx, ngrokURL, message)
+		resp, err := MakeHTTPRequest(ctx, t, ngrokURL, message)
+		if err != nil {
+			t.Fatal(err)
+		}
 		defer resp.Body.Close()
-
-		// Check the status code
-		assert.Equal(t, http.StatusOK, resp.StatusCode, "HTTP status should be 200 OK")
 
 		// Read the response body
 		body, err := io.ReadAll(resp.Body)

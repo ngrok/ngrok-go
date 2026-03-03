@@ -2,6 +2,7 @@ package integration_tests
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"crypto/tls"
 	"fmt"
@@ -78,25 +79,44 @@ func SetupListener(ctx context.Context, tb testing.TB, agent ngrok.Agent, opts .
 	return listener
 }
 
-// MakeHTTPRequest makes an HTTP request to the specified URL with the given message
-func MakeHTTPRequest(t *testing.T, ctx context.Context, url string, message string) *http.Response {
-	// Create a custom transport that doesn't reuse connections
-	transport := &http.Transport{
-		DisableKeepAlives: true,
-	}
+// MakeHTTPRequest makes an HTTP POST request to the specified URL with the given body.
+// MakeHTTPRequest ensures that a new connection will be created for this request
+// that will be closed before MakeHTTPRequest returns.
+// If the HTTP response status code is not 200, MakeHTTPRequest will return an error.
+// The body of the returned HTTP response does not need to be closed.
+func MakeHTTPRequest(ctx context.Context, tb testing.TB, url string, message string) (*http.Response, error) {
+	tb.Helper()
 
-	// Create a client with the custom transport
-	client := &http.Client{Transport: transport}
+	// Create a client with a custom transport that doesn't reuse connections.
+	client := &http.Client{
+		Transport: &http.Transport{
+			DisableKeepAlives: true,
+		},
+	}
+	defer client.CloseIdleConnections()
 
 	// Make the request
-	req, err := http.NewRequestWithContext(ctx, "POST", url, strings.NewReader(message))
-	require.NoError(t, err, "Failed to create request")
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, strings.NewReader(message))
+	if err != nil {
+		return nil, fmt.Errorf("post %s: %v", url, err)
+	}
 
-	t.Logf("Making HTTP request to %s", url)
+	tb.Logf("Making HTTP request to %s", url)
 	resp, err := client.Do(req)
-	require.NoError(t, err, "Failed to send request")
+	if err != nil {
+		return nil, fmt.Errorf("post %s: %v", url, err)
+	}
+	defer resp.Body.Close()
 
-	return resp
+	data, err := io.ReadAll(resp.Body)
+	resp.Body = io.NopCloser(bytes.NewReader(data))
+	if err != nil {
+		return resp, fmt.Errorf("post %s: %v", url, err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return resp, fmt.Errorf("post %s: http %s", url, resp.Status)
+	}
+	return resp, nil
 }
 
 // WaitForForwarderReady polls the forwarder endpoint until it responds or times out

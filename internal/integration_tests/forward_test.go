@@ -61,11 +61,11 @@ func TestForward(t *testing.T) {
 
 	// Send a request to the ngrok URL
 	expectedMessage := "Hello from forward test!"
-	resp := MakeHTTPRequest(t, ctx, ngrokURL, expectedMessage)
+	resp, err := MakeHTTPRequest(ctx, t, ngrokURL, expectedMessage)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer resp.Body.Close()
-
-	// Check the status code
-	assert.Equal(t, http.StatusOK, resp.StatusCode, "HTTP status should be 200 OK")
 
 	// Check the received header
 	receivedHeader := resp.Header.Get("X-Received")
