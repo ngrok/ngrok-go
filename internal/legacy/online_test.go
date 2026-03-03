@@ -214,8 +214,9 @@ func (sd *sketchyDialer) DialContext(ctx context.Context, network, addr string) 
 }
 
 func TestHeartbeatCallback(t *testing.T) {
-	// Don't run this one by default - it's long
-	skipUnless(t, "NGROK_TEST_LONG", "Skipping long network test")
+	if testing.Short() {
+		t.Skip("Skipping long network test")
+	}
 
 	ctx := context.Background()
 	heartbeats := 0
