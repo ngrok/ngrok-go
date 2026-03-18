@@ -13,6 +13,7 @@ type EndpointOption func(*endpointOpts)
 
 // endpointOpts stores configuration for endpoints.
 type endpointOpts struct {
+	name                    string
 	poolingEnabled          bool
 	bindings                []string
 	description             string
@@ -29,6 +30,13 @@ type endpointOpts struct {
 // defaultEndpointOpts returns the default options for an endpoint.
 func defaultEndpointOpts() *endpointOpts {
 	return &endpointOpts{}
+}
+
+// WithName sets a human-readable name for the endpoint.
+func WithName(name string) EndpointOption {
+	return func(opts *endpointOpts) {
+		opts.name = name
+	}
 }
 
 // WithPoolingEnabled controls whether the endpoint supports connection pooling.
@@ -149,6 +157,11 @@ func configureHTTPEndpoint(endpointOpts *endpointOpts) (config.Tunnel, error) {
 		configOpts = append(configOpts, config.WithMetadata(endpointOpts.metadata))
 	}
 
+	// Add name if specified
+	if len(endpointOpts.name) > 0 {
+		configOpts = append(configOpts, config.WithName(endpointOpts.name))
+	}
+
 	// Add description if specified
 	if len(endpointOpts.description) > 0 {
 		configOpts = append(configOpts, config.WithDescription(endpointOpts.description))
@@ -194,6 +207,11 @@ func configureTCPEndpoint(endpointOpts *endpointOpts) (config.Tunnel, error) {
 		configOpts = append(configOpts, config.WithMetadata(endpointOpts.metadata))
 	}
 
+	// Add name if specified
+	if len(endpointOpts.name) > 0 {
+		configOpts = append(configOpts, config.WithName(endpointOpts.name))
+	}
+
 	// Add description if specified
 	if len(endpointOpts.description) > 0 {
 		configOpts = append(configOpts, config.WithDescription(endpointOpts.description))
@@ -234,6 +252,11 @@ func configureTLSEndpoint(endpointOpts *endpointOpts) (config.Tunnel, error) {
 	// Add metadata if specified
 	if len(endpointOpts.metadata) > 0 {
 		configOpts = append(configOpts, config.WithMetadata(endpointOpts.metadata))
+	}
+
+	// Add name if specified
+	if len(endpointOpts.name) > 0 {
+		configOpts = append(configOpts, config.WithName(endpointOpts.name))
 	}
 
 	// Add description if specified

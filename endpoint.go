@@ -40,6 +40,9 @@ type Endpoint interface {
 	// Metadata returns the endpoint's opaque user-defined metadata set by WithMetadata.
 	Metadata() string
 
+	// Name returns the endpoint's human-readable name set by WithName.
+	Name() string
+
 	// Protocol is sugar for URL().Scheme
 	Protocol() string
 
@@ -57,6 +60,7 @@ type Endpoint interface {
 // EndpointForwarder.
 type baseEndpoint struct {
 	agent          Agent
+	name           string
 	poolingEnabled bool
 	bindings       []string
 	description    string
@@ -99,6 +103,10 @@ func (e *baseEndpoint) ID() string {
 
 func (e *baseEndpoint) Metadata() string {
 	return e.metadata
+}
+
+func (e *baseEndpoint) Name() string {
+	return e.name
 }
 
 func (e *baseEndpoint) Protocol() string {

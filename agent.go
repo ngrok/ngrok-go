@@ -255,6 +255,7 @@ func (a *agent) createListener(ctx context.Context, endpointOpts *endpointOpts) 
 		baseEndpoint: baseEndpoint{
 			agent:          a,
 			id:             tunnel.ID(),
+			name:           tunnel.Name(),
 			poolingEnabled: endpointOpts.poolingEnabled,
 			bindings:       endpointOpts.bindings,
 			description:    endpointOpts.description,

@@ -15,6 +15,7 @@ type Tunnel interface {
 	Close() error
 	RemoteBindConfig() *RemoteBindConfig
 	ID() string
+	Name() string
 	ForwardsTo() string
 	ForwardsProto() string
 }
@@ -133,6 +134,10 @@ func (t *tunnel) ForwardsTo() string {
 
 func (t *tunnel) ID() string {
 	return t.id.Load().(string)
+}
+
+func (t *tunnel) Name() string {
+	return t.bindExtra.Name
 }
 
 // RemoteBindConfig returns more detailed information about the public endpoint of the

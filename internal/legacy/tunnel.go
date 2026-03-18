@@ -49,6 +49,8 @@ type TunnelInfo interface {
 	Labels() map[string]string
 	// Metadata returns the arbitrary metadata string for this tunnel.
 	Metadata() string
+	// Name returns the human-readable name for this tunnel set by WithName.
+	Name() string
 	// Proto returns the protocol of the tunnel's endpoint.
 	// Labeled tunnels will return the empty string.
 	Proto() string
@@ -123,6 +125,10 @@ func (t *tunnelImpl) Metadata() string {
 
 func (t *tunnelImpl) ID() string {
 	return t.Tunnel.ID()
+}
+
+func (t *tunnelImpl) Name() string {
+	return t.Tunnel.Name()
 }
 
 func (t *tunnelImpl) Labels() map[string]string {
