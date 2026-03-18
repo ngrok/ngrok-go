@@ -50,11 +50,9 @@ testloop:
 		r := NewRawSession(logger, muxado.Client(&dummyStream{}, nil), nil, nil)
 
 		wg := sync.WaitGroup{}
-		wg.Add(1)
 
 		// Call onHeartbeat as fast as we can in the background.
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for {
 				select {
 				case <-ctx.Done():
@@ -63,7 +61,7 @@ testloop:
 				}
 				r.(*rawSession).onHeartbeat(time.Millisecond*1, false)
 			}
-		}()
+		})
 
 		// Verify that closing the session while a heartbeat is in flight won't
 		// cause a panic

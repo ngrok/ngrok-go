@@ -63,15 +63,13 @@ func TestListenWithURLAndPooling(t *testing.T) {
 
 	// Start handlers for both listeners
 	// Handler for first listener
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		defer close(processingDone)
 
 		// Signal that we're ready to accept connections
 		endpoint1Ready.Signal()
 
-		for i := 0; i < 5; i++ { // Handle up to 5 connections
+		for range 5 { // Handle up to 5 connections
 			conn, err := listener1.Accept()
 			if err != nil {
 				// Check if test is already finished before reporting errors
@@ -130,17 +128,15 @@ func TestListenWithURLAndPooling(t *testing.T) {
 				}
 			}(conn)
 		}
-	}()
+	})
 
 	// Handler for second listener
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 
 		// Signal that we're ready to accept connections
 		endpoint2Ready.Signal()
 
-		for i := 0; i < 5; i++ { // Handle up to 5 connections
+		for range 5 { // Handle up to 5 connections
 			conn, err := listener2.Accept()
 			if err != nil {
 				// Check if test is already finished before reporting errors
@@ -199,7 +195,7 @@ func TestListenWithURLAndPooling(t *testing.T) {
 				}
 			}(conn)
 		}
-	}()
+	})
 
 	// Wait for both endpoints to be ready to accept connections
 	endpoint1Ready.Wait(t)
