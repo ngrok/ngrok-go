@@ -43,8 +43,10 @@ func SetupAgent(t *testing.T) (ngrok.Agent, context.Context) {
 
 	ctx := testcontext.ForTB(t)
 
-	// Connect the agent
-	err = agent.Connect(ctx)
+	// Connect the agent using context.Background() so the session is not closed when
+	// the test context is cancelled (which happens before cleanup functions run).
+	// The session is explicitly closed by the agent.Disconnect() cleanup below.
+	err = agent.Connect(context.Background())
 	require.NoError(t, err, "Failed to connect agent")
 	t.Cleanup(func() {
 		if err := agent.Disconnect(); err != nil {
