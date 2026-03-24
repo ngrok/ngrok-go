@@ -39,6 +39,9 @@ type Session interface {
 	// connections. The returned Tunnel object is a net.Listener.
 	Listen(ctx context.Context, cfg config.Tunnel) (Tunnel, error)
 
+	// AgentSessionID returns the server-assigned ID for this agent session
+	AgentSessionID() string
+
 	// Warnings returns a list of warnings generated for the session on connect/auth
 	Warnings() []error
 
@@ -569,6 +572,7 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 			SessionDuration:    resp.Extra.SessionDuration,
 			DeprecationWarning: resp.Extra.DeprecationWarning,
 			ConnectAddresses:   resp.Extra.ConnectAddresses,
+			AgentSessionID:     resp.Extra.AgentSessionID,
 			Logger:             logger,
 		}
 
@@ -706,6 +710,7 @@ type sessionInner struct {
 	SessionDuration    int64
 	DeprecationWarning *proto.AgentVersionDeprecated
 	ConnectAddresses   []proto.ConnectAddress
+	AgentSessionID     string
 
 	Logger *slog.Logger
 }
@@ -724,6 +729,10 @@ func (s *sessionImpl) closeTunnel(clientID string, err error) error {
 
 func (s *sessionImpl) Close() error {
 	return s.inner().Close()
+}
+
+func (s *sessionImpl) AgentSessionID() string {
+	return s.inner().AgentSessionID
 }
 
 func (s *sessionImpl) Warnings() []error {

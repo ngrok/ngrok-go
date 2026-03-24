@@ -206,6 +206,7 @@ type AuthRespExtra struct {
 	Banner             string
 	DeprecationWarning *AgentVersionDeprecated
 	ConnectAddresses   []ConnectAddress
+	AgentSessionID     string
 }
 
 // A client sends this message to the server over a new stream
