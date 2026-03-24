@@ -61,8 +61,8 @@ func (ne ngrokError) Unwrap() error {
 func (ne ngrokError) Msg() string {
 	errMsg := ne.Inner.Error()
 	out := []string{}
-	lines := strings.Split(errMsg, "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(errMsg, "\n")
+	for line := range lines {
 		line = strings.Trim(line, " \t\n\r")
 		if line == "" || ngrokErrorCodeRegex.MatchString(line) {
 			continue

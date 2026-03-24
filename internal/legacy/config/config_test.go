@@ -58,7 +58,7 @@ type testCases[T tunnelConfigPrivate, O any] []testCase[T, O]
 func (tc testCase[T, O]) Run(t *testing.T) {
 	t.Run(tc.name, func(t *testing.T) {
 		actualOpts, ok := tc.opts.(T)
-		require.Truef(t, ok, "Tunnel opts should have type %v", reflect.TypeOf(new(T)))
+		require.Truef(t, ok, "Tunnel opts should have type %v", reflect.TypeFor[*T]())
 		if tc.expectForwardsTo != nil {
 			require.Equal(t, *tc.expectForwardsTo, actualOpts.ForwardsTo())
 		}
@@ -84,7 +84,7 @@ func (tc testCase[T, O]) Run(t *testing.T) {
 			require.Nil(t, actualOpts.Opts())
 		} else if tc.expectOpts != nil {
 			opts, ok := actualOpts.Opts().(*O)
-			require.Truef(t, ok, "Opts has the type %v", reflect.TypeOf((*O)(nil)))
+			require.Truef(t, ok, "Opts has the type %v", reflect.TypeFor[*O]())
 			tc.expectOpts(t, opts)
 		}
 	})
