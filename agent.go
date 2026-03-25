@@ -155,6 +155,7 @@ func (a *agent) Connect(ctx context.Context) error {
 	}
 
 	// Complete the AgentSession wrapper with session-specific data
+	agentSession.id = sess.AgentSessionID()
 	agentSession.warnings = sess.Warnings()
 
 	// Store in agent

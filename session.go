@@ -8,8 +8,7 @@ import (
 // service.
 type AgentSession interface {
 	// ID returns the server-assigned ID of the agent session
-	// TODO(alan): implement when the server begins setting this value
-	// ID() string
+	ID() string
 	// Warnings is a list of warnings returned by the ngrok cloud service after the Agent has connected
 	Warnings() []error
 	// Agent returns the agent that started this session
