@@ -59,12 +59,6 @@ type TunnelInfo interface {
 	URL() string
 	// Region returns the region where this tunnel was created.
 	Region() string
-	// CreatedAt returns the time when the tunnel was created.
-	CreatedAt() time.Time
-	// UpdatedAt returns the time when the tunnel was last updated.
-	UpdatedAt() time.Time
-	// TunnelSessionID returns the ID of the session that created this tunnel.
-	TunnelSessionID() string
 	// TunnelID returns the tunnel resource ID.
 	TunnelID() string
 }
@@ -147,18 +141,6 @@ func (t *tunnelImpl) Labels() map[string]string {
 
 func (t *tunnelImpl) Region() string {
 	return t.Tunnel.Region()
-}
-
-func (t *tunnelImpl) CreatedAt() time.Time {
-	return t.Tunnel.CreatedAt()
-}
-
-func (t *tunnelImpl) UpdatedAt() time.Time {
-	return t.Tunnel.UpdatedAt()
-}
-
-func (t *tunnelImpl) TunnelSessionID() string {
-	return t.Tunnel.TunnelSessionID()
 }
 
 func (t *tunnelImpl) TunnelID() string {

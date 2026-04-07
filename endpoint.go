@@ -65,7 +65,7 @@ type Endpoint interface {
 	// UpdatedAt returns the time when the endpoint was last updated.
 	UpdatedAt() time.Time
 
-	// TunnelSessionID returns the ID of the session that created this endpoint.
+	// TunnelSessionID returns the ID of the agent session that created this endpoint.
 	TunnelSessionID() string
 
 	// TunnelID returns the tunnel resource ID.

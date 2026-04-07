@@ -5,7 +5,6 @@ import (
 	"net"
 	"net/url"
 	"sync/atomic"
-	"time"
 
 	"golang.ngrok.com/ngrok/v2/internal/tunnel/proto"
 )
@@ -20,9 +19,6 @@ type Tunnel interface {
 	ForwardsTo() string
 	ForwardsProto() string
 	Region() string
-	CreatedAt() time.Time
-	UpdatedAt() time.Time
-	TunnelSessionID() string
 	TunnelID() string
 }
 
@@ -34,20 +30,17 @@ type ProxyConn struct {
 // A Tunnel is a net.Listener that Accept()'s connections from a
 // remote machine.
 type tunnel struct {
-	id              atomic.Value
-	configProto     string
-	url             string
-	opts            any
-	token           string
-	bindExtra       proto.BindExtra
-	labels          map[string]string
-	forwardsTo      string
-	forwardsProto   string
-	region          string
-	createdAt       time.Time
-	updatedAt       time.Time
-	tunnelSessionID string
-	tunnelID        string
+	id            atomic.Value
+	configProto   string
+	url           string
+	opts          any
+	token         string
+	bindExtra     proto.BindExtra
+	labels        map[string]string
+	forwardsTo    string
+	forwardsProto string
+	region        string
+	tunnelID      string
 
 	accept     chan *ProxyConn // new connections come on this channel
 	unlisten   func() error    // call this function to close the tunnel
@@ -59,32 +52,20 @@ type tunnel struct {
 func newTunnel(resp proto.BindResp, extra proto.BindExtra, s *session, forwardsTo string, forwardsProto string) *tunnel {
 	id := atomic.Value{}
 	id.Store(resp.ClientID)
-
-	var createdAt, updatedAt time.Time
-	if resp.Extra.CreatedAt != 0 {
-		createdAt = time.Unix(resp.Extra.CreatedAt, 0)
-	}
-	if resp.Extra.UpdatedAt != 0 {
-		updatedAt = time.Unix(resp.Extra.UpdatedAt, 0)
-	}
-
 	return &tunnel{
-		id:              id,
-		configProto:     resp.Proto,
-		url:             resp.URL,
-		opts:            resp.Opts,
-		token:           resp.Extra.Token,
-		bindExtra:       extra, // this makes the reconnecting session a little easier
-		accept:          make(chan *ProxyConn),
-		unlisten:        func() error { return s.unlisten(resp.ClientID) },
-		forwardsTo:      forwardsTo,
-		forwardsProto:   forwardsProto,
-		closeError:      errors.New("Listener closed"),
-		region:          resp.Extra.Region,
-		createdAt:       createdAt,
-		updatedAt:       updatedAt,
-		tunnelSessionID: resp.Extra.TunnelSessionID,
-		tunnelID:        resp.Extra.TunnelID,
+		id:            id,
+		configProto:   resp.Proto,
+		url:           resp.URL,
+		opts:          resp.Opts,
+		token:         resp.Extra.Token,
+		bindExtra:     extra, // this makes the reconnecting session a little easier
+		accept:        make(chan *ProxyConn),
+		unlisten:      func() error { return s.unlisten(resp.ClientID) },
+		forwardsTo:    forwardsTo,
+		forwardsProto: forwardsProto,
+		closeError:    errors.New("Listener closed"),
+		region:        resp.Extra.Region,
+		tunnelID:      resp.Extra.TunnelID,
 	}
 }
 
@@ -167,18 +148,6 @@ func (t *tunnel) Name() string {
 
 func (t *tunnel) Region() string {
 	return t.region
-}
-
-func (t *tunnel) CreatedAt() time.Time {
-	return t.createdAt
-}
-
-func (t *tunnel) UpdatedAt() time.Time {
-	return t.updatedAt
-}
-
-func (t *tunnel) TunnelSessionID() string {
-	return t.tunnelSessionID
 }
 
 func (t *tunnel) TunnelID() string {

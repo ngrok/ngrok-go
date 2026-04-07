@@ -251,6 +251,13 @@ func (a *agent) createListener(ctx context.Context, endpointOpts *endpointOpts) 
 		}
 	}
 
+	var tunnelSessionID string
+	if sess, err := a.Session(); err == nil {
+		tunnelSessionID = sess.ID()
+	}
+
+	now := time.Now()
+
 	// Create endpoint listener
 	endpoint := &endpointListener{
 		baseEndpoint: baseEndpoint{
@@ -267,9 +274,9 @@ func (a *agent) createListener(ctx context.Context, endpointOpts *endpointOpts) 
 			doneChannel:     make(chan struct{}),
 			doneOnce:        &sync.Once{},
 			region:          tunnel.Region(),
-			createdAt:       tunnel.CreatedAt(),
-			updatedAt:       tunnel.UpdatedAt(),
-			tunnelSessionID: tunnel.TunnelSessionID(),
+			createdAt:       now,
+			updatedAt:       now,
+			tunnelSessionID: tunnelSessionID,
 			tunnelID:        tunnel.TunnelID(),
 		},
 		tunnel: tunnel,

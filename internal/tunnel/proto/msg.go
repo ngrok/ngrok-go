@@ -243,12 +243,9 @@ type BindResp struct {
 }
 
 type BindRespExtra struct {
-	Token           string
-	Region          string
-	CreatedAt       int64  // unix timestamp in seconds when the tunnel was created
-	UpdatedAt       int64  // unix timestamp in seconds when the tunnel was last updated
-	TunnelSessionID string // ID of the session that created this tunnel
-	TunnelID        string // ID of the tunnel resource
+	Token    string
+	Region   string
+	TunnelID string // ID of the tunnel resource
 }
 
 // A client sends this message to the server over a new stream
