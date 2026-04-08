@@ -245,7 +245,7 @@ type BindResp struct {
 type BindRespExtra struct {
 	Token    string
 	Region   string
-	TunnelID string // ID of the tunnel resource
+	TunnelID string
 }
 
 // A client sends this message to the server over a new stream
