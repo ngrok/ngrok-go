@@ -221,6 +221,7 @@ func (a *agent) createListener(ctx context.Context, endpointOpts *endpointOpts) 
 	// Get the session
 	a.mu.RLock()
 	sess := a.sess
+	tunnelSessionID := sess.AgentSessionID()
 	a.mu.RUnlock()
 
 	// Determine URL scheme and configure endpoint
@@ -249,11 +250,6 @@ func (a *agent) createListener(ctx context.Context, endpointOpts *endpointOpts) 
 		if err != nil {
 			return nil, fmt.Errorf("invalid upstream URL: %w", err)
 		}
-	}
-
-	var tunnelSessionID string
-	if sess, err := a.Session(); err == nil {
-		tunnelSessionID = sess.ID()
 	}
 
 	now := time.Now()
