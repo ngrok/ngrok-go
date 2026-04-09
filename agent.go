@@ -269,7 +269,6 @@ func (a *agent) createListener(ctx context.Context, endpointOpts *endpointOpts) 
 			endpointURL:     *tunnelURL,
 			doneChannel:     make(chan struct{}),
 			doneOnce:        &sync.Once{},
-			region:          tunnel.Region(),
 			createdAt:       now,
 			updatedAt:       now,
 			tunnelSessionID: tunnelSessionID,

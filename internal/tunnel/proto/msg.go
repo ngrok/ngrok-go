@@ -244,7 +244,6 @@ type BindResp struct {
 
 type BindRespExtra struct {
 	Token    string
-	Region   string
 	TunnelID string
 }
 

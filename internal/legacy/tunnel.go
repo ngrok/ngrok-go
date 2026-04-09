@@ -57,8 +57,6 @@ type TunnelInfo interface {
 	// URL returns the tunnel endpoint's URL.
 	// Labeled tunnels will return the empty string.
 	URL() string
-	// Region returns the region where this tunnel was created.
-	Region() string
 	// TunnelID returns the tunnel resource ID.
 	TunnelID() string
 }
@@ -137,10 +135,6 @@ func (t *tunnelImpl) Name() string {
 
 func (t *tunnelImpl) Labels() map[string]string {
 	return t.Tunnel.RemoteBindConfig().Labels
-}
-
-func (t *tunnelImpl) Region() string {
-	return t.Tunnel.Region()
 }
 
 func (t *tunnelImpl) TunnelID() string {

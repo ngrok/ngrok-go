@@ -56,9 +56,6 @@ type Endpoint interface {
 	// URL returns the Endpoint's URL
 	URL() *url.URL
 
-	// Region returns the region where this endpoint was created.
-	Region() string
-
 	// CreatedAt returns the time when the endpoint was created.
 	CreatedAt() time.Time
 
@@ -87,7 +84,6 @@ type baseEndpoint struct {
 	endpointURL     url.URL
 	doneChannel     chan struct{}
 	doneOnce        *sync.Once
-	region          string
 	createdAt       time.Time
 	updatedAt       time.Time
 	tunnelSessionID string
@@ -144,10 +140,6 @@ func (e *baseEndpoint) TrafficPolicy() string {
 
 func (e *baseEndpoint) URL() *url.URL {
 	return &e.endpointURL
-}
-
-func (e *baseEndpoint) Region() string {
-	return e.region
 }
 
 func (e *baseEndpoint) CreatedAt() time.Time {

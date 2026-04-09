@@ -18,7 +18,6 @@ type Tunnel interface {
 	Name() string
 	ForwardsTo() string
 	ForwardsProto() string
-	Region() string
 	TunnelID() string
 }
 
@@ -39,7 +38,6 @@ type tunnel struct {
 	labels        map[string]string
 	forwardsTo    string
 	forwardsProto string
-	region        string
 	tunnelID      string
 
 	accept     chan *ProxyConn // new connections come on this channel
@@ -64,7 +62,6 @@ func newTunnel(resp proto.BindResp, extra proto.BindExtra, s *session, forwardsT
 		forwardsTo:    forwardsTo,
 		forwardsProto: forwardsProto,
 		closeError:    errors.New("Listener closed"),
-		region:        resp.Extra.Region,
 		tunnelID:      resp.Extra.TunnelID,
 	}
 }
@@ -144,10 +141,6 @@ func (t *tunnel) ID() string {
 
 func (t *tunnel) Name() string {
 	return t.bindExtra.Name
-}
-
-func (t *tunnel) Region() string {
-	return t.region
 }
 
 func (t *tunnel) TunnelID() string {
