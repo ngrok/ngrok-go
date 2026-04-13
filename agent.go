@@ -221,6 +221,7 @@ func (a *agent) createListener(ctx context.Context, endpointOpts *endpointOpts) 
 	// Get the session
 	a.mu.RLock()
 	sess := a.sess
+	tunnelSessionID := sess.AgentSessionID()
 	a.mu.RUnlock()
 
 	// Determine URL scheme and configure endpoint
@@ -251,21 +252,27 @@ func (a *agent) createListener(ctx context.Context, endpointOpts *endpointOpts) 
 		}
 	}
 
+	now := time.Now()
+
 	// Create endpoint listener
 	endpoint := &endpointListener{
 		baseEndpoint: baseEndpoint{
-			agent:          a,
-			id:             tunnel.ID(),
-			name:           tunnel.Name(),
-			poolingEnabled: endpointOpts.poolingEnabled,
-			bindings:       endpointOpts.bindings,
-			description:    endpointOpts.description,
-			metadata:       endpointOpts.metadata,
-			agentTLSConfig: endpointOpts.agentTLSConfig,
-			trafficPolicy:  endpointOpts.trafficPolicy,
-			endpointURL:    *tunnelURL,
-			doneChannel:    make(chan struct{}),
-			doneOnce:       &sync.Once{},
+			agent:           a,
+			id:              tunnel.ID(),
+			name:            tunnel.Name(),
+			poolingEnabled:  endpointOpts.poolingEnabled,
+			bindings:        endpointOpts.bindings,
+			description:     endpointOpts.description,
+			metadata:        endpointOpts.metadata,
+			agentTLSConfig:  endpointOpts.agentTLSConfig,
+			trafficPolicy:   endpointOpts.trafficPolicy,
+			endpointURL:     *tunnelURL,
+			doneChannel:     make(chan struct{}),
+			doneOnce:        &sync.Once{},
+			createdAt:       now,
+			updatedAt:       now,
+			tunnelSessionID: tunnelSessionID,
+			tunnelID:        tunnel.TunnelID(),
 		},
 		tunnel: tunnel,
 	}

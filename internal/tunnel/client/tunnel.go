@@ -18,6 +18,7 @@ type Tunnel interface {
 	Name() string
 	ForwardsTo() string
 	ForwardsProto() string
+	TunnelID() string
 }
 
 type ProxyConn struct {
@@ -37,6 +38,7 @@ type tunnel struct {
 	labels        map[string]string
 	forwardsTo    string
 	forwardsProto string
+	tunnelID      string
 
 	accept     chan *ProxyConn // new connections come on this channel
 	unlisten   func() error    // call this function to close the tunnel
@@ -60,6 +62,7 @@ func newTunnel(resp proto.BindResp, extra proto.BindExtra, s *session, forwardsT
 		forwardsTo:    forwardsTo,
 		forwardsProto: forwardsProto,
 		closeError:    errors.New("Listener closed"),
+		tunnelID:      resp.Extra.TunnelID,
 	}
 }
 
@@ -138,6 +141,10 @@ func (t *tunnel) ID() string {
 
 func (t *tunnel) Name() string {
 	return t.bindExtra.Name
+}
+
+func (t *tunnel) TunnelID() string {
+	return t.tunnelID
 }
 
 // RemoteBindConfig returns more detailed information about the public endpoint of the

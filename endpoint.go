@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"net/url"
 	"sync"
+	"time"
 )
 
 // Endpoint is the interface implemented by both EndpointListener and
@@ -54,23 +55,39 @@ type Endpoint interface {
 
 	// URL returns the Endpoint's URL
 	URL() *url.URL
+
+	// CreatedAt returns the time when the endpoint was created.
+	CreatedAt() time.Time
+
+	// UpdatedAt returns the time when the endpoint was last updated.
+	UpdatedAt() time.Time
+
+	// TunnelSessionID returns the ID of the agent session that created this endpoint.
+	TunnelSessionID() string
+
+	// TunnelID returns the tunnel resource ID.
+	TunnelID() string
 }
 
 // baseEndpoint implements the common functionality for both EndpointListener and
 // EndpointForwarder.
 type baseEndpoint struct {
-	agent          Agent
-	name           string
-	poolingEnabled bool
-	bindings       []string
-	description    string
-	id             string
-	metadata       string
-	agentTLSConfig *tls.Config // TLS config for termination
-	trafficPolicy  string
-	endpointURL    url.URL
-	doneChannel    chan struct{}
-	doneOnce       *sync.Once
+	agent           Agent
+	name            string
+	poolingEnabled  bool
+	bindings        []string
+	description     string
+	id              string
+	metadata        string
+	agentTLSConfig  *tls.Config // TLS config for termination
+	trafficPolicy   string
+	endpointURL     url.URL
+	doneChannel     chan struct{}
+	doneOnce        *sync.Once
+	createdAt       time.Time
+	updatedAt       time.Time
+	tunnelSessionID string
+	tunnelID        string
 }
 
 func (e *baseEndpoint) Agent() Agent {
@@ -123,6 +140,22 @@ func (e *baseEndpoint) TrafficPolicy() string {
 
 func (e *baseEndpoint) URL() *url.URL {
 	return &e.endpointURL
+}
+
+func (e *baseEndpoint) CreatedAt() time.Time {
+	return e.createdAt
+}
+
+func (e *baseEndpoint) UpdatedAt() time.Time {
+	return e.updatedAt
+}
+
+func (e *baseEndpoint) TunnelSessionID() string {
+	return e.tunnelSessionID
+}
+
+func (e *baseEndpoint) TunnelID() string {
+	return e.tunnelID
 }
 
 // signalDone safely closes the done channel using sync.Once
