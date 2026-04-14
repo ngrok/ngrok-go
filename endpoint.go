@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"net/url"
 	"sync"
+	"time"
 )
 
 // Endpoint is the interface implemented by both
@@ -15,18 +16,22 @@ type Endpoint interface {
 // baseEndpoint implements the common functionality for both EndpointListener and
 // EndpointForwarder.
 type baseEndpoint struct {
-	agent          *Agent
-	name           string
-	poolingEnabled bool
-	bindings       []string
-	description    string
-	id             string
-	metadata       string
-	agentTLSConfig *tls.Config // TLS config for termination
-	trafficPolicy  string
-	endpointURL    url.URL
-	doneChannel    chan struct{}
-	doneOnce       *sync.Once
+	agent           *Agent
+	name            string
+	poolingEnabled  bool
+	bindings        []string
+	description     string
+	id              string
+	metadata        string
+	agentTLSConfig  *tls.Config // TLS config for termination
+	trafficPolicy   string
+	endpointURL     url.URL
+	doneChannel     chan struct{}
+	doneOnce        *sync.Once
+	createdAt       time.Time
+	updatedAt       time.Time
+	tunnelSessionID string
+	tunnelID        string
 }
 
 func (e *baseEndpoint) endpoint() {}
@@ -94,6 +99,26 @@ func (e *baseEndpoint) TrafficPolicy() string {
 // URL returns the Endpoint's URL.
 func (e *baseEndpoint) URL() *url.URL {
 	return &e.endpointURL
+}
+
+// CreatedAt returns the time when the endpoint was created.
+func (e *baseEndpoint) CreatedAt() time.Time {
+	return e.createdAt
+}
+
+// UpdatedAt returns the time when the endpoint was last updated.
+func (e *baseEndpoint) UpdatedAt() time.Time {
+	return e.updatedAt
+}
+
+// TunnelSessionID returns the ID of the agent session that created this endpoint.
+func (e *baseEndpoint) TunnelSessionID() string {
+	return e.tunnelSessionID
+}
+
+// TunnelID returns the tunnel resource ID.
+func (e *baseEndpoint) TunnelID() string {
+	return e.tunnelID
 }
 
 // signalDone safely closes the done channel using sync.Once

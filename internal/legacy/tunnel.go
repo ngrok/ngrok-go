@@ -57,6 +57,8 @@ type TunnelInfo interface {
 	// URL returns the tunnel endpoint's URL.
 	// Labeled tunnels will return the empty string.
 	URL() string
+	// TunnelID returns the tunnel resource ID.
+	TunnelID() string
 }
 
 type tunnelImpl struct {
@@ -133,6 +135,10 @@ func (t *tunnelImpl) Name() string {
 
 func (t *tunnelImpl) Labels() map[string]string {
 	return t.Tunnel.RemoteBindConfig().Labels
+}
+
+func (t *tunnelImpl) TunnelID() string {
+	return t.Tunnel.TunnelID()
 }
 
 func (t *tunnelImpl) Session() Session {
