@@ -17,27 +17,6 @@ import (
 	"golang.ngrok.com/ngrok/v2/rpc"
 )
 
-// Agent is the main interface for interacting with the ngrok service.
-type Agent interface {
-	// Connect begins a new Session by connecting and authenticating to the ngrok cloud service.
-	Connect(context.Context) error
-
-	// Disconnect terminates the current Session which disconnects it from the ngrok cloud service.
-	Disconnect() error
-
-	// Session returns an object describing the connection of the Agent to the ngrok cloud service.
-	Session() (AgentSession, error)
-
-	// Endpoints returns the list of endpoints created by this Agent from calls to either Listen or Forward.
-	Endpoints() []Endpoint
-
-	// Listen creates an Endpoint which returns received connections to the caller via an EndpointListener.
-	Listen(context.Context, ...EndpointOption) (EndpointListener, error)
-
-	// Forward creates an Endpoint which forwards received connections to a target upstream URL.
-	Forward(context.Context, *Upstream, ...EndpointOption) (EndpointForwarder, error)
-}
-
 // Dialer is an interface that is satisfied by net.Dialer or you can specify your
 // own implementation.
 type Dialer interface {
@@ -45,8 +24,8 @@ type Dialer interface {
 	DialContext(ctx context.Context, network, address string) (net.Conn, error)
 }
 
-// agent implements the Agent interface.
-type agent struct {
+// Agent is the main interface for interacting with the ngrok service.
+type Agent struct {
 	mu           sync.RWMutex
 	sess         legacy.Session
 	agentSession *agentSession
@@ -58,13 +37,13 @@ type agent struct {
 }
 
 // NewAgent creates a new Agent object.
-func NewAgent(agentOpts ...AgentOption) (Agent, error) {
+func NewAgent(agentOpts ...AgentOption) (*Agent, error) {
 	opts := defaultAgentOpts()
 	for _, opt := range agentOpts {
 		opt(opts)
 	}
 
-	return &agent{
+	return &Agent{
 		opts:          opts,
 		endpoints:     make([]Endpoint, 0),
 		eventHandlers: opts.eventHandlers,
@@ -73,7 +52,7 @@ func NewAgent(agentOpts ...AgentOption) (Agent, error) {
 
 // Connect begins a new Session by connecting and authenticating to the ngrok
 // cloud service.
-func (a *agent) Connect(ctx context.Context) error {
+func (a *Agent) Connect(ctx context.Context) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
@@ -167,7 +146,7 @@ func (a *agent) Connect(ctx context.Context) error {
 
 // Disconnect terminates the current Session which disconnects it from the ngrok
 // cloud service.
-func (a *agent) Disconnect() error {
+func (a *Agent) Disconnect() error {
 	// Get what we need under lock
 	a.mu.Lock()
 	sess := a.sess
@@ -196,7 +175,7 @@ func (a *agent) Disconnect() error {
 
 // Session returns an object describing the connection of the Agent to the ngrok
 // cloud service.
-func (a *agent) Session() (AgentSession, error) {
+func (a *Agent) Session() (AgentSession, error) {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 
@@ -207,8 +186,9 @@ func (a *agent) Session() (AgentSession, error) {
 	return a.agentSession, nil
 }
 
-// Endpoints returns the list of endpoints created by this Agent.
-func (a *agent) Endpoints() []Endpoint {
+// Endpoints returns the list of endpoints created by this Agent
+// from calls to either [*Agent.Listen] or [*Agent.Forward].
+func (a *Agent) Endpoints() []Endpoint {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 
@@ -217,7 +197,7 @@ func (a *agent) Endpoints() []Endpoint {
 }
 
 // createListener creates an endpointListener for internal use
-func (a *agent) createListener(ctx context.Context, endpointOpts *endpointOpts) (*endpointListener, error) {
+func (a *Agent) createListener(ctx context.Context, endpointOpts *endpointOpts) (*EndpointListener, error) {
 	// Get the session
 	a.mu.RLock()
 	sess := a.sess
@@ -252,7 +232,7 @@ func (a *agent) createListener(ctx context.Context, endpointOpts *endpointOpts) 
 	}
 
 	// Create endpoint listener
-	endpoint := &endpointListener{
+	endpoint := &EndpointListener{
 		baseEndpoint: baseEndpoint{
 			agent:          a,
 			id:             tunnel.ID(),
@@ -278,8 +258,9 @@ func (a *agent) createListener(ctx context.Context, endpointOpts *endpointOpts) 
 	return endpoint, nil
 }
 
-// Listen creates an EndpointListener.
-func (a *agent) Listen(ctx context.Context, opts ...EndpointOption) (EndpointListener, error) {
+// Listen creates an endpoint which returns received connections to the caller
+// via an [*EndpointListener].
+func (a *Agent) Listen(ctx context.Context, opts ...EndpointOption) (*EndpointListener, error) {
 	// Apply all options
 	endpointOpts := defaultEndpointOpts()
 	for _, opt := range opts {
@@ -301,7 +282,7 @@ func (a *agent) Listen(ctx context.Context, opts ...EndpointOption) (EndpointLis
 }
 
 // ensureConnected handles automatic connection and verifies connection state
-func (a *agent) ensureConnected(ctx context.Context) error {
+func (a *Agent) ensureConnected(ctx context.Context) error {
 	// First check if we're already connected (with a read lock)
 	a.mu.RLock()
 	sessionExists := a.sess != nil
@@ -326,7 +307,7 @@ func (a *agent) ensureConnected(ctx context.Context) error {
 }
 
 // removeEndpoint removes an endpoint from the agent's list
-func (a *agent) removeEndpoint(endpoint Endpoint) {
+func (a *Agent) removeEndpoint(endpoint Endpoint) {
 	// Remove the endpoint from our list under lock
 	a.mu.Lock()
 	for i, e := range a.endpoints {
@@ -339,7 +320,7 @@ func (a *agent) removeEndpoint(endpoint Endpoint) {
 }
 
 // emitEvent sends an event to all registered handlers
-func (a *agent) emitEvent(evt Event) {
+func (a *Agent) emitEvent(evt Event) {
 	a.eventMutex.RLock()
 	handlers := make([]EventHandler, len(a.eventHandlers))
 	copy(handlers, a.eventHandlers)
@@ -354,7 +335,7 @@ func (a *agent) emitEvent(evt Event) {
 
 // createCommandHandler returns a legacy.ServerCommandHandler that delegates to the RPCHandler
 // for the specified RPC method.
-func (a *agent) createCommandHandler(method string) legacy.ServerCommandHandler {
+func (a *Agent) createCommandHandler(method string) legacy.ServerCommandHandler {
 	return func(ctx context.Context, sess legacy.Session) error {
 		if a.opts.rpcHandler == nil {
 			return nil
@@ -382,7 +363,7 @@ func (a *agent) createCommandHandler(method string) legacy.ServerCommandHandler 
 // Forward creates an EndpointForwarder that forwards traffic to the specified upstream.
 // The upstream parameter is required and must be created using WithUpstream().
 // Additional endpoint options can be provided to configure the endpoint.
-func (a *agent) Forward(ctx context.Context, upstream *Upstream, opts ...EndpointOption) (EndpointForwarder, error) {
+func (a *Agent) Forward(ctx context.Context, upstream *Upstream, opts ...EndpointOption) (*EndpointForwarder, error) {
 	// Apply all base options first
 	endpointOpts := defaultEndpointOpts()
 
@@ -425,7 +406,7 @@ func (a *agent) Forward(ctx context.Context, upstream *Upstream, opts ...Endpoin
 	upstreamURL, _ := url.Parse(endpointOpts.upstreamURL)
 
 	// Create the forwarder
-	endpoint := &endpointForwarder{
+	endpoint := &EndpointForwarder{
 		baseEndpoint:            listener.baseEndpoint, // reuse the baseEndpoint from listener
 		listener:                listener,
 		upstreamURL:             *upstreamURL,
