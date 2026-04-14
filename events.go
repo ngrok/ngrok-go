@@ -50,14 +50,14 @@ type EventHandler func(Event)
 type EventAgentConnectSucceeded struct {
 	baseEvent
 	Agent   *Agent
-	Session AgentSession
+	Session *AgentSession
 }
 
 // EventAgentDisconnected is emitted when an agent disconnects
 type EventAgentDisconnected struct {
 	baseEvent
 	Agent   *Agent
-	Session AgentSession
+	Session *AgentSession
 	Error   error
 }
 
@@ -65,11 +65,11 @@ type EventAgentDisconnected struct {
 type EventAgentHeartbeatReceived struct {
 	baseEvent
 	Agent   *Agent
-	Session AgentSession
+	Session *AgentSession
 	Latency time.Duration
 }
 
-func newAgentConnectSucceeded(agent *Agent, session AgentSession) *EventAgentConnectSucceeded {
+func newAgentConnectSucceeded(agent *Agent, session *AgentSession) *EventAgentConnectSucceeded {
 	return &EventAgentConnectSucceeded{
 		baseEvent: baseEvent{
 			Type:       EventTypeAgentConnectSucceeded,
@@ -80,7 +80,7 @@ func newAgentConnectSucceeded(agent *Agent, session AgentSession) *EventAgentCon
 	}
 }
 
-func newAgentDisconnected(agent *Agent, session AgentSession, err error) *EventAgentDisconnected {
+func newAgentDisconnected(agent *Agent, session *AgentSession, err error) *EventAgentDisconnected {
 	return &EventAgentDisconnected{
 		baseEvent: baseEvent{
 			Type:       EventTypeAgentDisconnected,
@@ -92,7 +92,7 @@ func newAgentDisconnected(agent *Agent, session AgentSession, err error) *EventA
 	}
 }
 
-func newAgentHeartbeatReceived(agent *Agent, session AgentSession, latency time.Duration) *EventAgentHeartbeatReceived {
+func newAgentHeartbeatReceived(agent *Agent, session *AgentSession, latency time.Duration) *EventAgentHeartbeatReceived {
 	return &EventAgentHeartbeatReceived{
 		baseEvent: baseEvent{
 			Type:       EventTypeAgentHeartbeatReceived,

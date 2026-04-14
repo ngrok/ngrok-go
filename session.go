@@ -1,42 +1,30 @@
 package ngrok
 
 import (
+	"slices"
 	"time"
 )
 
-// AgentSession represents an active connection from an Agent to the ngrok cloud
-// service.
-type AgentSession interface {
-	// ID returns the server-assigned ID of the agent session
-	ID() string
-	// Warnings is a list of warnings returned by the ngrok cloud service after the Agent has connected
-	Warnings() []error
-	// Agent returns the agent that started this session
-	Agent() *Agent
-	// StartedAt returns the time that the AgentSession was connected
-	StartedAt() time.Time
+// AgentSession describes an active connection from an [*Agent]
+// to the ngrok cloud service.
+type AgentSession struct {
+	// ID is the server-assigned ID of the agent session.
+	ID string
+	// Warnings is a list of warnings returned by the ngrok cloud service
+	// after the Agent has connected.
+	Warnings []error
+	// Agent is the agent that started this session.
+	Agent *Agent
+	// StartedAt returns the time that the session was connected.
+	StartedAt time.Time
 }
 
-// agentSession implements the AgentSession interface.
-type agentSession struct {
-	id        string
-	warnings  []error
-	agent     *Agent
-	startedAt time.Time
-}
-
-func (s *agentSession) ID() string {
-	return s.id
-}
-
-func (s *agentSession) Warnings() []error {
-	return s.warnings
-}
-
-func (s *agentSession) Agent() *Agent {
-	return s.agent
-}
-
-func (s *agentSession) StartedAt() time.Time {
-	return s.startedAt
+func (sess *AgentSession) clone() *AgentSession {
+	if sess == nil {
+		return nil
+	}
+	sessionCopy := new(AgentSession)
+	*sessionCopy = *sess
+	sessionCopy.Warnings = slices.Clone(sess.Warnings)
+	return sessionCopy
 }

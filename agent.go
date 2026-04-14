@@ -28,7 +28,7 @@ type Dialer interface {
 type Agent struct {
 	mu           sync.RWMutex
 	sess         legacy.Session
-	agentSession *agentSession
+	agentSession *AgentSession
 	opts         *agentOpts
 	endpoints    []Endpoint
 	// Event handlers registered with this agent
@@ -97,9 +97,9 @@ func (a *Agent) Connect(ctx context.Context) error {
 	}
 
 	// Create our AgentSession wrapper early so we can capture it in closures
-	agentSession := &agentSession{
-		agent:     a,
-		startedAt: time.Now(),
+	agentSession := &AgentSession{
+		Agent:     a,
+		StartedAt: time.Now(),
 	}
 
 	// Hook up connect event
@@ -134,8 +134,8 @@ func (a *Agent) Connect(ctx context.Context) error {
 	}
 
 	// Complete the AgentSession wrapper with session-specific data
-	agentSession.id = sess.AgentSessionID()
-	agentSession.warnings = sess.Warnings()
+	agentSession.ID = sess.AgentSessionID()
+	agentSession.Warnings = sess.Warnings()
 
 	// Store in agent
 	a.sess = sess
@@ -175,15 +175,13 @@ func (a *Agent) Disconnect() error {
 
 // Session returns an object describing the connection of the Agent to the ngrok
 // cloud service.
-func (a *Agent) Session() (AgentSession, error) {
+func (a *Agent) Session() (*AgentSession, error) {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
-
 	if a.sess == nil || a.agentSession == nil {
 		return nil, errors.New("agent not connected")
 	}
-
-	return a.agentSession, nil
+	return a.agentSession.clone(), nil
 }
 
 // Endpoints returns the list of endpoints created by this Agent

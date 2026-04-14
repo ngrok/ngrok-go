@@ -38,7 +38,7 @@ func TestBaseEvent(t *testing.T) {
 func TestEventCreation(t *testing.T) {
 	// Create a mock agent and session for testing
 	agent := &Agent{}
-	session := &agentSession{}
+	session := &AgentSession{}
 
 	// Test EventAgentConnectSucceeded creation
 	connectEvent := newAgentConnectSucceeded(agent, session)
