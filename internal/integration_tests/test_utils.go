@@ -26,7 +26,7 @@ func SkipIfOffline(t *testing.T) {
 }
 
 // SetupAgent creates and connects a new agent for testing
-func SetupAgent(t *testing.T) (ngrok.Agent, context.Context) {
+func SetupAgent(t *testing.T) (*ngrok.Agent, context.Context) {
 	// Skip if not running online tests
 	SkipIfOffline(t)
 
@@ -59,7 +59,7 @@ func SetupAgent(t *testing.T) (ngrok.Agent, context.Context) {
 // SetupListener sets up an ngrok listener with the specified options.
 // SetupListener must be called from the goroutine running the test or benchmark.
 // The returned listener will be closed when the test or benchmark function returns.
-func SetupListener(ctx context.Context, tb testing.TB, agent ngrok.Agent, opts ...ngrok.EndpointOption) ngrok.EndpointListener {
+func SetupListener(ctx context.Context, tb testing.TB, agent *ngrok.Agent, opts ...ngrok.EndpointOption) *ngrok.EndpointListener {
 	tb.Helper()
 
 	// Create a listener endpoint

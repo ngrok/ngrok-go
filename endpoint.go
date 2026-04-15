@@ -1,78 +1,22 @@
 package ngrok
 
 import (
-	"context"
 	"crypto/tls"
 	"net/url"
 	"sync"
 	"time"
 )
 
-// Endpoint is the interface implemented by both EndpointListener and
-// EndpointForwarder.
+// Endpoint is the interface implemented by both
+// [*EndpointListener] and [*EndpointForwarder].
 type Endpoint interface {
-	// Agent returns the Agent that created this Endpoint.
-	Agent() Agent
-
-	// PoolingEnabled returns whether the endpoint supports pooling set by WithPoolingEnabled.
-	PoolingEnabled() bool
-
-	// Bindings returns the endpoint's bindings set by WithBindings
-	Bindings() []string
-
-	// Close() is equivalent to for CloseWithContext(context.Background())
-	Close() error
-
-	// CloseWithContext closes the endpoint with the provided context.
-	CloseWithContext(context.Context) error
-
-	// Description returns the endpoint's human-readable description set by WithDescription.
-	Description() string
-
-	// Done returns a channel that is closed when the endpoint stops.
-	Done() <-chan struct{}
-
-	// Wait blocks until the endpoint stops.
-	Wait()
-
-	// ID returns the unique endpoint identifier assigned by the ngrok cloud service.
-	ID() string
-
-	// Metadata returns the endpoint's opaque user-defined metadata set by WithMetadata.
-	Metadata() string
-
-	// Name returns the endpoint's human-readable name set by WithName.
-	Name() string
-
-	// Protocol is sugar for URL().Scheme
-	Protocol() string
-
-	// AgentTLSTermination returns the TLS config that the agent uses to terminate TLS connections.
-	AgentTLSTermination() *tls.Config
-
-	// TrafficPolicy returns the traffic policy for the endpoint.
-	TrafficPolicy() string
-
-	// URL returns the Endpoint's URL
-	URL() *url.URL
-
-	// CreatedAt returns the time when the endpoint was created.
-	CreatedAt() time.Time
-
-	// UpdatedAt returns the time when the endpoint was last updated.
-	UpdatedAt() time.Time
-
-	// TunnelSessionID returns the ID of the agent session that created this endpoint.
-	TunnelSessionID() string
-
-	// TunnelID returns the tunnel resource ID.
-	TunnelID() string
+	endpoint()
 }
 
 // baseEndpoint implements the common functionality for both EndpointListener and
 // EndpointForwarder.
 type baseEndpoint struct {
-	agent           Agent
+	agent           *Agent
 	name            string
 	poolingEnabled  bool
 	bindings        []string
@@ -90,70 +34,89 @@ type baseEndpoint struct {
 	tunnelID        string
 }
 
-func (e *baseEndpoint) Agent() Agent {
+func (e *baseEndpoint) endpoint() {}
+
+// Agent returns the [*Agent] that created this Endpoint.
+func (e *baseEndpoint) Agent() *Agent {
 	return e.agent
 }
 
+// PoolingEnabled returns whether the endpoint supports pooling set by WithPoolingEnabled.
 func (e *baseEndpoint) PoolingEnabled() bool {
 	return e.poolingEnabled
 }
 
+// Bindings returns the endpoint's bindings set by WithBindings
 func (e *baseEndpoint) Bindings() []string {
 	return e.bindings
 }
 
+// Description returns the endpoint's human-readable description set by WithDescription.
 func (e *baseEndpoint) Description() string {
 	return e.description
 }
 
+// Done returns a channel that is closed when the endpoint stops.
 func (e *baseEndpoint) Done() <-chan struct{} {
 	return e.doneChannel
 }
 
+// Wait blocks until the endpoint stops.
 func (e *baseEndpoint) Wait() {
 	<-e.doneChannel
 }
 
+// ID returns the unique endpoint identifier assigned by the ngrok cloud service.
 func (e *baseEndpoint) ID() string {
 	return e.id
 }
 
+// Metadata returns the endpoint's opaque user-defined metadata set by WithMetadata.
 func (e *baseEndpoint) Metadata() string {
 	return e.metadata
 }
 
+// Name returns the endpoint's human-readable name set by WithName.
 func (e *baseEndpoint) Name() string {
 	return e.name
 }
 
+// Protocol is sugar for URL().Scheme
 func (e *baseEndpoint) Protocol() string {
 	return e.endpointURL.Scheme
 }
 
+// AgentTLSTermination returns the TLS config that the agent uses to terminate TLS connections.
 func (e *baseEndpoint) AgentTLSTermination() *tls.Config {
 	return e.agentTLSConfig
 }
 
+// TrafficPolicy returns the traffic policy for the endpoint.
 func (e *baseEndpoint) TrafficPolicy() string {
 	return e.trafficPolicy
 }
 
+// URL returns the Endpoint's URL.
 func (e *baseEndpoint) URL() *url.URL {
 	return &e.endpointURL
 }
 
+// CreatedAt returns the time when the endpoint was created.
 func (e *baseEndpoint) CreatedAt() time.Time {
 	return e.createdAt
 }
 
+// UpdatedAt returns the time when the endpoint was last updated.
 func (e *baseEndpoint) UpdatedAt() time.Time {
 	return e.updatedAt
 }
 
+// TunnelSessionID returns the ID of the agent session that created this endpoint.
 func (e *baseEndpoint) TunnelSessionID() string {
 	return e.tunnelSessionID
 }
 
+// TunnelID returns the tunnel resource ID.
 func (e *baseEndpoint) TunnelID() string {
 	return e.tunnelID
 }

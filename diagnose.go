@@ -64,26 +64,15 @@ func IsMuxadoDiagnoseFailure(err error) bool {
 	return errors.As(err, &de) && de.Step == "muxado"
 }
 
-// Diagnoser is implemented by Agent types that support pre-connection
-// diagnostic probing. Use a type assertion to access it:
+// Diagnose tests connectivity to addr by probing TCP, TLS, and the Muxado
+// tunnel protocol. It uses the Agent's configured TLS settings, CA roots,
+// and proxy/dialer settings.
 //
-//	d, ok := agent.(ngrok.Diagnoser)
-type Diagnoser interface {
-	Agent
-
-	// Diagnose tests connectivity to addr by probing TCP, TLS, and the Muxado
-	// tunnel protocol. It uses the Agent's configured TLS settings, CA roots,
-	// and proxy/dialer settings.
-	//
-	// If addr is empty, the configured server address is probed.
-	//
-	// This method does NOT establish a persistent session or call Auth. It is
-	// safe to call without affecting any existing connection.
-	Diagnose(ctx context.Context, addr string) (DiagnoseResult, error)
-}
-
-// Diagnose implements Diagnoser.
-func (a *agent) Diagnose(ctx context.Context, addr string) (DiagnoseResult, error) {
+// If addr is empty, the configured server address is probed.
+//
+// This method does NOT establish a persistent session or call Auth. It is
+// safe to call without affecting any existing connection.
+func (a *Agent) Diagnose(ctx context.Context, addr string) (DiagnoseResult, error) {
 	connectAddr := cmp.Or(a.opts.connectURL, "connect.ngrok-agent.com:443")
 	if addr == "" {
 		addr = connectAddr
@@ -110,7 +99,7 @@ func (a *agent) Diagnose(ctx context.Context, addr string) (DiagnoseResult, erro
 
 // buildDiagnosticDialer returns the effective dialer for probes, applying
 // proxy configuration without mutating agent state.
-func (a *agent) buildDiagnosticDialer() (Dialer, error) {
+func (a *Agent) buildDiagnosticDialer() (Dialer, error) {
 	baseDialer := cmp.Or(a.opts.dialer, Dialer(&net.Dialer{}))
 	if a.opts.proxyURL == "" {
 		return baseDialer, nil
@@ -132,7 +121,7 @@ func (a *agent) buildDiagnosticDialer() (Dialer, error) {
 
 // probeAddr runs TCP → TLS → Muxado → SrvInfo for addr and returns a
 // DiagnoseResult on success, or a *DiagnoseError indicating which step failed.
-func (a *agent) probeAddr(ctx context.Context, logger *slog.Logger, dialer Dialer, serverName, addr string) (DiagnoseResult, error) {
+func (a *Agent) probeAddr(ctx context.Context, logger *slog.Logger, dialer Dialer, serverName, addr string) (DiagnoseResult, error) {
 	result := DiagnoseResult{Addr: addr}
 
 	// TCP

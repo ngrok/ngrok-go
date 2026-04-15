@@ -30,10 +30,7 @@ func TestDiagnoseTCPFailure(t *testing.T) {
 	a, err := NewAgent()
 	require.NoError(t, err)
 
-	d, ok := a.(Diagnoser)
-	require.True(t, ok, "agent should implement Diagnoser")
-
-	result, err := d.Diagnose(testcontext.ForTB(t), addr)
+	result, err := a.Diagnose(testcontext.ForTB(t), addr)
 	require.Error(t, err)
 	assert.True(t, IsTCPDiagnoseFailure(err))
 	assert.Equal(t, addr, result.Addr)
@@ -57,9 +54,7 @@ func TestDiagnoseTLSFailure(t *testing.T) {
 	a, err := NewAgent(WithAgentConnectURL(l.Addr().String()))
 	require.NoError(t, err)
 
-	d := a.(Diagnoser)
-
-	result, err := d.Diagnose(testcontext.ForTB(t), l.Addr().String())
+	result, err := a.Diagnose(testcontext.ForTB(t), l.Addr().String())
 	require.Error(t, err)
 	assert.True(t, IsTLSDiagnoseFailure(err))
 	assert.Equal(t, l.Addr().String(), result.Addr)
@@ -118,9 +113,7 @@ func TestDiagnoseMuxadoSuccess(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	d := a.(Diagnoser)
-
-	result, err := d.Diagnose(testcontext.ForTB(t), l.Addr().String())
+	result, err := a.Diagnose(testcontext.ForTB(t), l.Addr().String())
 	require.NoError(t, err)
 	assert.Equal(t, l.Addr().String(), result.Addr)
 	assert.Equal(t, testRegion, result.Region)
@@ -149,12 +142,9 @@ func TestDiagnoseOnline(t *testing.T) {
 	a, err := NewAgent(agentOpts...)
 	require.NoError(t, err)
 
-	d, ok := a.(Diagnoser)
-	require.True(t, ok)
-
 	ctx := testcontext.ForTB(t)
 
-	result, err := d.Diagnose(ctx, serverAddr)
+	result, err := a.Diagnose(ctx, serverAddr)
 	require.NoError(t, err)
 	t.Logf("addr=%s region=%s latency=%s", result.Addr, result.Region, result.Latency)
 	assert.NotEmpty(t, result.Region)

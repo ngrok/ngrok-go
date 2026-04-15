@@ -8,19 +8,8 @@ import (
 	"golang.ngrok.com/ngrok/v2/internal/legacy"
 )
 
-// EndpointListener is an endpoint that you may treat as a net.Listener.
-type EndpointListener interface {
-	Endpoint
-
-	// Accept returns the next connection received the Endpoint.
-	Accept() (net.Conn, error)
-
-	// Addr() returns where the Endpoint is listening.
-	Addr() net.Addr
-}
-
-// endpointListener implements the EndpointListener interface.
-type endpointListener struct {
+// EndpointListener is an endpoint that you may treat as a [net.Listener].
+type EndpointListener struct {
 	baseEndpoint
 	tunnel legacy.Tunnel
 }
@@ -37,7 +26,8 @@ func wrapConnWithTLS(conn net.Conn, tlsConfig *tls.Config) net.Conn {
 	return tls.Server(conn, tlsConfig)
 }
 
-func (e *endpointListener) Accept() (net.Conn, error) {
+// Accept returns the next connection received the Endpoint.
+func (e *EndpointListener) Accept() (net.Conn, error) {
 	// Accept connection from the tunnel
 	conn, err := e.tunnel.Accept()
 	if err != nil {
@@ -54,22 +44,23 @@ func (e *endpointListener) Accept() (net.Conn, error) {
 	return conn, nil
 }
 
-func (e *endpointListener) Addr() net.Addr {
+// Addr() returns where the Endpoint is listening.
+func (e *EndpointListener) Addr() net.Addr {
 	return e.tunnel.Addr()
 }
 
-func (e *endpointListener) Close() error {
+// Close() is equivalent to for CloseWithContext(context.Background())
+func (e *EndpointListener) Close() error {
 	return e.CloseWithContext(context.Background())
 }
 
-func (e *endpointListener) CloseWithContext(ctx context.Context) error {
+// CloseWithContext closes the endpoint with the provided context.
+func (e *EndpointListener) CloseWithContext(ctx context.Context) error {
 	err := e.tunnel.CloseWithContext(ctx)
 	e.signalDone()
 
 	// Remove from agent
-	if a, ok := e.agent.(*agent); ok {
-		a.removeEndpoint(e)
-	}
+	e.agent.removeEndpoint(e)
 
 	return wrapError(err)
 }
