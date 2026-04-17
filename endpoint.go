@@ -73,8 +73,12 @@ type Endpoint interface {
 // EndpointForwarder.
 type baseEndpoint struct {
 	agent           Agent
-	id              string
+	name            string
+	poolingEnabled  bool
 	bindings        []string
+	description     string
+	id              string
+	metadata        string
 	agentTLSConfig  *tls.Config // TLS config for termination
 	trafficPolicy   string
 	endpointURL     url.URL
@@ -84,13 +88,6 @@ type baseEndpoint struct {
 	updatedAt       time.Time
 	tunnelSessionID string
 	tunnelID        string
-
-	// mu protects the following mutable fields
-	mu             sync.RWMutex
-	name           string
-	description    string
-	metadata       string
-	poolingEnabled bool
 }
 
 func (e *baseEndpoint) Agent() Agent {
@@ -98,8 +95,6 @@ func (e *baseEndpoint) Agent() Agent {
 }
 
 func (e *baseEndpoint) PoolingEnabled() bool {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
 	return e.poolingEnabled
 }
 
@@ -108,8 +103,6 @@ func (e *baseEndpoint) Bindings() []string {
 }
 
 func (e *baseEndpoint) Description() string {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
 	return e.description
 }
 
@@ -126,20 +119,14 @@ func (e *baseEndpoint) ID() string {
 }
 
 func (e *baseEndpoint) Metadata() string {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
 	return e.metadata
 }
 
 func (e *baseEndpoint) Name() string {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
 	return e.name
 }
 
 func (e *baseEndpoint) update(name, description, metadata *string, poolingEnabled *bool) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
 	if name != nil {
 		e.name = *name
 	}

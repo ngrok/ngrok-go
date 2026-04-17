@@ -50,6 +50,7 @@ type endpointForwarder struct {
 	upstreamDialer          Dialer
 }
 
+
 // Start begins forwarding connections from the listener to the upstream URL
 func (e *endpointForwarder) start(ctx context.Context) {
 	go e.forwardLoop(ctx)
@@ -256,7 +257,7 @@ func (e *endpointForwarder) Update(ctx context.Context, name, description, metad
 			return err
 		}
 	}
-	e.baseEndpoint.update(name, description, metadata, poolingEnabled)
+	e.update(name, description, metadata, poolingEnabled)
 	return nil
 }
 
