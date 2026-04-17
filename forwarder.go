@@ -50,7 +50,6 @@ type endpointForwarder struct {
 	upstreamDialer          Dialer
 }
 
-
 // Start begins forwarding connections from the listener to the upstream URL
 func (e *endpointForwarder) start(ctx context.Context) {
 	go e.forwardLoop(ctx)
