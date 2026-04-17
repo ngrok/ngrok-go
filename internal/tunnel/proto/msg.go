@@ -31,6 +31,9 @@ const (
 
 	// sent from client to the server
 	SrvInfoReq ReqType = 8
+
+	// sent from client to the server to patch mutable tunnel state
+	PatchTunnelStateReq ReqType = 10
 )
 
 var Version = []string{"3", "2"} // integers in priority order
@@ -440,4 +443,19 @@ type SrvInfo struct{}
 
 type SrvInfoResp struct {
 	Region string
+}
+
+// PatchTunnelState is sent from the client to the server to update mutable
+// fields on a bound tunnel without unbinding and rebinding.
+type PatchTunnelState struct {
+	TunnelID       string  `json:"TunnelId"`
+	Name           *string `json:"Name,omitempty"`
+	Description    *string `json:"Description,omitempty"`
+	Metadata       *string `json:"Metadata,omitempty"`
+	PoolingEnabled *bool   `json:"PoolingEnabled,omitempty"`
+}
+
+// PatchTunnelStateResp is the server's reply to a PatchTunnelState request.
+type PatchTunnelStateResp struct {
+	Error string
 }

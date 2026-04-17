@@ -332,6 +332,18 @@ func (a *agent) ensureConnected(ctx context.Context) error {
 	return nil
 }
 
+// patchTunnelState sends a PatchTunnelState muxado message over the active
+// session to propagate metadata changes to the backend.
+func (a *agent) patchTunnelState(_ context.Context, tunnelID string, name, description, metadata *string, poolingEnabled *bool) error {
+	a.mu.RLock()
+	sess := a.sess
+	a.mu.RUnlock()
+	if sess == nil {
+		return fmt.Errorf("agent not connected")
+	}
+	return sess.PatchTunnelState(tunnelID, name, description, metadata, poolingEnabled)
+}
+
 // removeEndpoint removes an endpoint from the agent's list
 func (a *agent) removeEndpoint(endpoint Endpoint) {
 	// Remove the endpoint from our list under lock
@@ -435,12 +447,12 @@ func (a *agent) Forward(ctx context.Context, upstream *Upstream, opts ...Endpoin
 	endpoint := &endpointForwarder{
 		baseEndpoint:            listener.baseEndpoint, // reuse the baseEndpoint from listener
 		listener:                listener,
-		upstreamURL:             *upstreamURL,
 		upstreamProtocol:        endpointOpts.upstreamProtocol,
 		upstreamTLSClientConfig: endpointOpts.upstreamTLSClientConfig,
 		proxyProtocol:           upstream.proxyProto,
 		upstreamDialer:          upstream.dialer,
 	}
+	endpoint.upstreamURL.Store(upstreamURL)
 
 	// Start the forwarding process
 	endpoint.start(ctx)

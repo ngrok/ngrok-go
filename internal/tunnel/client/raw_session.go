@@ -21,6 +21,7 @@ type RawSession interface {
 	Listen(proto string, opts any, extra proto.BindExtra, id string, forwardsTo string, forwardsProto string) (proto.BindResp, error)
 	ListenLabel(labels map[string]string, metadata string, forwardsTo string, forwardsProto string) (proto.StartTunnelWithLabelResp, error)
 	Unlisten(id string) (proto.UnbindResp, error)
+	PatchTunnelState(id string, name, description, metadata *string, poolingEnabled *bool) (proto.PatchTunnelStateResp, error)
 	Accept() (netx.LoggedConn, error)
 
 	SrvInfo() (proto.SrvInfoResp, error)
@@ -134,6 +135,23 @@ func (s *rawSession) ListenLabel(labels map[string]string, metadata string, forw
 func (s *rawSession) Unlisten(id string) (resp proto.UnbindResp, err error) {
 	req := proto.Unbind{ClientID: id}
 	err = s.rpc(proto.UnbindReq, &req, &resp)
+	return
+}
+
+// PatchTunnelState sends a patch message to the server to update mutable fields
+// on a bound tunnel without unbinding and rebinding.
+func (s *rawSession) PatchTunnelState(tunnelID string, name, description, metadata *string, poolingEnabled *bool) (resp proto.PatchTunnelStateResp, err error) {
+	req := proto.PatchTunnelState{
+		TunnelID:       tunnelID,
+		Name:           name,
+		Description:    description,
+		Metadata:       metadata,
+		PoolingEnabled: poolingEnabled,
+	}
+	err = s.rpc(proto.PatchTunnelStateReq, &req, &resp)
+	if err == nil && resp.Error != "" {
+		err = proto.StringError(resp.Error)
+	}
 	return
 }
 

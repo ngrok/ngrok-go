@@ -58,6 +58,9 @@ type Session interface {
 	// ListenTLS listens on a remote TLS endpoint
 	ListenTLS(opts *proto.TLSEndpoint, extra proto.BindExtra, forwardsTo string) (Tunnel, error)
 
+	// PatchTunnelState sends a muxado request to the server to update mutable fields on a tunnel
+	PatchTunnelState(tunnelID string, name, description, metadata *string, poolingEnabled *bool) error
+
 	SrvInfo() (proto.SrvInfoResp, error)
 
 	// Send a muxado heartbeat and record the latency
@@ -179,6 +182,17 @@ func (s *session) ListenSSH(opts *proto.SSHOptions, extra proto.BindExtra, forwa
 
 func (s *session) SrvInfo() (proto.SrvInfoResp, error) {
 	return s.raw.SrvInfo()
+}
+
+func (s *session) PatchTunnelState(tunnelID string, name, description, metadata *string, poolingEnabled *bool) error {
+	resp, err := s.raw.PatchTunnelState(tunnelID, name, description, metadata, poolingEnabled)
+	if err != nil {
+		return err
+	}
+	if resp.Error != "" {
+		return proto.StringError(resp.Error)
+	}
+	return nil
 }
 
 func (s *session) CloseTunnel(clientId string, err error) error {

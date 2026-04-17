@@ -23,6 +23,14 @@ type EndpointForwarder interface {
 	// UpstreamURL returns the URL that the endpoint forwards its traffic to.
 	UpstreamURL() url.URL
 
+	// UpdateUpstream atomically updates the upstream URL that connections are forwarded to.
+	// Connections already in progress are not affected. Only new connections use the new URL.
+	UpdateUpstream(u url.URL)
+
+	// Update applies a partial update to the endpoint's mutable metadata fields
+	// and propagates the change to the ngrok backend over the active session.
+	Update(ctx context.Context, name, description, metadata *string, poolingEnabled *bool) error
+
 	// UpstreamTLSClientConfig returns the TLS client configuration used for upstream connections.
 	UpstreamTLSClientConfig() *tls.Config
 
@@ -35,7 +43,7 @@ type EndpointForwarder interface {
 type endpointForwarder struct {
 	baseEndpoint
 	listener                *endpointListener
-	upstreamURL             url.URL
+	upstreamURL             atomic.Pointer[url.URL]
 	upstreamTLSClientConfig *tls.Config
 	upstreamProtocol        string
 	proxyProtocol           ProxyProtoVersion
@@ -105,7 +113,7 @@ func (e *endpointForwarder) emitConnectionEvent(evt Event) {
 }
 
 func (e *endpointForwarder) isHTTP() bool {
-	switch strings.ToLower(e.upstreamURL.Scheme) {
+	switch strings.ToLower(e.upstreamURL.Load().Scheme) {
 	case "http", "https":
 		return true
 	default:
@@ -133,15 +141,17 @@ func (c *countingConn) Write(p []byte) (int, error) {
 
 // connectToBackend establishes a connection to the upstream URL
 func (e *endpointForwarder) connectToBackend(ctx context.Context) (net.Conn, error) {
+	u := e.upstreamURL.Load()
+
 	// Parse host and port from URL
-	host := e.upstreamURL.Hostname()
-	port := e.upstreamURL.Port()
+	host := u.Hostname()
+	port := u.Port()
 	if port == "" {
 		// Default ports based on scheme
 		switch {
-		case usesTLS(e.upstreamURL.Scheme):
+		case usesTLS(u.Scheme):
 			port = "443"
-		case strings.ToLower(e.upstreamURL.Scheme) == "http":
+		case strings.ToLower(u.Scheme) == "http":
 			port = "80"
 		default:
 			port = "80" // Default fallback
@@ -168,9 +178,9 @@ func (e *endpointForwarder) connectToBackend(ctx context.Context) (net.Conn, err
 	}
 
 	// For HTTPS/TLS upstreams, establish TLS
-	if usesTLS(e.upstreamURL.Scheme) {
+	if usesTLS(u.Scheme) {
 		config := &tls.Config{
-			ServerName: e.upstreamURL.Hostname(),
+			ServerName: u.Hostname(),
 		}
 
 		// Use custom TLS client config if provided
@@ -178,7 +188,7 @@ func (e *endpointForwarder) connectToBackend(ctx context.Context) (net.Conn, err
 			// Use the provided config as a base, but ensure ServerName is set
 			config = e.upstreamTLSClientConfig.Clone()
 			if config.ServerName == "" {
-				config.ServerName = e.upstreamURL.Hostname()
+				config.ServerName = u.Hostname()
 			}
 		}
 
@@ -233,7 +243,24 @@ func (e *endpointForwarder) UpstreamProtocol() string {
 
 // UpstreamURL returns the URL that the endpoint forwards its traffic to.
 func (e *endpointForwarder) UpstreamURL() url.URL {
-	return e.upstreamURL
+	return *e.upstreamURL.Load()
+}
+
+// UpdateUpstream atomically updates the upstream URL that connections are forwarded to.
+func (e *endpointForwarder) UpdateUpstream(u url.URL) {
+	e.upstreamURL.Store(&u)
+}
+
+// Update applies a partial update to the endpoint's mutable metadata fields
+// and propagates the change to the ngrok backend over the active session.
+func (e *endpointForwarder) Update(ctx context.Context, name, description, metadata *string, poolingEnabled *bool) error {
+	if a, ok := e.agent.(*agent); ok {
+		if err := a.patchTunnelState(ctx, e.tunnelID, name, description, metadata, poolingEnabled); err != nil {
+			return err
+		}
+	}
+	e.baseEndpoint.update(name, description, metadata, poolingEnabled)
+	return nil
 }
 
 // UpstreamTLSClientConfig returns the TLS client configuration used for upstream connections.
