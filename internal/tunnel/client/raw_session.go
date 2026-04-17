@@ -138,8 +138,6 @@ func (s *rawSession) Unlisten(id string) (resp proto.UnbindResp, err error) {
 	return
 }
 
-// PatchTunnelState sends a patch message to the server to update mutable fields
-// on a bound tunnel without unbinding and rebinding.
 func (s *rawSession) PatchTunnelState(tunnelID string, name, description, metadata *string, poolingEnabled *bool) (resp proto.PatchTunnelStateResp, err error) {
 	req := proto.PatchTunnelState{
 		TunnelID:       tunnelID,

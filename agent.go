@@ -332,8 +332,6 @@ func (a *agent) ensureConnected(ctx context.Context) error {
 	return nil
 }
 
-// patchTunnelState sends a PatchTunnelState muxado message over the active
-// session to propagate metadata changes to the backend.
 func (a *agent) patchTunnelState(_ context.Context, tunnelID string, name, description, metadata *string, poolingEnabled *bool) error {
 	a.mu.RLock()
 	sess := a.sess

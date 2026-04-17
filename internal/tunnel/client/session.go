@@ -185,14 +185,8 @@ func (s *session) SrvInfo() (proto.SrvInfoResp, error) {
 }
 
 func (s *session) PatchTunnelState(tunnelID string, name, description, metadata *string, poolingEnabled *bool) error {
-	resp, err := s.raw.PatchTunnelState(tunnelID, name, description, metadata, poolingEnabled)
-	if err != nil {
-		return err
-	}
-	if resp.Error != "" {
-		return proto.StringError(resp.Error)
-	}
-	return nil
+	_, err := s.raw.PatchTunnelState(tunnelID, name, description, metadata, poolingEnabled)
+	return err
 }
 
 func (s *session) CloseTunnel(clientId string, err error) error {

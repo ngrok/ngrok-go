@@ -246,13 +246,10 @@ func (e *endpointForwarder) UpstreamURL() url.URL {
 	return *e.upstreamURL.Load()
 }
 
-// UpdateUpstream atomically updates the upstream URL that connections are forwarded to.
 func (e *endpointForwarder) UpdateUpstream(u url.URL) {
 	e.upstreamURL.Store(&u)
 }
 
-// Update applies a partial update to the endpoint's mutable metadata fields
-// and propagates the change to the ngrok backend over the active session.
 func (e *endpointForwarder) Update(ctx context.Context, name, description, metadata *string, poolingEnabled *bool) error {
 	if a, ok := e.agent.(*agent); ok {
 		if err := a.patchTunnelState(ctx, e.tunnelID, name, description, metadata, poolingEnabled); err != nil {
