@@ -23,6 +23,22 @@ type EndpointForwarder interface {
 	// UpstreamURL returns the URL that the endpoint forwards its traffic to.
 	UpstreamURL() url.URL
 
+	// UpstreamTLSClientConfig returns the TLS client configuration used for upstream connections.
+	UpstreamTLSClientConfig() *tls.Config
+
+	// ProxyProtocol returns the PROXY protocol version used for the endpoint.
+	// Returns a ProxyProtoVersion or empty string if not enabled.
+	ProxyProtocol() ProxyProtoVersion
+}
+
+// UpdateableEndpointForwarder is implemented by EndpointForwarder types that support
+// live updates to the upstream URL and mutable metadata fields. Use a type assertion
+// to access it:
+//
+//	u, ok := forwarder.(ngrok.UpdateableEndpointForwarder)
+type UpdateableEndpointForwarder interface {
+	EndpointForwarder
+
 	// UpdateUpstream atomically updates the upstream URL that connections are forwarded to.
 	// Connections already in progress are not affected. Only new connections use the new URL.
 	UpdateUpstream(u url.URL)
@@ -30,13 +46,6 @@ type EndpointForwarder interface {
 	// Update applies a partial update to the endpoint's mutable metadata fields
 	// and propagates the change to the ngrok backend over the active session.
 	Update(ctx context.Context, name, description, metadata *string, poolingEnabled *bool) error
-
-	// UpstreamTLSClientConfig returns the TLS client configuration used for upstream connections.
-	UpstreamTLSClientConfig() *tls.Config
-
-	// ProxyProtocol returns the PROXY protocol version used for the endpoint.
-	// Returns a ProxyProtoVersion or empty string if not enabled.
-	ProxyProtocol() ProxyProtoVersion
 }
 
 // endpointForwarder implements the EndpointForwarder interface.

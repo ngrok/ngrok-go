@@ -21,6 +21,7 @@ const (
 	BindReq                 ReqType = 1
 	UnbindReq               ReqType = 2
 	StartTunnelWithLabelReq ReqType = 7
+	PatchTunnelStateReq     ReqType = 10
 
 	// sent from the server to the client
 	ProxyReq      ReqType = 3
@@ -31,9 +32,6 @@ const (
 
 	// sent from client to the server
 	SrvInfoReq ReqType = 8
-
-	// sent from client to the server to patch mutable tunnel state
-	PatchTunnelStateReq ReqType = 10
 )
 
 var Version = []string{"3", "2"} // integers in priority order
