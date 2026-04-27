@@ -126,6 +126,21 @@ func (e *baseEndpoint) Name() string {
 	return e.name
 }
 
+func (e *baseEndpoint) update(name, description, metadata *string, poolingEnabled *bool) {
+	if name != nil {
+		e.name = *name
+	}
+	if description != nil {
+		e.description = *description
+	}
+	if metadata != nil {
+		e.metadata = *metadata
+	}
+	if poolingEnabled != nil {
+		e.poolingEnabled = *poolingEnabled
+	}
+}
+
 func (e *baseEndpoint) Protocol() string {
 	return e.endpointURL.Scheme
 }

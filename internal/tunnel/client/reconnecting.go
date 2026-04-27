@@ -60,6 +60,13 @@ func (s *swapRaw) Unlisten(url string) (resp proto.UnbindResp, err error) {
 	return proto.UnbindResp{}, ErrSessionNotReady
 }
 
+func (s *swapRaw) PatchTunnelState(tunnelID string, name, description, metadata *string, poolingEnabled *bool) (resp proto.PatchTunnelStateResp, err error) {
+	if raw := s.get(); raw != nil {
+		return raw.PatchTunnelState(tunnelID, name, description, metadata, poolingEnabled)
+	}
+	return proto.PatchTunnelStateResp{}, ErrSessionNotReady
+}
+
 func (s *swapRaw) SrvInfo() (resp proto.SrvInfoResp, err error) {
 	if raw := s.get(); raw != nil {
 		return raw.SrvInfo()
@@ -211,6 +218,13 @@ func (s *reconnectingSession) listenTunnel(listen func(*session) (Tunnel, error)
 		return tun, nil
 	}
 	return nil, ErrSessionNotReady
+}
+
+func (s *reconnectingSession) PatchTunnelState(tunnelID string, name, description, metadata *string, poolingEnabled *bool) error {
+	if sess := s.firstSession(); sess != nil {
+		return sess.PatchTunnelState(tunnelID, name, description, metadata, poolingEnabled)
+	}
+	return ErrSessionNotReady
 }
 
 func (s *reconnectingSession) SrvInfo() (resp proto.SrvInfoResp, err error) {
