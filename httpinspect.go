@@ -18,7 +18,7 @@ import (
 // It creates an http.Server with a handler that wraps ReverseProxy and a
 // statusCaptureWriter for event emission, then uses httpx.ServeConnServer
 // to serve the single proxy connection without needing a real net.Listener.
-func (e *endpointForwarder) httpServe(proxyConn net.Conn) {
+func (e *EndpointForwarder) httpServe(proxyConn net.Conn) {
 	target := e.upstreamURL
 	transport := e.buildHTTPTransport()
 
@@ -58,7 +58,7 @@ func (e *endpointForwarder) httpServe(proxyConn net.Conn) {
 
 // buildHTTPTransport creates an http.Transport configured with the
 // endpoint's upstream settings
-func (e *endpointForwarder) buildHTTPTransport() *http.Transport {
+func (e *EndpointForwarder) buildHTTPTransport() *http.Transport {
 	tlsConfig := &tls.Config{
 		ServerName: e.upstreamURL.Hostname(),
 	}

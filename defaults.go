@@ -11,11 +11,11 @@ var DefaultAgent, _ = NewAgent(
 )
 
 // Listen is equivalent to DefaultAgent.Listen().
-func Listen(ctx context.Context, opts ...EndpointOption) (EndpointListener, error) {
+func Listen(ctx context.Context, opts ...EndpointOption) (*EndpointListener, error) {
 	return DefaultAgent.Listen(ctx, opts...)
 }
 
 // Forward is sugar for DefaultAgent.Forward().
-func Forward(ctx context.Context, upstream *Upstream, opts ...EndpointOption) (EndpointForwarder, error) {
+func Forward(ctx context.Context, upstream *Upstream, opts ...EndpointOption) (*EndpointForwarder, error) {
 	return DefaultAgent.Forward(ctx, upstream, opts...)
 }

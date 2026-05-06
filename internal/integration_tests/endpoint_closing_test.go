@@ -1,11 +1,13 @@
 package integration_tests
 
 import (
+	"net/url"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.ngrok.com/ngrok/v2"
 )
 
 // TestEndpointClosingIntegration tests closing an endpoint while an agent session is live
@@ -22,14 +24,14 @@ func TestEndpointClosingIntegration(t *testing.T) {
 	require.NoError(t, err, "Failed to create listener")
 
 	// Store the endpoint URL for verification
-	endpointURL := listener.URL().String()
-	t.Logf("Created endpoint: %s", endpointURL)
+	wantEndpointURL := listener.URL().String()
+	t.Logf("Created endpoint: %s", wantEndpointURL)
 
 	// Verify the endpoint appears in the agent's endpoints list
 	endpoints := agent.Endpoints()
 	endpointFound := false
 	for _, ep := range endpoints {
-		if ep.URL().String() == endpointURL {
+		if endpointURL(ep).String() == wantEndpointURL {
 			endpointFound = true
 			break
 		}
@@ -58,6 +60,16 @@ func TestEndpointClosingIntegration(t *testing.T) {
 	// Verify the endpoint is removed from the agent's endpoints list
 	endpoints = agent.Endpoints()
 	for _, ep := range endpoints {
-		assert.NotEqual(t, endpointURL, ep.URL().String(), "Endpoint should not be found in agent's endpoints list after closing")
+		assert.NotEqual(t, wantEndpointURL, endpointURL(ep).String(), "Endpoint should not be found in agent's endpoints list after closing")
 	}
+}
+
+func endpointURL(ep ngrok.Endpoint) *url.URL {
+	u, ok := ep.(interface {
+		URL() *url.URL
+	})
+	if !ok {
+		return nil
+	}
+	return u.URL()
 }

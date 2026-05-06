@@ -13,28 +13,9 @@ import (
 )
 
 // EndpointForwarder is an Endpoint that forwards traffic to an upstream service.
-type EndpointForwarder interface {
-	Endpoint
-
-	// UpstreamProtocol returns the protocol used to communicate with the upstream server.
-	// This differs from UpstreamURL().Scheme if http2 is used.
-	UpstreamProtocol() string
-
-	// UpstreamURL returns the URL that the endpoint forwards its traffic to.
-	UpstreamURL() url.URL
-
-	// UpstreamTLSClientConfig returns the TLS client configuration used for upstream connections.
-	UpstreamTLSClientConfig() *tls.Config
-
-	// ProxyProtocol returns the PROXY protocol version used for the endpoint.
-	// Returns a ProxyProtoVersion or empty string if not enabled.
-	ProxyProtocol() ProxyProtoVersion
-}
-
-// endpointForwarder implements the EndpointForwarder interface.
-type endpointForwarder struct {
+type EndpointForwarder struct {
 	baseEndpoint
-	listener                *endpointListener
+	listener                *EndpointListener
 	upstreamURL             url.URL
 	upstreamTLSClientConfig *tls.Config
 	upstreamProtocol        string
@@ -43,12 +24,12 @@ type endpointForwarder struct {
 }
 
 // Start begins forwarding connections from the listener to the upstream URL
-func (e *endpointForwarder) start(ctx context.Context) {
+func (e *EndpointForwarder) start(ctx context.Context) {
 	go e.forwardLoop(ctx)
 }
 
 // forwardLoop is the main loop that forwards connections
-func (e *endpointForwarder) forwardLoop(ctx context.Context) {
+func (e *EndpointForwarder) forwardLoop(ctx context.Context) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	for {
@@ -74,7 +55,7 @@ func (e *endpointForwarder) forwardLoop(ctx context.Context) {
 }
 
 // handleConnection processes a single connection
-func (e *endpointForwarder) handleConnection(ctx context.Context, conn net.Conn) {
+func (e *EndpointForwarder) handleConnection(ctx context.Context, conn net.Conn) {
 	start := time.Now()
 	remoteAddr := conn.RemoteAddr().String()
 
@@ -98,13 +79,11 @@ func (e *endpointForwarder) handleConnection(ctx context.Context, conn net.Conn)
 	}
 }
 
-func (e *endpointForwarder) emitConnectionEvent(evt Event) {
-	if a, ok := e.agent.(*agent); ok {
-		a.emitEvent(evt)
-	}
+func (e *EndpointForwarder) emitConnectionEvent(evt Event) {
+	e.agent.emitEvent(evt)
 }
 
-func (e *endpointForwarder) isHTTP() bool {
+func (e *EndpointForwarder) isHTTP() bool {
 	switch strings.ToLower(e.upstreamURL.Scheme) {
 	case "http", "https":
 		return true
@@ -132,7 +111,7 @@ func (c *countingConn) Write(p []byte) (int, error) {
 }
 
 // connectToBackend establishes a connection to the upstream URL
-func (e *endpointForwarder) connectToBackend(ctx context.Context) (net.Conn, error) {
+func (e *EndpointForwarder) connectToBackend(ctx context.Context) (net.Conn, error) {
 	// Parse host and port from URL
 	host := e.upstreamURL.Hostname()
 	port := e.upstreamURL.Port()
@@ -194,7 +173,7 @@ func (e *endpointForwarder) connectToBackend(ctx context.Context) (net.Conn, err
 }
 
 // join copies data bidirectionally between the two connections
-func (e *endpointForwarder) join(left, right net.Conn) {
+func (e *EndpointForwarder) join(left, right net.Conn) {
 	wg := &sync.WaitGroup{}
 	wg.Add(2)
 
@@ -215,11 +194,13 @@ func (e *endpointForwarder) join(left, right net.Conn) {
 	wg.Wait()
 }
 
-func (e *endpointForwarder) Close() error {
+// Close() is equivalent to for CloseWithContext(context.Background())
+func (e *EndpointForwarder) Close() error {
 	return e.CloseWithContext(context.Background())
 }
 
-func (e *endpointForwarder) CloseWithContext(ctx context.Context) error {
+// CloseWithContext closes the endpoint with the provided context.
+func (e *EndpointForwarder) CloseWithContext(ctx context.Context) error {
 	// Close via the listener
 	err := e.listener.CloseWithContext(ctx)
 
@@ -227,22 +208,24 @@ func (e *endpointForwarder) CloseWithContext(ctx context.Context) error {
 }
 
 // UpstreamProtocol returns the protocol used to communicate with the upstream server.
-func (e *endpointForwarder) UpstreamProtocol() string {
+// This differs from UpstreamURL().Scheme if http2 is used.
+func (e *EndpointForwarder) UpstreamProtocol() string {
 	return e.upstreamProtocol
 }
 
 // UpstreamURL returns the URL that the endpoint forwards its traffic to.
-func (e *endpointForwarder) UpstreamURL() url.URL {
+func (e *EndpointForwarder) UpstreamURL() url.URL {
 	return e.upstreamURL
 }
 
 // UpstreamTLSClientConfig returns the TLS client configuration used for upstream connections.
-func (e *endpointForwarder) UpstreamTLSClientConfig() *tls.Config {
+func (e *EndpointForwarder) UpstreamTLSClientConfig() *tls.Config {
 	return e.upstreamTLSClientConfig
 }
 
 // ProxyProtocol returns the PROXY protocol version used for the endpoint.
-func (e *endpointForwarder) ProxyProtocol() ProxyProtoVersion {
+// Returns a ProxyProtoVersion or empty string if not enabled.
+func (e *EndpointForwarder) ProxyProtocol() ProxyProtoVersion {
 	return e.proxyProtocol
 }
 
