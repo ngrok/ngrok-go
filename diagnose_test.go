@@ -125,6 +125,7 @@ func TestDiagnoseMuxadoSuccess(t *testing.T) {
 	assert.Equal(t, l.Addr().String(), result.Addr)
 	assert.Equal(t, testRegion, result.Region)
 	assert.Greater(t, result.Latency, time.Duration(0))
+	assert.NotEmpty(t, result.PeerCertificates, "peer certificate chain should be captured after TLS handshake")
 }
 
 // TestDiagnoseOnline connects to a live tunnel server and verifies the full

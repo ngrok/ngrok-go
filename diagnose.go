@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -28,6 +29,10 @@ type DiagnoseResult struct {
 	Region string
 	// Round-trip latency of the SrvInfo call.
 	Latency time.Duration
+	// PeerCertificates is the certificate chain presented by the server
+	// during the TLS handshake, with the leaf certificate first. Populated
+	// whenever the TLS handshake succeeded, even if a later probe step failed.
+	PeerCertificates []*x509.Certificate
 }
 
 // diagnoseError is returned by [Diagnoser.Diagnose] when a probe step fails.
@@ -165,6 +170,7 @@ func (a *agent) probeAddr(ctx context.Context, logger *slog.Logger, dialer Diale
 	if err := tlsConn.HandshakeContext(ctx); err != nil {
 		return result, &diagnoseError{Step: "tls", Err: err}
 	}
+	result.PeerCertificates = tlsConn.ConnectionState().PeerCertificates
 
 	// Muxado + SrvInfo
 	muxSess := muxado.Client(tlsConn, nil)
