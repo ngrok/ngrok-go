@@ -21,7 +21,7 @@ type RawSession interface {
 	Listen(proto string, opts any, extra proto.BindExtra, id string, forwardsTo string, forwardsProto string) (proto.BindResp, error)
 	ListenLabel(labels map[string]string, metadata string, forwardsTo string, forwardsProto string) (proto.StartTunnelWithLabelResp, error)
 	Unlisten(id string) (proto.UnbindResp, error)
-	PatchTunnelState(id string, name, description, metadata *string, poolingEnabled *bool) (proto.PatchTunnelStateResp, error)
+	PatchTunnelState(id string, name, description, metadata *string, poolingEnabled *bool, trafficPolicy *string) (proto.PatchTunnelStateResp, error)
 	Accept() (netx.LoggedConn, error)
 
 	SrvInfo() (proto.SrvInfoResp, error)
@@ -138,13 +138,14 @@ func (s *rawSession) Unlisten(id string) (resp proto.UnbindResp, err error) {
 	return
 }
 
-func (s *rawSession) PatchTunnelState(tunnelID string, name, description, metadata *string, poolingEnabled *bool) (resp proto.PatchTunnelStateResp, err error) {
+func (s *rawSession) PatchTunnelState(tunnelID string, name, description, metadata *string, poolingEnabled *bool, trafficPolicy *string) (resp proto.PatchTunnelStateResp, err error) {
 	req := proto.PatchTunnelState{
 		TunnelID:       tunnelID,
 		Name:           name,
 		Description:    description,
 		Metadata:       metadata,
 		PoolingEnabled: poolingEnabled,
+		TrafficPolicy:  trafficPolicy,
 	}
 	err = s.rpc(proto.PatchTunnelStateReq, &req, &resp)
 	if err == nil && resp.Error != "" {

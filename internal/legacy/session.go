@@ -46,7 +46,7 @@ type Session interface {
 	Warnings() []error
 
 	// PatchTunnelState sends a muxado request to update mutable fields on a tunnel
-	PatchTunnelState(tunnelID string, name, description, metadata *string, poolingEnabled *bool) error
+	PatchTunnelState(tunnelID string, name, description, metadata *string, poolingEnabled *bool, trafficPolicy *string) error
 
 	// Close ends the ngrok session. All Tunnel objects created by Listen
 	// on this session will be closed.
@@ -746,8 +746,8 @@ func (s *sessionImpl) Warnings() []error {
 	return nil
 }
 
-func (s *sessionImpl) PatchTunnelState(tunnelID string, name, description, metadata *string, poolingEnabled *bool) error {
-	return s.inner().PatchTunnelState(tunnelID, name, description, metadata, poolingEnabled)
+func (s *sessionImpl) PatchTunnelState(tunnelID string, name, description, metadata *string, poolingEnabled *bool, trafficPolicy *string) error {
+	return s.inner().PatchTunnelState(tunnelID, name, description, metadata, poolingEnabled, trafficPolicy)
 }
 
 func (s *sessionImpl) Listen(ctx context.Context, cfg config.Tunnel) (Tunnel, error) {

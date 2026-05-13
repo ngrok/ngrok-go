@@ -332,14 +332,14 @@ func (a *agent) ensureConnected(ctx context.Context) error {
 	return nil
 }
 
-func (a *agent) patchTunnelState(_ context.Context, tunnelID string, name, description, metadata *string, poolingEnabled *bool) error {
+func (a *agent) patchTunnelState(_ context.Context, tunnelID string, name, description, metadata *string, poolingEnabled *bool, trafficPolicy *string) error {
 	a.mu.RLock()
 	sess := a.sess
 	a.mu.RUnlock()
 	if sess == nil {
 		return fmt.Errorf("agent not connected")
 	}
-	return sess.PatchTunnelState(tunnelID, name, description, metadata, poolingEnabled)
+	return sess.PatchTunnelState(tunnelID, name, description, metadata, poolingEnabled, trafficPolicy)
 }
 
 // removeEndpoint removes an endpoint from the agent's list
