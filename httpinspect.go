@@ -19,12 +19,12 @@ import (
 // statusCaptureWriter for event emission, then uses httpx.ServeConnServer
 // to serve the single proxy connection without needing a real net.Listener.
 func (e *endpointForwarder) httpServe(proxyConn net.Conn) {
-	target := e.upstreamURL
+	target := e.upstreamURL.Load()
 	transport := e.buildHTTPTransport()
 
 	rp := &httputil.ReverseProxy{
 		Rewrite: func(pr *httputil.ProxyRequest) {
-			pr.SetURL(&target)
+			pr.SetURL(target)
 			// Preserve the original Host header from the inbound request
 			pr.Out.Host = pr.In.Host
 		},
@@ -59,13 +59,14 @@ func (e *endpointForwarder) httpServe(proxyConn net.Conn) {
 // buildHTTPTransport creates an http.Transport configured with the
 // endpoint's upstream settings
 func (e *endpointForwarder) buildHTTPTransport() *http.Transport {
+	u := e.upstreamURL.Load()
 	tlsConfig := &tls.Config{
-		ServerName: e.upstreamURL.Hostname(),
+		ServerName: u.Hostname(),
 	}
 	if e.upstreamTLSClientConfig != nil {
 		tlsConfig = e.upstreamTLSClientConfig.Clone()
 		if tlsConfig.ServerName == "" {
-			tlsConfig.ServerName = e.upstreamURL.Hostname()
+			tlsConfig.ServerName = u.Hostname()
 		}
 	}
 
