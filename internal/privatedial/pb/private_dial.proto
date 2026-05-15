@@ -1,0 +1,93 @@
+syntax = "proto3";
+
+package private_dial;
+
+import "google/protobuf/duration.proto";
+
+// This file is vendored from ngrok monorepo proto/lib/private_dial/private_dial.proto
+// at commit 5a243324af0d96cf6a7499c1a3a1483cdd4e5ef2. When regenerating, sync
+// from a known monorepo commit and update this header.
+option go_package = "golang.ngrok.com/ngrok/v2/internal/privatedial/pb;pb";
+
+// SessionReq is the first message the client sends on the /session
+// request body. Auth is carried in the HTTP Authorization header, not in
+// this message; SessionReq carries client identity and free-form
+// metadata for server-side logging.
+message SessionReq {
+  string client_version = 1;
+  map<string, string> metadata = 2;
+}
+
+// SessionAck is the first message the server sends on the control stream
+// response body after successful auth. Subsequent frames on the control
+// stream are ControlFrame messages.
+message SessionAck {
+  // server_id identifies the server instance that terminated this
+  // session. Useful for client-side logging and request correlation.
+  string server_id = 1;
+
+  // ping_interval is the cadence at which the server expects to send
+  // and receive Ping frames on the control stream. Clients should
+  // observe this for their own ping cadence.
+  google.protobuf.Duration ping_interval = 2;
+}
+
+// Ping is sent by either side to measure RTT and prove liveness. The
+// peer must immediately reply with a Pong carrying the same token.
+// Token is opaque correlation data — typically 8 random bytes,
+// mirroring HTTP/2 PING semantics.
+message Ping {
+  fixed64 token = 1;
+}
+
+// Pong echoes the token from a received Ping.
+message Pong {
+  fixed64 token = 1;
+}
+
+// PleaseDrain tells the client that the server is draining. The client should
+// stop opening new dial streams on this session and allow existing streams to
+// finish within grace_period_seconds. Server-to-client only.
+message PleaseDrain {
+  string reason = 1;
+  uint32 grace_period_seconds = 2;
+}
+
+// SessionError terminates the session. Server-to-client only.
+message SessionError {
+  string code = 1;
+  string message = 2;
+}
+
+// ControlFrame is the message format on the control stream in both
+// directions after SessionAck. Ping and Pong may originate from either
+// side; PleaseDrain and SessionError are server-to-client only.
+message ControlFrame {
+  oneof frame {
+    Ping ping = 1;
+    PleaseDrain please_drain = 2;
+    SessionError session_error = 3;
+    Pong pong = 4;
+  }
+}
+
+// DialReq is the first message on a dial stream (POST /dial) body. After
+// this frame is read by the server, the rest of the stream is raw bytes
+// bridged to the target tunnel connection.
+message DialReq {
+  string host = 1;
+  int64 port = 2;
+  map<string, string> metadata = 3;
+
+  // session_req is sent in /dial requests until the client has
+  // received any server response, so a /dial opened in parallel with
+  // /session can establish auth on its own. Once the client knows
+  // /session has acked, this field is left unset.
+  SessionReq session_req = 4;
+}
+
+// DialTrailer is sent via HTTP/2 trailers when the dial stream terminates.
+message DialTrailer {
+  string error_code = 1;
+  string error_message = 2;
+}

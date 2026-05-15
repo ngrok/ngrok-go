@@ -1,0 +1,7 @@
+version: v2
+inputs:
+  - directory: internal/privatedial/pb
+plugins:
+  - local: ["go", "tool", "protoc-gen-go"]
+    out: internal/privatedial/pb
+    opt: paths=source_relative
