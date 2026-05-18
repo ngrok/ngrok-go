@@ -45,7 +45,7 @@ type UpdateableEndpointForwarder interface {
 
 	// Update applies a partial update to the endpoint's mutable metadata fields
 	// and propagates the change to the ngrok backend over the active session.
-	Update(ctx context.Context, name, description, metadata *string, poolingEnabled *bool) error
+	Update(ctx context.Context, name, description, metadata *string, poolingEnabled *bool, trafficPolicy *string) error
 }
 
 // endpointForwarder implements the EndpointForwarder interface.
@@ -259,13 +259,13 @@ func (e *endpointForwarder) UpdateUpstream(u url.URL) {
 	e.upstreamURL.Store(&u)
 }
 
-func (e *endpointForwarder) Update(ctx context.Context, name, description, metadata *string, poolingEnabled *bool) error {
+func (e *endpointForwarder) Update(ctx context.Context, name, description, metadata *string, poolingEnabled *bool, trafficPolicy *string) error {
 	if a, ok := e.agent.(*agent); ok {
-		if err := a.patchTunnelState(ctx, e.tunnelID, name, description, metadata, poolingEnabled); err != nil {
+		if err := a.patchTunnelState(ctx, e.tunnelID, name, description, metadata, poolingEnabled, trafficPolicy); err != nil {
 			return err
 		}
 	}
-	e.update(name, description, metadata, poolingEnabled)
+	e.update(name, description, metadata, poolingEnabled, trafficPolicy)
 	return nil
 }
 

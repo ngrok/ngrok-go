@@ -59,7 +59,7 @@ type Session interface {
 	ListenTLS(opts *proto.TLSEndpoint, extra proto.BindExtra, forwardsTo string) (Tunnel, error)
 
 	// PatchTunnelState sends a muxado request to the server to update mutable fields on a tunnel
-	PatchTunnelState(tunnelID string, name, description, metadata *string, poolingEnabled *bool) error
+	PatchTunnelState(tunnelID string, name, description, metadata *string, poolingEnabled *bool, trafficPolicy *string) error
 
 	SrvInfo() (proto.SrvInfoResp, error)
 
@@ -184,8 +184,8 @@ func (s *session) SrvInfo() (proto.SrvInfoResp, error) {
 	return s.raw.SrvInfo()
 }
 
-func (s *session) PatchTunnelState(tunnelID string, name, description, metadata *string, poolingEnabled *bool) error {
-	_, err := s.raw.PatchTunnelState(tunnelID, name, description, metadata, poolingEnabled)
+func (s *session) PatchTunnelState(tunnelID string, name, description, metadata *string, poolingEnabled *bool, trafficPolicy *string) error {
+	_, err := s.raw.PatchTunnelState(tunnelID, name, description, metadata, poolingEnabled, trafficPolicy)
 	return err
 }
 

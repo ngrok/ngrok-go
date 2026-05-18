@@ -60,9 +60,9 @@ func (s *swapRaw) Unlisten(url string) (resp proto.UnbindResp, err error) {
 	return proto.UnbindResp{}, ErrSessionNotReady
 }
 
-func (s *swapRaw) PatchTunnelState(tunnelID string, name, description, metadata *string, poolingEnabled *bool) (resp proto.PatchTunnelStateResp, err error) {
+func (s *swapRaw) PatchTunnelState(tunnelID string, name, description, metadata *string, poolingEnabled *bool, trafficPolicy *string) (resp proto.PatchTunnelStateResp, err error) {
 	if raw := s.get(); raw != nil {
-		return raw.PatchTunnelState(tunnelID, name, description, metadata, poolingEnabled)
+		return raw.PatchTunnelState(tunnelID, name, description, metadata, poolingEnabled, trafficPolicy)
 	}
 	return proto.PatchTunnelStateResp{}, ErrSessionNotReady
 }
@@ -220,9 +220,9 @@ func (s *reconnectingSession) listenTunnel(listen func(*session) (Tunnel, error)
 	return nil, ErrSessionNotReady
 }
 
-func (s *reconnectingSession) PatchTunnelState(tunnelID string, name, description, metadata *string, poolingEnabled *bool) error {
+func (s *reconnectingSession) PatchTunnelState(tunnelID string, name, description, metadata *string, poolingEnabled *bool, trafficPolicy *string) error {
 	if sess := s.firstSession(); sess != nil {
-		return sess.PatchTunnelState(tunnelID, name, description, metadata, poolingEnabled)
+		return sess.PatchTunnelState(tunnelID, name, description, metadata, poolingEnabled, trafficPolicy)
 	}
 	return ErrSessionNotReady
 }

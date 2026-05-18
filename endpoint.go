@@ -126,7 +126,7 @@ func (e *baseEndpoint) Name() string {
 	return e.name
 }
 
-func (e *baseEndpoint) update(name, description, metadata *string, poolingEnabled *bool) {
+func (e *baseEndpoint) update(name, description, metadata *string, poolingEnabled *bool, trafficPolicy *string) {
 	if name != nil {
 		e.name = *name
 	}
@@ -138,6 +138,9 @@ func (e *baseEndpoint) update(name, description, metadata *string, poolingEnable
 	}
 	if poolingEnabled != nil {
 		e.poolingEnabled = *poolingEnabled
+	}
+	if trafficPolicy != nil {
+		e.trafficPolicy = *trafficPolicy
 	}
 }
 

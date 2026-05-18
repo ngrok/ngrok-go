@@ -451,6 +451,7 @@ type PatchTunnelState struct {
 	Description    *string `json:"Description,omitempty"`
 	Metadata       *string `json:"Metadata,omitempty"`
 	PoolingEnabled *bool   `json:"PoolingEnabled,omitempty"`
+	TrafficPolicy  *string `json:"TrafficPolicy,omitempty"`
 }
 
 // PatchTunnelStateResp is the server's reply to a PatchTunnelState request.
