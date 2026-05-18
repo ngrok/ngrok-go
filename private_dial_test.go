@@ -216,7 +216,7 @@ func TestPrivateDialer_RoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DialContext: %v", err)
 	}
-	defer conn.Close()
+	defer conn.Close() //nolint:errcheck
 	if _, err := conn.Write([]byte("hello\n")); err != nil {
 		t.Fatalf("write: %v", err)
 	}
