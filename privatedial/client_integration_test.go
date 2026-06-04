@@ -9,6 +9,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"fmt"
 	"io"
 	"math/big"
 	"net"
@@ -246,6 +247,152 @@ func TestDialEcho(t *testing.T) {
 	}
 }
 
+func TestDrainReconnect(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		proto Protocol
+	}{
+		{"h2", ProtocolH2},
+		{"quic", ProtocolQUIC},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			resetSticky()
+			cert := genTLSCert(t)
+			var sessionN atomic.Int32
+			firstDrainCh := make(chan struct{})
+
+			mux := http.NewServeMux()
+			mux.HandleFunc("/session", func(w http.ResponseWriter, r *http.Request) {
+				n := sessionN.Add(1)
+				var req pbpd.SessionReq
+				if err := protodelimUnmarshaler.UnmarshalFrom(bufio.NewReader(r.Body), &req); err != nil {
+					http.Error(w, "bad SessionReq", http.StatusBadRequest)
+					return
+				}
+				if _, err := protodelim.MarshalTo(w, &pbpd.SessionAck{ServerId: fmt.Sprintf("srv-%d", n)}); err != nil {
+					return
+				}
+				flush(w)
+				if n == 1 {
+					select {
+					case <-firstDrainCh:
+					case <-r.Context().Done():
+						return
+					}
+					_, _ = protodelim.MarshalTo(w, &pbpd.ControlFrame{
+						Frame: &pbpd.ControlFrame_PleaseDrain{
+							PleaseDrain: &pbpd.PleaseDrain{GracePeriodSeconds: 1},
+						},
+					})
+					flush(w)
+				}
+				<-r.Context().Done()
+			})
+			mux.HandleFunc("/dial", echoDialHandler)
+
+			sess := mustOpenSession(t, clientOptsForProtocol(t, tc.proto, cert, mux))
+			defer sess.Close()
+
+			if got := sess.Protocol(); got != tc.proto {
+				t.Fatalf("Protocol = %v, want %v", got, tc.proto)
+			}
+			if got := sess.ServerID(); got != "srv-1" {
+				t.Fatalf("initial ServerID = %q, want srv-1", got)
+			}
+			conn1 := mustDial(t, sess, "first.private:80")
+			assertEcho(t, conn1, "before-drain")
+			_ = conn1.Close()
+
+			close(firstDrainCh)
+			waitFor(t, 3*time.Second, func() bool { return sess.ServerID() == "srv-2" })
+
+			conn2 := mustDial(t, sess, "second.private:443")
+			if got := conn2.RemoteAddr().Network(); got != "tcp" {
+				t.Fatalf("RemoteAddr network = %q, want tcp", got)
+			}
+			if got := conn2.RemoteAddr().String(); got != "second.private:443" {
+				t.Fatalf("RemoteAddr string = %q, want second.private:443", got)
+			}
+			assertEcho(t, conn2, "after-drain")
+			_ = conn2.Close()
+		})
+	}
+}
+
+func TestAbruptControlStreamReconnect(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		proto Protocol
+	}{
+		{"h2", ProtocolH2},
+		{"quic", ProtocolQUIC},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			resetSticky()
+			cert := genTLSCert(t)
+			var sessionN atomic.Int32
+			dropFirst := make(chan struct{})
+
+			mux := http.NewServeMux()
+			mux.HandleFunc("/session", func(w http.ResponseWriter, r *http.Request) {
+				n := sessionN.Add(1)
+				var req pbpd.SessionReq
+				if err := protodelimUnmarshaler.UnmarshalFrom(bufio.NewReader(r.Body), &req); err != nil {
+					http.Error(w, "bad SessionReq", http.StatusBadRequest)
+					return
+				}
+				if _, err := protodelim.MarshalTo(w, &pbpd.SessionAck{ServerId: fmt.Sprintf("srv-%d", n)}); err != nil {
+					return
+				}
+				flush(w)
+				if n == 1 {
+					select {
+					case <-dropFirst:
+					case <-r.Context().Done():
+					}
+					return
+				}
+				<-r.Context().Done()
+			})
+			mux.HandleFunc("/dial", echoDialHandler)
+
+			sess := mustOpenSession(t, clientOptsForProtocol(t, tc.proto, cert, mux))
+			defer sess.Close()
+
+			if got := sess.Protocol(); got != tc.proto {
+				t.Fatalf("Protocol = %v, want %v", got, tc.proto)
+			}
+			if got := sess.ServerID(); got != "srv-1" {
+				t.Fatalf("initial ServerID = %q, want srv-1", got)
+			}
+			close(dropFirst)
+			waitFor(t, 3*time.Second, func() bool { return sess.ServerID() == "srv-2" })
+
+			conn := mustDial(t, sess, "after-drop.private:80")
+			assertEcho(t, conn, "after-drop")
+			_ = conn.Close()
+		})
+	}
+}
+
+func clientOptsForProtocol(t *testing.T, proto Protocol, cert tls.Certificate, h http.Handler) ClientOpts {
+	t.Helper()
+	opts := ClientOpts{
+		AuthToken:     "test-token",
+		ForceProtocol: proto,
+		TLSConfig:     &tls.Config{InsecureSkipVerify: true},
+	}
+	switch proto {
+	case ProtocolH2:
+		opts.H2ServerAddr = startH2Server(t, cert, h)
+	case ProtocolQUIC:
+		opts.QUICServerAddr = startH3Server(t, cert, h)
+	default:
+		t.Fatalf("unsupported protocol %v", proto)
+	}
+	return opts
+}
+
 // mustOpenSession opens a session with the given opts, failing the test on
 // error.
 func mustOpenSession(t *testing.T, opts ClientOpts) *Session {
@@ -257,6 +404,43 @@ func mustOpenSession(t *testing.T, opts ClientOpts) *Session {
 		t.Fatalf("OpenSession: %v", err)
 	}
 	return sess
+}
+
+func mustDial(t *testing.T, sess *Session, addr string) net.Conn {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	conn, err := sess.DialContext(ctx, "tcp", addr)
+	if err != nil {
+		t.Fatalf("DialContext: %v", err)
+	}
+	return conn
+}
+
+func assertEcho(t *testing.T, conn net.Conn, msg string) {
+	t.Helper()
+	if _, err := io.WriteString(conn, msg); err != nil {
+		t.Fatalf("WriteString: %v", err)
+	}
+	buf := make([]byte, len(msg))
+	if _, err := io.ReadFull(conn, buf); err != nil {
+		t.Fatalf("ReadFull: %v", err)
+	}
+	if string(buf) != msg {
+		t.Fatalf("echo mismatch: got %q want %q", buf, msg)
+	}
+}
+
+func waitFor(t *testing.T, timeout time.Duration, fn func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if fn() {
+			return
+		}
+		time.Sleep(2 * time.Millisecond)
+	}
+	t.Fatalf("waitFor timed out after %s", timeout)
 }
 
 // privateDialHandler returns a handler that speaks the private-dial protocol:
@@ -300,6 +484,18 @@ func privateDialHandler(counter *atomic.Int64) http.Handler {
 	})
 
 	return mux
+}
+
+func echoDialHandler(w http.ResponseWriter, r *http.Request) {
+	br := bufio.NewReader(r.Body)
+	var dreq pbpd.DialReq
+	if err := protodelimUnmarshaler.UnmarshalFrom(br, &dreq); err != nil {
+		http.Error(w, "bad DialReq", http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	flush(w)
+	_, _ = io.Copy(flushWriter{w}, br)
 }
 
 func flush(w http.ResponseWriter) {
