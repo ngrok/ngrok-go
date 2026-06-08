@@ -1,6 +1,7 @@
 package privatedial
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"io"
@@ -14,6 +15,7 @@ import (
 	"sync/atomic"
 	"syscall"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"google.golang.org/protobuf/encoding/protodelim"
@@ -55,19 +57,33 @@ func newTestSessionWithClock(t *testing.T, openFn func(context.Context) (*sessio
 	ctx, cancel := context.WithCancel(context.Background())
 	clk := newManualClock(time.Now())
 	s := &Dialer{
-		ctx:         ctx,
-		cancel:      cancel,
-		proto:       ProtocolH2,
-		ready:       make(chan struct{}),
-		connected:   true,
-		current:     first,
-		openFn:      openFn,
-		clock:       clk,
-		done:        make(chan struct{}),
+		ctx:       ctx,
+		cancel:    cancel,
+		proto:     ProtocolH2,
+		ready:     make(chan struct{}),
+		connected: true,
+		current:   first,
+		openFn:    openFn,
+		clock:     clk,
+		done:      make(chan struct{}),
 	}
 	go s.supervise()
 	t.Cleanup(func() { _ = s.Close() })
 	return s, clk
+}
+
+func newBareDialerForTest(current *sessionConn, dialWait time.Duration) *Dialer {
+	ctx, cancel := context.WithCancel(context.Background())
+	return &Dialer{
+		ctx:       ctx,
+		cancel:    cancel,
+		proto:     ProtocolH2,
+		ready:     make(chan struct{}),
+		connected: true,
+		current:   current,
+		dialWait:  dialWait,
+		done:      make(chan struct{}),
+	}
 }
 
 func TestReconnectBacksOffAfterTransientOpenError(t *testing.T) {
@@ -216,40 +232,34 @@ func TestAuthFatalStopsReconnect(t *testing.T) {
 }
 
 func TestDialBlocksThenTimesOutWhenNoCurrent(t *testing.T) {
-	first := newFakeConn("conn-1")
-	transient := errors.New("transient")
-	var calls atomic.Int32
-	openFn := func(context.Context) (*sessionConn, error) {
-		i := calls.Add(1)
-		if i == 1 {
-			return first, nil
+	synctest.Test(t, func(t *testing.T) {
+		s := newBareDialerForTest(nil, 80*time.Millisecond)
+		defer s.Close() //nolint:errcheck
+
+		errCh := make(chan error, 1)
+		go func() {
+			_, err := s.DialContext(context.Background(), "tcp", "x.private:80")
+			errCh <- err
+		}()
+
+		synctest.Wait()
+		select {
+		case err := <-errCh:
+			t.Fatalf("Dial returned before timeout: %v", err)
+		default:
 		}
-		return nil, transient
-	}
-	s, clk := newTestSessionWithClock(t, openFn)
-	s.dialWait = 80 * time.Millisecond
 
-	first.serverErrCh <- errors.New("boom")
-	waitFor(t, time.Second, func() bool {
-		cur, _, _ := s.snapshot()
-		return cur == nil
+		time.Sleep(80 * time.Millisecond)
+		synctest.Wait()
+
+		err := <-errCh
+		if err == nil {
+			t.Fatal("Dial succeeded, want timeout")
+		}
+		if !errors.Is(err, syscall.ECONNREFUSED) {
+			t.Fatalf("error = %v, want ECONNREFUSED", err)
+		}
 	})
-
-	errCh := make(chan error, 1)
-	go func() {
-		_, err := s.DialContext(context.Background(), "tcp", "x.private:80")
-		errCh <- err
-	}()
-	waitFor(t, time.Second, func() bool { return clk.NumWaiters() >= 2 })
-	clk.Step(80 * time.Millisecond)
-
-	err := <-errCh
-	if err == nil {
-		t.Fatal("Dial succeeded, want timeout")
-	}
-	if !errors.Is(err, syscall.ECONNREFUSED) {
-		t.Fatalf("error = %v, want ECONNREFUSED", err)
-	}
 }
 
 func TestWaitForCurrentWakesOnReconnect(t *testing.T) {
@@ -281,7 +291,7 @@ func TestWaitForCurrentWakesOnReconnect(t *testing.T) {
 	}
 	out := make(chan result, 1)
 	go func() {
-		cur, err := s.waitForCurrent(context.Background(), make(chan time.Time))
+		cur, err := s.waitForCurrent(context.Background())
 		out <- result{cur: cur, err: err}
 	}()
 
@@ -348,43 +358,37 @@ func TestCloseDuringReconnectDiscardsLateConn(t *testing.T) {
 }
 
 func TestDialSkipsDrainedCurrent(t *testing.T) {
-	first := newFakeConn("conn-1")
-	clk := newManualClock(time.Now())
-	openFn := func(context.Context) (*sessionConn, error) {
-		return first, nil
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	s := &Dialer{
-		ctx:         ctx,
-		cancel:      cancel,
-		proto:       ProtocolH2,
-		ready:       make(chan struct{}),
-		connected:   true,
-		current:     first,
-		openFn:      openFn,
-		clock:       clk,
-		dialWait:    200 * time.Millisecond,
-		done:        make(chan struct{}),
-	}
-	t.Cleanup(func() { _ = s.Close() })
+	synctest.Test(t, func(t *testing.T) {
+		first := newFakeConn("conn-1")
+		s := newBareDialerForTest(first, 200*time.Millisecond)
+		defer s.Close() //nolint:errcheck
 
-	first.markDraining(time.Second)
+		first.markDraining(time.Second)
 
-	errCh := make(chan error, 1)
-	go func() {
-		_, err := s.DialContext(context.Background(), "tcp", "x.private:80")
-		errCh <- err
-	}()
-	waitFor(t, time.Second, clk.HasWaiters)
-	clk.Step(200 * time.Millisecond)
+		errCh := make(chan error, 1)
+		go func() {
+			_, err := s.DialContext(context.Background(), "tcp", "x.private:80")
+			errCh <- err
+		}()
 
-	err := <-errCh
-	if err == nil {
-		t.Fatal("Dial succeeded on drained conn")
-	}
-	if !errors.Is(err, syscall.ECONNREFUSED) {
-		t.Fatalf("error = %v, want ECONNREFUSED", err)
-	}
+		synctest.Wait()
+		select {
+		case err := <-errCh:
+			t.Fatalf("Dial returned before timeout: %v", err)
+		default:
+		}
+
+		time.Sleep(200 * time.Millisecond)
+		synctest.Wait()
+
+		err := <-errCh
+		if err == nil {
+			t.Fatal("Dial succeeded on drained conn")
+		}
+		if !errors.Is(err, syscall.ECONNREFUSED) {
+			t.Fatalf("error = %v, want ECONNREFUSED", err)
+		}
+	})
 }
 
 func TestAcceptStreamSerializesWithDrain(t *testing.T) {
@@ -443,15 +447,65 @@ func TestSessionConnDialRefusesAfterClose(t *testing.T) {
 	}
 }
 
+// blockingTransport blocks RoundTrip until the request context is cancelled,
+// modeling a conn whose peer has silently gone away.
+type blockingTransport struct{}
+
+func (blockingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	var dreq pbpd.DialReq
+	if err := protodelim.UnmarshalFrom(bufio.NewReader(req.Body), &dreq); err != nil {
+		return nil, err
+	}
+	<-req.Context().Done()
+	return nil, req.Context().Err()
+}
+
+func (blockingTransport) CloseIdleConnections() {}
+
+func TestDialBudgetBoundsHangingRoundTrip(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		h := newFakeConn("conn-1")
+		h.transport = blockingTransport{}
+		h.authToken = "tok"
+
+		s := newBareDialerForTest(h, 80*time.Millisecond)
+		defer s.Close() //nolint:errcheck
+
+		errCh := make(chan error, 1)
+		go func() {
+			_, err := s.DialContext(context.Background(), "tcp", "x.private:80")
+			errCh <- err
+		}()
+
+		synctest.Wait()
+		select {
+		case err := <-errCh:
+			t.Fatalf("Dial returned before timeout: %v", err)
+		default:
+		}
+
+		time.Sleep(80 * time.Millisecond)
+		synctest.Wait()
+
+		err := <-errCh
+		if err == nil {
+			t.Fatal("Dial succeeded on hanging conn, want timeout")
+		}
+		if !errors.Is(err, syscall.ECONNREFUSED) {
+			t.Fatalf("error = %v, want ECONNREFUSED", err)
+		}
+	})
+}
+
 func TestParkDrainingNoOpAfterClose(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	s := &Dialer{
-		ctx:         ctx,
-		cancel:      cancel,
-		ready:       make(chan struct{}),
-		dialWait:    50 * time.Millisecond,
-		openFn:      func(context.Context) (*sessionConn, error) { return nil, errors.New("never") },
-		done:        make(chan struct{}),
+		ctx:      ctx,
+		cancel:   cancel,
+		ready:    make(chan struct{}),
+		dialWait: 50 * time.Millisecond,
+		openFn:   func(context.Context) (*sessionConn, error) { return nil, errors.New("never") },
+		done:     make(chan struct{}),
 	}
 	cancel()
 
@@ -520,44 +574,29 @@ func TestCloseStopsSupervisorAndConns(t *testing.T) {
 }
 
 func TestDialContextCancelDuringWait(t *testing.T) {
-	first := newFakeConn("conn-1")
-	transient := errors.New("transient")
-	var calls atomic.Int32
-	openFn := func(context.Context) (*sessionConn, error) {
-		i := calls.Add(1)
-		if i == 1 {
-			return first, nil
+	synctest.Test(t, func(t *testing.T) {
+		s := newBareDialerForTest(nil, 5*time.Second)
+		defer s.Close() //nolint:errcheck
+
+		ctx, cancel := context.WithCancel(context.Background())
+		errCh := make(chan error, 1)
+		go func() {
+			_, err := s.DialContext(ctx, "tcp", "x.private:80")
+			errCh <- err
+		}()
+
+		synctest.Wait()
+		cancel()
+		synctest.Wait()
+
+		err := <-errCh
+		if err == nil {
+			t.Fatal("Dial succeeded, want context cancel")
 		}
-		return nil, transient
-	}
-	s, clk := newTestSessionWithClock(t, openFn)
-	s.dialWait = 5 * time.Second
-
-	first.serverErrCh <- errors.New("boom")
-	waitFor(t, time.Second, func() bool {
-		cur, _, _ := s.snapshot()
-		return cur == nil
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("error = %v, want context.Canceled", err)
+		}
 	})
-
-	ctx, cancel := context.WithCancel(context.Background())
-	var (
-		wg  sync.WaitGroup
-		err error
-	)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		_, err = s.DialContext(ctx, "tcp", "x.private:80")
-	}()
-	waitFor(t, time.Second, func() bool { return clk.NumWaiters() >= 2 })
-	cancel()
-	wg.Wait()
-	if err == nil {
-		t.Fatal("Dial succeeded, want context cancel")
-	}
-	if !errors.Is(err, context.Canceled) {
-		t.Fatalf("error = %v, want context.Canceled", err)
-	}
 }
 
 func TestReadControlHandlesPleaseDrain(t *testing.T) {

@@ -74,7 +74,15 @@ const (
 	// HTTP/2 attempt is staggered in. If QUIC completes within this window
 	// no second connection is ever made.
 	quicHeadStart = 250 * time.Millisecond
+
+	h2ReadIdleTimeout = 10 * time.Second
+	h2PingTimeout     = 5 * time.Second
+
+	quicKeepAlivePeriod = h2ReadIdleTimeout
+	quicMaxIdleTimeout  = h2ReadIdleTimeout + h2PingTimeout
 )
+
+var errDialWaitTimeout = errors.New("private-dial: dial wait timeout")
 
 // stickyProtocol records the first protocol the race settled on in this
 // process. Once set, every subsequent connect (including reconnects) reuses
@@ -553,8 +561,8 @@ func (d *Dialer) newH2Transport(ctx context.Context) (roundTripCloser, string, e
 	}
 	remoteAddr := tlsConn.RemoteAddr().String()
 	transport := &http2.Transport{
-		ReadIdleTimeout: 30 * time.Second,
-		PingTimeout:     15 * time.Second,
+		ReadIdleTimeout: h2ReadIdleTimeout,
+		PingTimeout:     h2PingTimeout,
 	}
 	cc, err := transport.NewClientConn(tlsConn)
 	if err != nil {
@@ -565,15 +573,16 @@ func (d *Dialer) newH2Transport(ctx context.Context) (roundTripCloser, string, e
 }
 
 // newH3Transport builds the HTTP/3 (QUIC) transport and records the server
-// address the QUIC connection lands on. KeepAlivePeriod is the QUIC analogue
-// of the h2 keepalive PINGs: it keeps the single multiplexing connection alive
-// and surfaces a dead peer to stuck stream writers.
+// address the QUIC connection lands on. QUIC does not expose separate read-idle
+// and ping timeouts like HTTP/2, so bound its idle timeout and send keepalives
+// on the same cadence as h2's read-idle probes.
 func (d *Dialer) newH3Transport() (roundTripCloser, *connAddrRecorder) {
 	rec := &connAddrRecorder{}
 	t := &http3.Transport{
 		TLSClientConfig: d.tlsConfigFor(d.cfg.QUICServerAddr, "h3"),
 		QUICConfig: &quic.Config{
-			KeepAlivePeriod: 30 * time.Second,
+			KeepAlivePeriod: quicKeepAlivePeriod,
+			MaxIdleTimeout:  quicMaxIdleTimeout,
 		},
 	}
 	t.Dial = func(ctx context.Context, addr string, tlsCfg *tls.Config, cfg *quic.Config) (*quic.Conn, error) {
@@ -692,7 +701,7 @@ func (d *Dialer) Connect(ctx context.Context) error {
 	if err := d.ensureConnected(ctx); err != nil {
 		return err
 	}
-	_, err := d.waitForCurrent(ctx, nil)
+	_, err := d.waitForCurrent(ctx)
 	return err
 }
 
@@ -860,11 +869,18 @@ func (d *Dialer) DialContext(ctx context.Context, network string, addr string) (
 }
 
 func (d *Dialer) dial(ctx context.Context, addr dialAddr) (net.Conn, error) {
-	timer := d.sessionClock().NewTimer(d.dialWaitTimeout())
-	defer timer.Stop()
+	// budgetCtx bounds the entire dial: both the wait for a usable conn and the
+	// per-conn RoundTrip. The cause lets us map our own budget expiry to a
+	// refused connect without treating caller cancellation the same way.
+	budgetCtx, cancel := context.WithTimeoutCause(ctx, d.dialWaitTimeout(), errDialWaitTimeout)
+	defer cancel()
+
+	dialBudgetExpired := func() bool {
+		return errors.Is(context.Cause(budgetCtx), errDialWaitTimeout)
+	}
 
 	dialErrFor := func(err error) error {
-		if ctx.Err() == nil && errors.Is(err, context.DeadlineExceeded) {
+		if ctx.Err() == nil && (dialBudgetExpired() || errors.Is(err, context.DeadlineExceeded)) {
 			return &net.OpError{
 				Op:   "dial",
 				Net:  addr.Network(),
@@ -876,21 +892,22 @@ func (d *Dialer) dial(ctx context.Context, addr dialAddr) (net.Conn, error) {
 	}
 
 	for {
-		select {
-		case <-timer.C():
-			return nil, dialErrFor(context.DeadlineExceeded)
-		default:
-		}
 		if err := ctx.Err(); err != nil {
 			return nil, dialErrFor(err)
 		}
-		cur, err := d.waitForCurrent(ctx, timer.C())
+		if dialBudgetExpired() {
+			return nil, dialErrFor(context.DeadlineExceeded)
+		}
+		cur, err := d.waitForCurrent(budgetCtx)
 		if err != nil {
 			return nil, dialErrFor(err)
 		}
-		conn, dialErr := cur.dial(ctx, addr)
+		conn, dialErr := cur.dial(budgetCtx, addr)
 		if dialErr == nil {
 			return conn, nil
+		}
+		if dialBudgetExpired() {
+			return nil, dialErrFor(context.DeadlineExceeded)
 		}
 		if errors.Is(dialErr, context.Canceled) || errors.Is(dialErr, context.DeadlineExceeded) {
 			return nil, dialErr
@@ -902,7 +919,7 @@ func (d *Dialer) dial(ctx context.Context, addr dialAddr) (net.Conn, error) {
 	}
 }
 
-func (d *Dialer) waitForCurrent(ctx context.Context, budget <-chan time.Time) (*sessionConn, error) {
+func (d *Dialer) waitForCurrent(ctx context.Context) (*sessionConn, error) {
 	for {
 		if err := d.ctx.Err(); err != nil {
 			return nil, ErrSessionClosed
@@ -918,8 +935,6 @@ func (d *Dialer) waitForCurrent(ctx context.Context, budget <-chan time.Time) (*
 		case <-ready:
 		case <-ctx.Done():
 			return nil, ctx.Err()
-		case <-budget:
-			return nil, context.DeadlineExceeded
 		case <-d.ctx.Done():
 			return nil, ErrSessionClosed
 		}
@@ -1367,7 +1382,6 @@ func netSentinelForCode(code string) error {
 // nil when the trailers carry no error, so a clean stream termination is
 // distinguishable from a server-reported failure. The trailers are only
 // populated once the corresponding response body has been read to EOF.
-//
 func errorFromTrailer(trailer http.Header) Error {
 	code := trailer.Get(dialErrorCodeTrailer)
 	message := strings.TrimSpace(trailer.Get(dialErrorMessageTrailer))
