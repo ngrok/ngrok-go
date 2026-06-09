@@ -628,125 +628,135 @@ func TestReadControlEOFSurfacesAsServerErr(t *testing.T) {
 	waitForChan(t, done, time.Second, "readControl done")
 }
 
-func TestDialResponseErrorMapping(t *testing.T) {
-	addr := dialAddr{addr: "x.private:80", host: "x.private", port: 80}
-
+func TestErrorFromTrailer(t *testing.T) {
 	cases := []struct {
 		name      string
-		status    int
-		errorCode string
-		body      string
-		assert    func(*testing.T, error)
+		code      string
+		message   string
+		wantNil   bool
+		wantCode  string
+		wantMsg   string // substring expected in Error()
+		wantRefus bool   // expect syscall.ECONNREFUSED to bubble
 	}{
 		{
-			name:      "404 maps to DNSError IsNotFound",
-			status:    http.StatusNotFound,
-			errorCode: "ERR_NGROK_706",
-			body:      "endpoint not found",
-			assert: func(t *testing.T, err error) {
-				var dnsErr *net.DNSError
-				if !errors.As(err, &dnsErr) {
-					t.Fatalf("error %T does not wrap *net.DNSError", err)
-				}
-				if !dnsErr.IsNotFound || dnsErr.Name != "x.private" {
-					t.Fatalf("DNSError = %+v", dnsErr)
-				}
-
-				var se *ServerError
-				if !errors.As(err, &se) {
-					t.Fatalf("error %T does not wrap *ServerError", err)
-				}
-				if se.Code != "ERR_NGROK_706" || se.Message != "endpoint not found" || se.Status != http.StatusNotFound {
-					t.Fatalf("ServerError = %+v", se)
-				}
-			},
+			name:      "unauthorized maps to ECONNREFUSED",
+			code:      errCodeUnauthorized,
+			message:   "unauthorized",
+			wantCode:  errCodeUnauthorized,
+			wantMsg:   "unauthorized",
+			wantRefus: true,
 		},
 		{
-			name:   "503 maps to ECONNREFUSED",
-			status: http.StatusServiceUnavailable,
-			body:   "no endpoint available",
-			assert: func(t *testing.T, err error) {
-				if !errors.Is(err, syscall.ECONNREFUSED) {
-					t.Fatalf("error = %v, want ECONNREFUSED", err)
-				}
-			},
+			name:      "session draining maps to ECONNREFUSED",
+			code:      errCodeSessionDraining,
+			message:   "session draining",
+			wantCode:  errCodeSessionDraining,
+			wantMsg:   "session draining",
+			wantRefus: true,
 		},
 		{
-			name:   "401 maps to ECONNREFUSED",
-			status: http.StatusUnauthorized,
-			body:   "missing bearer token",
-			assert: func(t *testing.T, err error) {
-				if !errors.Is(err, syscall.ECONNREFUSED) {
-					t.Fatalf("error = %v, want ECONNREFUSED", err)
-				}
-			},
+			name:     "unmapped code carries no sentinel",
+			code:     "ERR_NGROK_9999",
+			message:  "some other failure",
+			wantCode: "ERR_NGROK_9999",
+			wantMsg:  "some other failure",
 		},
 		{
-			name:   "403 maps to ECONNREFUSED",
-			status: http.StatusForbidden,
-			body:   "invalid token",
-			assert: func(t *testing.T, err error) {
-				if !errors.Is(err, syscall.ECONNREFUSED) {
-					t.Fatalf("error = %v, want ECONNREFUSED", err)
-				}
-			},
+			name:    "message only",
+			message: "no endpoint available",
+			wantMsg: "no endpoint available",
 		},
 		{
-			name:   "429 maps to ECONNREFUSED",
-			status: http.StatusTooManyRequests,
-			body:   "rate limited",
-			assert: func(t *testing.T, err error) {
-				if !errors.Is(err, syscall.ECONNREFUSED) {
-					t.Fatalf("error = %v, want ECONNREFUSED", err)
-				}
-			},
-		},
-		{
-			name:   "500 has no sentinel",
-			status: http.StatusInternalServerError,
-			body:   "internal error",
-			assert: func(t *testing.T, err error) {
-				var se *ServerError
-				if !errors.As(err, &se) {
-					t.Fatalf("error %T does not wrap *ServerError", err)
-				}
-				if se.Message != "internal error" || se.Status != http.StatusInternalServerError {
-					t.Fatalf("ServerError = %+v", se)
-				}
-				var dnsErr *net.DNSError
-				if errors.As(err, &dnsErr) {
-					t.Fatalf("unexpected DNSError: %+v", dnsErr)
-				}
-				if errors.Is(err, syscall.ECONNREFUSED) {
-					t.Fatal("unexpected ECONNREFUSED")
-				}
-			},
+			name:    "empty trailers are not an error",
+			wantNil: true,
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			resp := &http.Response{
-				StatusCode: tc.status,
-				Header:     http.Header{},
+			trailer := http.Header{}
+			if tc.code != "" {
+				trailer.Set(dialErrorCodeTrailer, tc.code)
 			}
-			if tc.errorCode != "" {
-				resp.Header.Set(dialErrorCodeHeader, tc.errorCode)
+			if tc.message != "" {
+				trailer.Set(dialErrorMessageTrailer, tc.message)
 			}
-			err := dialResponseError(resp, addr, tc.body)
+
+			err := errorFromTrailer(trailer)
+			if tc.wantNil {
+				if err != nil {
+					t.Fatalf("errorFromTrailer = %v, want nil", err)
+				}
+				return
+			}
 			if err == nil {
-				t.Fatal("dialResponseError returned nil")
+				t.Fatal("errorFromTrailer returned nil")
 			}
-			var op *net.OpError
-			if !errors.As(err, &op) {
-				t.Fatalf("error %T does not wrap *net.OpError", err)
+			if err.Code() != tc.wantCode {
+				t.Fatalf("Code() = %q, want %q", err.Code(), tc.wantCode)
 			}
-			if op.Op != "dial" || op.Net != "tcp" {
-				t.Fatalf("OpError = %+v", op)
+			if !strings.Contains(err.Error(), tc.wantMsg) {
+				t.Fatalf("Error() = %q, want substring %q", err.Error(), tc.wantMsg)
 			}
-			tc.assert(t, err)
+			// The rehydrated error must be extractable via the public
+			// Error interface using errors.As.
+			var nerr Error
+			if !errors.As(err, &nerr) {
+				t.Fatalf("error %T not assignable to privatedial.Error", err)
+			}
+			if tc.wantCode != "" && !strings.Contains(err.Error(), ngrokErrorsURL) {
+				t.Fatalf("Error() = %q, want docs URL when a code is present", err.Error())
+			}
+			if gotRefus := errors.Is(err, syscall.ECONNREFUSED); gotRefus != tc.wantRefus {
+				t.Fatalf("errors.Is(ECONNREFUSED) = %v, want %v", gotRefus, tc.wantRefus)
+			}
 		})
 	}
+}
+
+// TestDialConnReadSurfacesTrailerError proves a dialConn surfaces a
+// server-reported trailer error in place of io.EOF, while a clean stream
+// termination still surfaces as io.EOF.
+func TestDialConnReadSurfacesTrailerError(t *testing.T) {
+	t.Run("trailer error preempts EOF", func(t *testing.T) {
+		addr := dialAddr{addr: "x.private:80", host: "x.private", port: 80}
+		resp := &http.Response{Trailer: http.Header{}}
+		resp.Trailer.Set(dialErrorCodeTrailer, errCodeSessionDraining)
+		resp.Trailer.Set(dialErrorMessageTrailer, "session draining")
+		c := &dialConn{remoteAddr: addr, resp: resp, respBody: io.NopCloser(strings.NewReader(""))}
+
+		_, err := c.Read(make([]byte, 8))
+		if errors.Is(err, io.EOF) {
+			t.Fatalf("Read returned io.EOF, want trailer error")
+		}
+
+		// The dial failure must surface as a *net.OpError wrapping the
+		// ngrok Error and the net sentinel, just like the old path.
+		var op *net.OpError
+		if !errors.As(err, &op) {
+			t.Fatalf("error %T does not wrap *net.OpError", err)
+		}
+		if op.Op != "dial" || op.Net != "tcp" {
+			t.Fatalf("OpError = %+v", op)
+		}
+		var nerr Error
+		if !errors.As(err, &nerr) {
+			t.Fatalf("error %T not assignable to privatedial.Error", err)
+		}
+		if nerr.Code() != errCodeSessionDraining {
+			t.Fatalf("Code() = %q", nerr.Code())
+		}
+		if !errors.Is(err, syscall.ECONNREFUSED) {
+			t.Fatalf("want ECONNREFUSED to bubble, got %v", err)
+		}
+	})
+
+	t.Run("clean EOF without trailer", func(t *testing.T) {
+		c := &dialConn{resp: &http.Response{Trailer: http.Header{}}, respBody: io.NopCloser(strings.NewReader(""))}
+		if _, err := c.Read(make([]byte, 8)); !errors.Is(err, io.EOF) {
+			t.Fatalf("Read = %v, want io.EOF", err)
+		}
+	})
 }
 
 type manualClock struct {

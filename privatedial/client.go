@@ -489,6 +489,13 @@ func (c *Client) openConn(ctx context.Context, p Protocol) (*sessionConn, error)
 	ack := new(pbpd.SessionAck)
 	if err := protodelimUnmarshaler.UnmarshalFrom(respBody, ack); err != nil {
 		_ = h.close()
+		// The server can reject a session by committing to a 200 and then
+		// reporting the failure via trailers instead of sending a
+		// SessionAck. Because this read is synchronous, that error surfaces
+		// straight out of OpenSession rather than later on ServerErrCh.
+		if rerr := errorFromTrailer(resp.Trailer); rerr != nil {
+			return nil, rerr
+		}
 		return nil, fmt.Errorf("read SessionAck: %w", err)
 	}
 
@@ -499,6 +506,7 @@ func (c *Client) openConn(ctx context.Context, p Protocol) (*sessionConn, error)
 	h.pingInterval = ack.GetPingInterval().AsDuration()
 	h.dialURL = dialURL
 	h.authToken = c.opts.AuthToken
+	h.controlResp = resp
 	h.controlRespBody = respBody
 	h.sendCh = make(chan *pbpd.ControlFrame)
 	h.sendDone = make(chan struct{})
@@ -739,16 +747,16 @@ func (s *Session) ServerErrCh() <-chan error { return s.serverErrCh }
 //
 // The returned net.Conn is a bidirectional byte stream.
 //
-// Server-side dial failures are translated to standard net errors so
-// callers can use errors.Is/As against the usual sentinels:
-//   - "endpoint not found" returns a *net.OpError wrapping
-//     *net.DNSError (with IsNotFound: true) — analogous to a DNS
-//     lookup miss.
-//   - "no endpoint available" / "session draining" returns a
-//     *net.OpError wrapping syscall.ECONNREFUSED — analogous to a
-//     refused TCP connect.
-//   - other non-200 responses return a generic *net.OpError with the
-//     server's error body as the wrapped Err.
+// The server commits to the stream before it knows the dial outcome, so a
+// server-side dial failure is reported via HTTP trailers and surfaces on the
+// first Read of the returned conn (in place of io.EOF) rather than from
+// DialContext itself. That error is a *net.OpError wrapping a
+// privatedial.Error, and — for error codes with a net analogue — also wrapping
+// a standard sentinel so callers can branch with errors.Is/As as before:
+//   - an unauthorized or "session draining" rejection wraps
+//     syscall.ECONNREFUSED — analogous to a refused TCP connect.
+//   - other codes carry no sentinel; recover the ngrok code with
+//     errors.As(err, &nerr) where nerr is a privatedial.Error.
 func (s *Session) DialContext(ctx context.Context, network string, addr string) (net.Conn, error) {
 	if network != "tcp" {
 		// we only support tcp endpoints
@@ -1077,6 +1085,7 @@ type sessionConn struct {
 	dialURL   *url.URL
 	authToken string
 
+	controlResp     *http.Response
 	controlRespBody *readCloseByteReader
 	controlReqBody  *io.PipeWriter
 	controlCancel   context.CancelFunc
@@ -1179,95 +1188,120 @@ func (h *sessionConn) dial(ctx context.Context, addr dialAddr) (net.Conn, error)
 		_ = resp.Body.Close()
 		_ = reqWriter.Close()
 		reqCancel()
-		return nil, dialResponseError(resp, addr, string(snippet))
+		return nil, &net.OpError{
+			Op:   "dial",
+			Net:  addr.Network(),
+			Addr: addr,
+			Err:  fmt.Errorf("private-dial /dial status %d: %s", resp.StatusCode, strings.TrimSpace(string(snippet))),
+		}
 	}
 
 	return &dialConn{
 		remoteAddr: addr,
 		reqBody:    reqWriter,
+		resp:       resp,
 		respBody:   resp.Body,
 		reqCancel:  reqCancel,
 	}, nil
 }
 
-const dialErrorCodeHeader = "Ngrok-Error-Code"
+// The HTTP trailer names a private-dial server uses to report a structured
+// ngrok error when a /dial or /session stream terminates. Because they are
+// trailers, they only become readable once the response body reaches EOF.
+const (
+	dialErrorCodeTrailer    = "Ngrok-Dial-Error-Code"
+	dialErrorMessageTrailer = "Ngrok-Dial-Error-Message"
+)
 
-// dialResponseError translates a non-200 /dial response into a
-// *net.OpError that wraps a *ServerError carrying the structured ngrok
-// error code (when the server sent one). The ServerError's Unwrap
-// chain points at a familiar net sentinel — *net.DNSError for "not
-// found" / 404, syscall.ECONNREFUSED for "no endpoint" / 503, etc. —
-// so callers can use either errors.As(&serverErr) for the ngrok code
-// or errors.Is(err, syscall.ECONNREFUSED) / errors.As(&dnsErr) for
-// generic "couldn't connect" handling.
-func dialResponseError(resp *http.Response, addr dialAddr, body string) error {
-	body = strings.TrimSpace(body)
-	code := resp.Header.Get(dialErrorCodeHeader)
-
-	var sentinel error
-	switch resp.StatusCode {
-	case http.StatusNotFound:
-		sentinel = &net.DNSError{Err: "no such host", Name: addr.host, IsNotFound: true}
-	case http.StatusServiceUnavailable:
-		sentinel = &os.SyscallError{Syscall: "connect", Err: syscall.ECONNREFUSED}
-	case http.StatusUnauthorized, http.StatusForbidden, http.StatusTooManyRequests:
-		// Auth/quota/rate-limit rejections aren't routing failures, but
-		// from the caller's POV "I tried to dial and the server said no"
-		// behaves like ECONNREFUSED — a real connect that was refused.
-		sentinel = &os.SyscallError{Syscall: "connect", Err: syscall.ECONNREFUSED}
-	}
-
-	server := &ServerError{
-		Code:    code,
-		Message: body,
-		Status:  resp.StatusCode,
-		wrapped: sentinel,
-	}
-	return &net.OpError{Op: "dial", Net: addr.Network(), Addr: addr, Err: server}
+// Error is the structured error a private-dial server reports via the
+// dial/session HTTP trailers. It carries the ngrok error code so callers can
+// branch on it; all ngrok error codes are documented at
+// https://ngrok.com/docs/errors.
+//
+// Extract it from any error returned by this package with errors.As:
+//
+//	var nerr privatedial.Error
+//	if errors.As(err, &nerr) {
+//		fmt.Printf("%s: %s\n", nerr.Code(), nerr)
+//	}
+type Error interface {
+	error
+	// Code returns the prefixed ngrok error code (e.g. "ERR_NGROK_706").
+	// It is empty if the server did not send one.
+	Code() string
 }
 
-// ServerError carries the structured error a private-dial server returned
-// on a non-200 /dial response. It is wrapped inside *net.OpError so
-// callers who only care about the broad failure category can use
-// errors.Is / errors.As against the standard net sentinels (e.g.
-// *net.DNSError, syscall.ECONNREFUSED). Callers that want the ngrok
-// error code or the server's human-readable message can extract it via
-// errors.As(err, &serverErr).
-type ServerError struct {
-	// Code is the prefixed ngrok error code (e.g. "ERR_NGROK_706")
-	// extracted from the Ngrok-Error-Code response header. May be
-	// empty if the server did not emit one.
-	Code string
+const ngrokErrorsURL = "https://ngrok.com/docs/errors"
 
-	// Message is the server-provided human-readable description.
-	Message string
-
-	// Status is the HTTP status code of the response.
-	Status int
-
+// serverError is the concrete Error rehydrated from the dial/session trailers.
+// It optionally wraps a net-style sentinel (chosen from its ngrok error code by
+// netSentinelForCode) so callers who only care about the broad failure category
+// can match it with errors.Is/errors.As against the standard net errors — e.g.
+// errors.As(&net.DNSError{}) or errors.Is(err, syscall.ECONNREFUSED) — while
+// errors.As(&privatedial.Error) still recovers the ngrok code.
+type serverError struct {
+	code    string
+	message string
 	// wrapped is the net-style sentinel (*net.DNSError,
-	// *os.SyscallError{ECONNREFUSED}, etc.) used for errors.Is /
-	// errors.As composition. It is purely a type-match anchor; its
-	// own Error() text is not included in ServerError.Error().
+	// *os.SyscallError{ECONNREFUSED}, ...) this error code maps to, or nil
+	// when the code has no net analogue. It is purely a type/Is match anchor;
+	// its own text is not part of Error().
 	wrapped error
 }
 
-func (e *ServerError) Error() string {
-	switch {
-	case e.Code != "" && e.Message != "":
-		return fmt.Sprintf("%s: %s", e.Code, e.Message)
-	case e.Code != "":
-		return e.Code
-	case e.Message != "":
-		return e.Message
+func (e *serverError) Code() string { return e.code }
+
+func (e *serverError) Error() string {
+	msg := e.message
+	if e.code != "" {
+		if msg == "" {
+			msg = e.code
+		}
+		return fmt.Sprintf("%s\n\n%s/%s", msg, ngrokErrorsURL, strings.ToLower(e.code))
+	}
+	return msg
+}
+
+// Unwrap returns the net-style sentinel chosen for this error's ngrok code, so
+// errors.Is/errors.As walks down to it.
+func (e *serverError) Unwrap() error { return e.wrapped }
+
+// Private-dial ngrok error codes that carry a net-level analogue. The server
+// reports exactly these two on a dial/session trailer, and both behave like a
+// refused connect from the caller's POV — mirroring the old status-based
+// mapping (an unauthorized 401/403 or a "session draining" 503 -> ECONNREFUSED).
+const (
+	errCodeUnauthorized    = "ERR_NGROK_709"
+	errCodeSessionDraining = "ERR_NGROK_742"
+)
+
+// netSentinelForCode maps a private-dial ngrok error code to the net-style
+// sentinel that best matches it. The two codes with a net analogue both behave
+// like a refused connect; any other code has no sentinel, leaving the failure
+// to surface only as an Error.
+func netSentinelForCode(code string) error {
+	switch code {
+	case errCodeUnauthorized, errCodeSessionDraining:
+		return &os.SyscallError{Syscall: "connect", Err: syscall.ECONNREFUSED}
 	default:
-		return fmt.Sprintf("private-dial server returned %d", e.Status)
+		return nil
 	}
 }
 
-// Unwrap returns the standard-library sentinel error chosen for this
-// ServerError's status code, so errors.Is / errors.As walks down to it.
-func (e *ServerError) Unwrap() error { return e.wrapped }
+// errorFromTrailer rehydrates the structured ngrok error a private-dial server
+// reported via the HTTP trailers of a /dial or /session response. It returns
+// nil when the trailers carry no error, so a clean stream termination is
+// distinguishable from a server-reported failure. The trailers are only
+// populated once the corresponding response body has been read to EOF.
+//
+func errorFromTrailer(trailer http.Header) Error {
+	code := trailer.Get(dialErrorCodeTrailer)
+	message := strings.TrimSpace(trailer.Get(dialErrorMessageTrailer))
+	if code == "" && message == "" {
+		return nil
+	}
+	return &serverError{code: code, message: message, wrapped: netSentinelForCode(code)}
+}
 
 func (h *sessionConn) markClosed() {
 	h.lifeMu.Lock()
@@ -1424,6 +1458,17 @@ func (h *sessionConn) readControl() {
 		frame := new(pbpd.ControlFrame)
 		if err := protodelimUnmarshaler.UnmarshalFrom(h.controlRespBody, frame); err != nil {
 			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+				// The control stream ended. Its trailers are now readable;
+				// a server-reported error preempts the plain io.EOF the
+				// deferred send would otherwise forward.
+				if h.controlResp != nil {
+					if rerr := errorFromTrailer(h.controlResp.Trailer); rerr != nil {
+						select {
+						case h.serverErrCh <- rerr:
+						default:
+						}
+					}
+				}
 				return
 			}
 			select {
@@ -1457,11 +1502,16 @@ func (h *sessionConn) readControl() {
 
 // dialConn is the net.Conn returned from Session.DialContext. Read pulls
 // from the response body; Write pushes into the request body. Close terminates
-// both sides. Dial-level failures never reach a dialConn — they're returned
-// from DialContext directly as *net.OpError. EOF on Read surfaces normally as
-// io.EOF.
+// both sides.
+//
+// Because the server commits to a 200 before it knows whether the dial will
+// succeed, dial failures are reported via HTTP trailers that only become
+// readable once the response body reaches EOF. Read therefore inspects the
+// trailers on EOF: a server-reported failure surfaces as a privatedial.Error
+// in place of io.EOF, while a clean stream termination surfaces as io.EOF.
 type dialConn struct {
 	reqBody   *io.PipeWriter
+	resp      *http.Response
 	respBody  io.ReadCloser
 	reqCancel context.CancelFunc
 
@@ -1470,7 +1520,19 @@ type dialConn struct {
 	closeOnce sync.Once
 }
 
-func (c *dialConn) Read(p []byte) (int, error)  { return c.respBody.Read(p) }
+func (c *dialConn) Read(p []byte) (int, error) {
+	n, err := c.respBody.Read(p)
+	if errors.Is(err, io.EOF) {
+		if rerr := errorFromTrailer(c.resp.Trailer); rerr != nil {
+			// Wrap as *net.OpError so the failure category (the net
+			// sentinel netSentinelForCode chose) bubbles via errors.Is /
+			// errors.As just as the old status-based dial error did.
+			return n, &net.OpError{Op: "dial", Net: c.remoteAddr.Network(), Addr: c.remoteAddr, Err: rerr}
+		}
+	}
+	return n, err
+}
+
 func (c *dialConn) Write(p []byte) (int, error) { return c.reqBody.Write(p) }
 
 // CloseWrite signals end-of-request to the server by closing the request
