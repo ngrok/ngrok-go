@@ -39,9 +39,7 @@ import (
 // resetSticky clears the process-global protocol decision so each test
 // starts from ProtocolAuto.
 func resetSticky() {
-	stickyMu.Lock()
-	stickyProtocol = ProtocolAuto
-	stickyMu.Unlock()
+	stickyProtocol.Store(nil)
 }
 
 func TestRaceQUICWins(t *testing.T) {
@@ -59,7 +57,7 @@ func TestRaceQUICWins(t *testing.T) {
 	})
 	defer sess.Close()
 
-	if got := getStickyProtocol(); got != ProtocolQUIC {
+	if got := stickyProtocol.Load(); got == nil || *got != ProtocolQUIC {
 		t.Fatalf("expected QUIC to win the race, sticky protocol = %v", got)
 	}
 	// QUIC connects on localhost well inside the 250ms head start, so the
@@ -90,7 +88,7 @@ func TestRaceFallsBackToH2(t *testing.T) {
 	})
 	defer sess.Close()
 
-	if got := getStickyProtocol(); got != ProtocolH2 {
+	if got := stickyProtocol.Load(); got == nil || *got != ProtocolH2 {
 		t.Fatalf("expected HTTP/2 to win when QUIC is unreachable, sticky protocol = %v", got)
 	}
 	if h2Hits.Load() == 0 {
@@ -120,7 +118,7 @@ func TestStickyProtocolReused(t *testing.T) {
 	// First session races and settles on QUIC.
 	sess1 := mustOpenSession(t, opts)
 	defer sess1.Close()
-	if got := getStickyProtocol(); got != ProtocolQUIC {
+	if got := stickyProtocol.Load(); got == nil || *got != ProtocolQUIC {
 		t.Fatalf("first session should settle on QUIC, sticky = %v", got)
 	}
 
@@ -165,8 +163,8 @@ func TestForceProtocol(t *testing.T) {
 			t.Fatal("ForceProtocol=H2 should record a non-empty RemoteAddr")
 		}
 		// Forcing a protocol bypasses the race and must not write sticky state.
-		if got := getStickyProtocol(); got != ProtocolAuto {
-			t.Fatalf("ForceProtocol should not set sticky state, got %v", got)
+		if got := stickyProtocol.Load(); got != nil {
+			t.Fatalf("ForceProtocol should not set sticky state, got %v", *got)
 		}
 	})
 
