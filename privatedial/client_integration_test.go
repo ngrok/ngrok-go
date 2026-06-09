@@ -160,6 +160,10 @@ func TestForceProtocol(t *testing.T) {
 		if quicHits.Load() != 0 {
 			t.Fatalf("ForceProtocol=H2 must not touch QUIC, got %d hits", quicHits.Load())
 		}
+		// The H2 transport records the server IP it dialed.
+		if sess.RemoteAddr() == "" {
+			t.Fatal("ForceProtocol=H2 should record a non-empty RemoteAddr")
+		}
 		// Forcing a protocol bypasses the race and must not write sticky state.
 		if got := getStickyProtocol(); got != ProtocolAuto {
 			t.Fatalf("ForceProtocol should not set sticky state, got %v", got)
@@ -186,6 +190,10 @@ func TestForceProtocol(t *testing.T) {
 		}
 		if h2Hits.Load() != 0 {
 			t.Fatalf("ForceProtocol=QUIC must not touch HTTP/2, got %d hits", h2Hits.Load())
+		}
+		// The H3 transport records the server IP it dialed.
+		if sess.RemoteAddr() == "" {
+			t.Fatal("ForceProtocol=QUIC should record a non-empty RemoteAddr")
 		}
 	})
 }

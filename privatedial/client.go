@@ -19,6 +19,7 @@ import (
 	mathrand "math/rand/v2"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"os"
 	"strconv"
@@ -405,14 +406,16 @@ func (c *Client) openConn(ctx context.Context, p Protocol) (*sessionConn, error)
 	var (
 		transport  roundTripCloser
 		serverAddr string
+		remoteAddr string
+		rec        *connAddrRecorder
 		err        error
 	)
 	switch p {
 	case ProtocolQUIC:
-		transport = c.newH3Transport()
+		transport, rec = c.newH3Transport()
 		serverAddr = c.opts.QUICServerAddr
 	case ProtocolH2:
-		transport, err = c.newH2Transport(ctx)
+		transport, remoteAddr, err = c.newH2Transport(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -422,9 +425,10 @@ func (c *Client) openConn(ctx context.Context, p Protocol) (*sessionConn, error)
 	}
 
 	h := &sessionConn{
-		proto:     p,
-		transport: transport,
-		stopCh:    make(chan struct{}),
+		proto:      p,
+		transport:  transport,
+		remoteAddr: remoteAddr,
+		stopCh:     make(chan struct{}),
 	}
 
 	controlURL := &url.URL{Scheme: "https", Host: serverAddr, Path: "/session"}
@@ -501,6 +505,9 @@ func (c *Client) openConn(ctx context.Context, p Protocol) (*sessionConn, error)
 		return nil, fmt.Errorf("read SessionAck: %w", err)
 	}
 
+	if rec != nil {
+		h.remoteAddr = rec.get()
+	}
 	h.serverID = ack.GetServerId()
 	h.pingInterval = ack.GetPingInterval().AsDuration()
 	h.dialURL = dialURL
@@ -535,15 +542,36 @@ func (c *Client) tlsConfigFor(serverAddr string, nextProtos ...string) *tls.Conf
 	return tlsCfg
 }
 
+// connAddrRecorder captures the remote address of a transport connection as
+// it is dialed. The dial happens during RoundTrip, but the mutex keeps tests
+// race-detector-clean when the address is read after the handshake.
+type connAddrRecorder struct {
+	mu   sync.Mutex
+	addr string
+}
+
+func (r *connAddrRecorder) set(addr string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.addr = addr
+}
+
+func (r *connAddrRecorder) get() string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.addr
+}
+
 // newH2Transport builds an owned HTTP/2 ClientConn for one private-dial
 // control stream and its /dial streams. This avoids http2.Transport pooling
 // across logical sessions.
-func (c *Client) newH2Transport(ctx context.Context) (roundTripCloser, error) {
+func (c *Client) newH2Transport(ctx context.Context) (roundTripCloser, string, error) {
 	tlsConn, err := (&tls.Dialer{Config: c.tlsConfigFor(c.opts.H2ServerAddr, "h2")}).
 		DialContext(ctx, "tcp", c.opts.H2ServerAddr)
 	if err != nil {
-		return nil, fmt.Errorf("private-dial: tls dial: %w", err)
+		return nil, "", fmt.Errorf("private-dial: tls dial: %w", err)
 	}
+	remoteAddr := tlsConn.RemoteAddr().String()
 	transport := &http2.Transport{
 		ReadIdleTimeout: 30 * time.Second,
 		PingTimeout:     15 * time.Second,
@@ -551,21 +579,63 @@ func (c *Client) newH2Transport(ctx context.Context) (roundTripCloser, error) {
 	cc, err := transport.NewClientConn(tlsConn)
 	if err != nil {
 		_ = tlsConn.Close()
-		return nil, fmt.Errorf("private-dial: h2 client conn: %w", err)
+		return nil, "", fmt.Errorf("private-dial: h2 client conn: %w", err)
 	}
-	return &h2ClientConnTransport{cc: cc}, nil
+	return &h2ClientConnTransport{cc: cc}, remoteAddr, nil
 }
 
-// newH3Transport builds the HTTP/3 (QUIC) transport. KeepAlivePeriod is the
-// QUIC analogue of the h2 keepalive PINGs: it keeps the single multiplexing
-// connection alive and surfaces a dead peer to stuck stream writers.
-func (c *Client) newH3Transport() roundTripCloser {
-	return &http3.Transport{
+// newH3Transport builds the HTTP/3 (QUIC) transport and records the server
+// address the QUIC connection lands on. KeepAlivePeriod is the QUIC analogue
+// of the h2 keepalive PINGs: it keeps the single multiplexing connection alive
+// and surfaces a dead peer to stuck stream writers.
+func (c *Client) newH3Transport() (roundTripCloser, *connAddrRecorder) {
+	rec := &connAddrRecorder{}
+	t := &http3.Transport{
 		TLSClientConfig: c.tlsConfigFor(c.opts.QUICServerAddr, "h3"),
 		QUICConfig: &quic.Config{
 			KeepAlivePeriod: 30 * time.Second,
 		},
 	}
+	t.Dial = func(ctx context.Context, addr string, tlsCfg *tls.Config, cfg *quic.Config) (*quic.Conn, error) {
+		udpAddr, err := resolveUDPAddr(ctx, addr)
+		if err != nil {
+			return nil, err
+		}
+		pc, err := net.ListenUDP("udp", nil)
+		if err != nil {
+			return nil, err
+		}
+		conn, err := quic.DialEarly(ctx, pc, udpAddr, tlsCfg, cfg)
+		if err != nil {
+			_ = pc.Close()
+			return nil, err
+		}
+		rec.set(conn.RemoteAddr().String())
+		context.AfterFunc(conn.Context(), func() { _ = pc.Close() })
+		return conn, nil
+	}
+	return t, rec
+}
+
+// resolveUDPAddr resolves a "host:port" to a single *net.UDPAddr, honoring ctx
+// for cancellation. It mirrors the resolution the default http3 dial performs.
+func resolveUDPAddr(ctx context.Context, addr string) (*net.UDPAddr, error) {
+	host, portStr, err := net.SplitHostPort(addr)
+	if err != nil {
+		return nil, err
+	}
+	port, err := net.LookupPort("udp", portStr)
+	if err != nil {
+		return nil, err
+	}
+	ips, err := net.DefaultResolver.LookupNetIP(ctx, "ip", host)
+	if err != nil {
+		return nil, err
+	}
+	if len(ips) == 0 {
+		return nil, fmt.Errorf("no address for %s", host)
+	}
+	return net.UDPAddrFromAddrPort(netip.AddrPortFrom(ips[0].Unmap(), uint16(port))), nil
 }
 
 // authFatalError marks /session rejections that should not be retried.
@@ -626,6 +696,18 @@ func (s *Session) ServerID() string {
 // Protocol returns the transport this session settled on — ProtocolQUIC
 // (HTTP/3) or ProtocolH2 (HTTP/2).
 func (s *Session) Protocol() Protocol { return s.proto }
+
+// RemoteAddr returns the server address (host:port) the current underlying
+// transport connection landed on. It returns an empty string if no connection
+// is currently established.
+func (s *Session) RemoteAddr() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.current == nil {
+		return ""
+	}
+	return s.current.remoteAddr
+}
 
 // PingInterval is the cadence at which the server expects to send and receive
 // Ping frames on the current control stream. Zero if no conn is established.
@@ -997,6 +1079,7 @@ type sessionConn struct {
 	serverID     string
 	pingInterval time.Duration
 	proto        Protocol
+	remoteAddr   string
 
 	transport roundTripCloser
 
