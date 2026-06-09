@@ -9,12 +9,15 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"errors"
 	"fmt"
 	"io"
 	"math/big"
 	"net"
 	"net/http"
+	"strings"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
@@ -248,6 +251,139 @@ func TestDialEcho(t *testing.T) {
 			}
 			if string(got) != string(payload) {
 				t.Fatalf("echo mismatch: got %q want %q", got, payload)
+			}
+		})
+	}
+}
+
+// TestDialTrailerError proves an end-to-end dial failure reported via HTTP
+// trailers is rehydrated into a privatedial.Error and surfaced on the first
+// Read of the returned conn (the server commits to a 200 before it knows the
+// dial outcome, so the error can only ride out on the trailers).
+func TestDialTrailerError(t *testing.T) {
+	cert := genTLSCert(t)
+
+	dialErrorHandler := func() http.Handler {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/session", func(w http.ResponseWriter, r *http.Request) {
+			var req pbpd.SessionReq
+			if err := protodelimUnmarshaler.UnmarshalFrom(bufio.NewReader(r.Body), &req); err != nil {
+				http.Error(w, "bad SessionReq", http.StatusBadRequest)
+				return
+			}
+			if _, err := protodelim.MarshalTo(w, &pbpd.SessionAck{ServerId: "trailer-srv"}); err != nil {
+				return
+			}
+			flush(w)
+			<-r.Context().Done()
+		})
+		mux.HandleFunc("/dial", func(w http.ResponseWriter, r *http.Request) {
+			var dreq pbpd.DialReq
+			if err := protodelimUnmarshaler.UnmarshalFrom(bufio.NewReader(r.Body), &dreq); err != nil {
+				http.Error(w, "bad DialReq", http.StatusBadRequest)
+				return
+			}
+			// Commit to a 200, then report the dial failure via trailers
+			// with no body, mirroring an immediate server-side failure.
+			w.Header().Set(http.TrailerPrefix+dialErrorCodeTrailer, errCodeSessionDraining)
+			w.Header().Set(http.TrailerPrefix+dialErrorMessageTrailer, "session draining")
+			w.WriteHeader(http.StatusOK)
+			flush(w)
+		})
+		return mux
+	}
+
+	for _, tc := range []struct {
+		name  string
+		proto Protocol
+	}{
+		{"h2", ProtocolH2},
+		{"quic", ProtocolQUIC},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			resetSticky()
+			sess := mustOpenSession(t, clientOptsForProtocol(t, tc.proto, cert, dialErrorHandler()))
+			defer sess.Close()
+
+			conn := mustDial(t, sess, "foo.private:80")
+			defer conn.Close()
+
+			_, err := io.ReadAll(conn)
+			if err == nil {
+				t.Fatal("Read succeeded, want trailer error")
+			}
+			if errors.Is(err, io.EOF) {
+				t.Fatalf("Read returned io.EOF, want trailer error")
+			}
+			var nerr Error
+			if !errors.As(err, &nerr) {
+				t.Fatalf("error %T not assignable to privatedial.Error", err)
+			}
+			if nerr.Code() != errCodeSessionDraining {
+				t.Fatalf("Code() = %q, want %q", nerr.Code(), errCodeSessionDraining)
+			}
+			if !strings.Contains(nerr.Error(), "session draining") {
+				t.Fatalf("Error() = %q, want to contain message", nerr.Error())
+			}
+			// The code's net sentinel must bubble end-to-end.
+			if !errors.Is(err, syscall.ECONNREFUSED) {
+				t.Fatalf("want ECONNREFUSED to bubble, got %v", err)
+			}
+		})
+	}
+}
+
+// TestSessionTrailerError proves that a session rejected via trailers (a 200
+// with an error trailer and no SessionAck) is rehydrated and returned straight
+// out of OpenSession, since the handshake reads the SessionAck synchronously.
+func TestSessionTrailerError(t *testing.T) {
+	cert := genTLSCert(t)
+
+	sessionErrorHandler := func() http.Handler {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/session", func(w http.ResponseWriter, r *http.Request) {
+			var req pbpd.SessionReq
+			if err := protodelimUnmarshaler.UnmarshalFrom(bufio.NewReader(r.Body), &req); err != nil {
+				http.Error(w, "bad SessionReq", http.StatusBadRequest)
+				return
+			}
+			// Commit to a 200, then reject via trailers without ever
+			// sending a SessionAck.
+			w.Header().Set(http.TrailerPrefix+dialErrorCodeTrailer, "ERR_NGROK_4040")
+			w.Header().Set(http.TrailerPrefix+dialErrorMessageTrailer, "session rejected")
+			w.WriteHeader(http.StatusOK)
+			flush(w)
+		})
+		return mux
+	}
+
+	for _, tc := range []struct {
+		name  string
+		proto Protocol
+	}{
+		{"h2", ProtocolH2},
+		{"quic", ProtocolQUIC},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			resetSticky()
+			opts := clientOptsForProtocol(t, tc.proto, cert, sessionErrorHandler())
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			sess, err := NewClient(opts).OpenSession(ctx)
+			if err == nil {
+				_ = sess.Close()
+				t.Fatal("OpenSession succeeded, want trailer error")
+			}
+			var nerr Error
+			if !errors.As(err, &nerr) {
+				t.Fatalf("error %T not assignable to privatedial.Error: %v", err, err)
+			}
+			if nerr.Code() != "ERR_NGROK_4040" {
+				t.Fatalf("Code() = %q, want ERR_NGROK_4040", nerr.Code())
+			}
+			if !strings.Contains(nerr.Error(), "session rejected") {
+				t.Fatalf("Error() = %q, want to contain message", nerr.Error())
 			}
 		})
 	}
