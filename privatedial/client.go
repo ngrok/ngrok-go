@@ -374,7 +374,20 @@ func (c *Client) race(ctx context.Context) (*Session, error) {
 
 	quicCancel()
 	h2Cancel()
-	return nil, fmt.Errorf("private-dial: both transports failed: quic=%v, h2=%v", quicErr, h2Err)
+	return nil, bothTransportsFailed(quicErr, h2Err)
+}
+
+// bothTransportsFailed combines the per-transport failures from the race into
+// a single error. When both transports failed with the same ngrok error code,
+// the server reported one underlying cause to both attempts, so the result
+// collapses to that error rather than the redundant "quic=X, h2=X" form.
+func bothTransportsFailed(quicErr, h2Err error) error {
+	var qe, he Error
+	if errors.As(quicErr, &qe) && errors.As(h2Err, &he) &&
+		qe.Code() != "" && qe.Code() == he.Code() {
+		return qe
+	}
+	return fmt.Errorf("private-dial: both transports failed: quic=%v, h2=%v", quicErr, h2Err)
 }
 
 // openProtocol builds the transport for p and runs the /session handshake

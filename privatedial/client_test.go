@@ -759,6 +759,40 @@ func TestDialConnReadSurfacesTrailerError(t *testing.T) {
 	})
 }
 
+func TestBothTransportsFailed(t *testing.T) {
+	sameQUIC := &serverError{code: "ERR_NGROK_4040", message: "rejected via quic"}
+	sameH2 := &serverError{code: "ERR_NGROK_4040", message: "rejected via h2"}
+
+	t.Run("same code collapses to one error", func(t *testing.T) {
+		err := bothTransportsFailed(sameQUIC, sameH2)
+		var nerr Error
+		if !errors.As(err, &nerr) {
+			t.Fatalf("error %T not assignable to privatedial.Error", err)
+		}
+		if nerr.Code() != "ERR_NGROK_4040" {
+			t.Fatalf("Code() = %q", nerr.Code())
+		}
+		if strings.Contains(err.Error(), "both transports failed") {
+			t.Fatalf("error should not mention both transports: %q", err.Error())
+		}
+	})
+
+	t.Run("different codes keep both", func(t *testing.T) {
+		other := &serverError{code: "ERR_NGROK_706", message: "not found"}
+		err := bothTransportsFailed(sameQUIC, other)
+		if !strings.Contains(err.Error(), "both transports failed") {
+			t.Fatalf("want combined error, got %q", err.Error())
+		}
+	})
+
+	t.Run("missing codes keep both", func(t *testing.T) {
+		err := bothTransportsFailed(errors.New("quic boom"), errors.New("h2 boom"))
+		if !strings.Contains(err.Error(), "quic=quic boom") || !strings.Contains(err.Error(), "h2=h2 boom") {
+			t.Fatalf("want combined error, got %q", err.Error())
+		}
+	})
+}
+
 type manualClock struct {
 	mu     sync.Mutex
 	now    time.Time
