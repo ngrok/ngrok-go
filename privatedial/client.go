@@ -25,6 +25,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -78,24 +79,7 @@ const (
 // stickyProtocol records the first protocol the race settled on in this
 // process. Once set, OpenSession reuses it for every subsequent session
 // (including reconnects) and skips the happy-eyeballs race entirely.
-var (
-	stickyMu       sync.Mutex
-	stickyProtocol = ProtocolAuto
-)
-
-func setStickyProtocol(p Protocol) {
-	stickyMu.Lock()
-	if stickyProtocol == ProtocolAuto {
-		stickyProtocol = p
-	}
-	stickyMu.Unlock()
-}
-
-func getStickyProtocol() Protocol {
-	stickyMu.Lock()
-	defer stickyMu.Unlock()
-	return stickyProtocol
-}
+var stickyProtocol atomic.Pointer[Protocol]
 
 // roundTripCloser is the subset of transport behavior the session relies on.
 // Holding the transport behind this interface lets a single Session
@@ -265,7 +249,10 @@ func (c *Client) serverNameFor(addr string) string {
 func (c *Client) OpenSession(ctx context.Context) (*Session, error) {
 	proto := c.opts.ForceProtocol
 	if proto == ProtocolAuto {
-		proto = getStickyProtocol()
+		stickyProto := stickyProtocol.Load()
+		if stickyProto != nil {
+			proto = *stickyProto
+		}
 	}
 	switch proto {
 	case ProtocolQUIC, ProtocolH2:
@@ -321,7 +308,7 @@ func (c *Client) race(ctx context.Context) (*Session, error) {
 		quicDone = true
 		if r.err == nil {
 			quicCancel()
-			setStickyProtocol(ProtocolQUIC)
+			stickyProtocol.CompareAndSwap(nil, new(ProtocolQUIC))
 			return r.sess, nil
 		}
 		quicErr = r.err
@@ -352,7 +339,7 @@ func (c *Client) race(ctx context.Context) (*Session, error) {
 				} else {
 					closeLoser(h2Ch, h2Cancel)
 				}
-				setStickyProtocol(ProtocolQUIC)
+				stickyProtocol.CompareAndSwap(nil, new(ProtocolQUIC))
 				return r.sess, nil
 			}
 			quicErr = r.err
@@ -365,7 +352,7 @@ func (c *Client) race(ctx context.Context) (*Session, error) {
 				} else {
 					closeLoser(quicCh, quicCancel)
 				}
-				setStickyProtocol(ProtocolH2)
+				stickyProtocol.CompareAndSwap(nil, new(ProtocolH2))
 				return r.sess, nil
 			}
 			h2Err = r.err
