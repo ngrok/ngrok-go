@@ -784,29 +784,6 @@ func (d *Dialer) RemoteAddr() string {
 	return d.current.remoteAddr
 }
 
-// PingInterval is the cadence at which the server expects to send and receive
-// Ping frames on the current control stream. Zero if no conn is established.
-func (d *Dialer) PingInterval() time.Duration {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	if d.current == nil {
-		return 0
-	}
-	return d.current.pingInterval
-}
-
-// LastRTT returns the most recent round-trip time measured by the client-side
-// ping loop on the current conn. Zero before the first pong arrives, and reset
-// to zero across reconnects.
-func (d *Dialer) LastRTT() time.Duration {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	if d.current == nil {
-		return 0
-	}
-	return d.current.LastRTT()
-}
-
 // Done returns a channel that is closed when the Dialer is permanently done
 // dialing: after Close, or after a fatal session error such as a
 // non-retryable auth failure during reconnect. Err reports why. Transient
@@ -1204,16 +1181,7 @@ type sessionConn struct {
 
 	stopCh chan struct{}
 
-	rttMu   sync.Mutex
-	lastRTT time.Duration
-
 	closeOnce sync.Once
-}
-
-func (h *sessionConn) LastRTT() time.Duration {
-	h.rttMu.Lock()
-	defer h.rttMu.Unlock()
-	return h.lastRTT
 }
 
 func (h *sessionConn) dial(ctx context.Context, addr dialAddr) (net.Conn, error) {
@@ -1501,7 +1469,7 @@ func (h *sessionConn) controlSender() {
 	}
 }
 
-// pingLoop sends a Ping every pingInterval and records RTT when the
+// pingLoop sends a Ping every pingInterval and resolves the token when the
 // matching Pong arrives. It stops on Close.
 //
 // Each tick uses a per-send timeout of pingInterval so a stuck sender
@@ -1551,7 +1519,7 @@ func (h *sessionConn) completePing(token uint64, now time.Time) (time.Duration, 
 
 // readControl pumps ControlFrames from the server until EOF or error.
 // It closes drainCh on PleaseDrain, echoes Pong on inbound Ping (so the
-// server can measure its RTT to us), records client-side RTT on Pong,
+// server can measure its RTT to us), resolves outstanding pings on Pong,
 // and forwards terminal errors to serverErrCh.
 func (h *sessionConn) readControl() {
 	defer func() {
@@ -1597,11 +1565,9 @@ func (h *sessionConn) readControl() {
 				Frame: &pbpd.ControlFrame_Pong{Pong: &pbpd.Pong{Token: f.Ping.GetToken()}},
 			})
 		case *pbpd.ControlFrame_Pong:
-			if rtt, ok := h.completePing(f.Pong.GetToken(), time.Now()); ok {
-				h.rttMu.Lock()
-				h.lastRTT = rtt
-				h.rttMu.Unlock()
-			}
+			// completePing keeps the outstanding-ping map from growing; the
+			// measured RTT is not currently surfaced anywhere.
+			_, _ = h.completePing(f.Pong.GetToken(), time.Now())
 		}
 	}
 }
