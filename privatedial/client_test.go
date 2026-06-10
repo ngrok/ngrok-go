@@ -925,3 +925,25 @@ var _ = func() bool {
 	err := &net.OpError{Err: &os.SyscallError{Syscall: "connect", Err: syscall.ECONNREFUSED}}
 	return errors.Is(err, syscall.ECONNREFUSED)
 }()
+
+func TestConnectRequiresServerAddr(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		cfg  Config
+		want string
+	}{
+		{"forced h2", Config{ForceProtocol: ProtocolH2}, "H2ServerAddr"},
+		{"forced quic", Config{ForceProtocol: ProtocolQUIC}, "QUICServerAddr"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			d := New(tc.cfg)
+			defer func() { _ = d.Close() }()
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			err := d.Connect(ctx)
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("Connect = %v, want error mentioning %s", err, tc.want)
+			}
+		})
+	}
+}
