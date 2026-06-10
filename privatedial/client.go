@@ -193,8 +193,9 @@ type ClientOpts struct {
 	// API Key, it'll be a proper token eventually.
 	AuthToken string
 
-	// TLSConfig overrides the default TLS config. MinVersion and NextProtos
-	// are forced to TLS 1.3 / h2 respectively regardless.
+	// TLSConfig overrides the default TLS config. MinVersion defaults to
+	// TLS 1.3 when unset, and NextProtos is always set to match the
+	// negotiated transport (h2 or h3).
 	TLSConfig *tls.Config
 
 	// ClientVersion is metadata about this client.
