@@ -40,13 +40,13 @@ func sequentialOpener() func(context.Context) (*sessionConn, error) {
 	}
 }
 
-func newTestSession(t *testing.T, openFn func(context.Context) (*sessionConn, error)) *Session {
+func newTestSession(t *testing.T, openFn func(context.Context) (*sessionConn, error)) *Dialer {
 	t.Helper()
 	s, _ := newTestSessionWithClock(t, openFn)
 	return s
 }
 
-func newTestSessionWithClock(t *testing.T, openFn func(context.Context) (*sessionConn, error)) (*Session, *manualClock) {
+func newTestSessionWithClock(t *testing.T, openFn func(context.Context) (*sessionConn, error)) (*Dialer, *manualClock) {
 	t.Helper()
 	first, err := openFn(context.Background())
 	if err != nil {
@@ -54,11 +54,12 @@ func newTestSessionWithClock(t *testing.T, openFn func(context.Context) (*sessio
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	clk := newManualClock(time.Now())
-	s := &Session{
+	s := &Dialer{
 		ctx:         ctx,
 		cancel:      cancel,
 		proto:       ProtocolH2,
 		ready:       make(chan struct{}),
+		connected:   true,
 		current:     first,
 		openFn:      openFn,
 		clock:       clk,
@@ -344,11 +345,12 @@ func TestDialSkipsDrainedCurrent(t *testing.T) {
 		return first, nil
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	s := &Session{
+	s := &Dialer{
 		ctx:         ctx,
 		cancel:      cancel,
 		proto:       ProtocolH2,
 		ready:       make(chan struct{}),
+		connected:   true,
 		current:     first,
 		openFn:      openFn,
 		clock:       clk,
@@ -434,7 +436,7 @@ func TestSessionConnDialRefusesAfterClose(t *testing.T) {
 
 func TestParkDrainingNoOpAfterClose(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	s := &Session{
+	s := &Dialer{
 		ctx:         ctx,
 		cancel:      cancel,
 		ready:       make(chan struct{}),
@@ -867,10 +869,10 @@ func (t *manualTimer) Stop() bool {
 	return true
 }
 
-func (s *Session) snapshotCurrentForTest() *sessionConn {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.current
+func (d *Dialer) snapshotCurrentForTest() *sessionConn {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.current
 }
 
 func idFor(i int32) string {
