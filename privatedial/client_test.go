@@ -62,7 +62,6 @@ func newTestSessionWithClock(t *testing.T, openFn func(context.Context) (*sessio
 		current:     first,
 		openFn:      openFn,
 		clock:       clk,
-		drainCh:     make(chan struct{}),
 		serverErrCh: make(chan error, 1),
 	}
 	go s.supervise()
@@ -354,7 +353,6 @@ func TestDialSkipsDrainedCurrent(t *testing.T) {
 		openFn:      openFn,
 		clock:       clk,
 		dialWait:    200 * time.Millisecond,
-		drainCh:     make(chan struct{}),
 		serverErrCh: make(chan error, 1),
 	}
 	t.Cleanup(func() { _ = s.Close() })
@@ -442,7 +440,6 @@ func TestParkDrainingNoOpAfterClose(t *testing.T) {
 		ready:       make(chan struct{}),
 		dialWait:    50 * time.Millisecond,
 		openFn:      func(context.Context) (*sessionConn, error) { return nil, errors.New("never") },
-		drainCh:     make(chan struct{}),
 		serverErrCh: make(chan error, 1),
 	}
 	cancel()

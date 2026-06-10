@@ -392,7 +392,6 @@ func (c *Client) openProtocol(ctx context.Context, p Protocol) (*Session, error)
 		proto:       p,
 		ready:       make(chan struct{}),
 		current:     first,
-		drainCh:     make(chan struct{}),
 		serverErrCh: make(chan error, 1),
 		openFn: func(ctx context.Context) (*sessionConn, error) {
 			return c.openConn(ctx, p)
@@ -681,8 +680,6 @@ type Session struct {
 
 	dialWait time.Duration
 
-	drainOnce   sync.Once
-	drainCh     chan struct{}
 	serverErrCh chan error
 
 	closeOnce sync.Once
@@ -739,11 +736,6 @@ func (s *Session) LastRTT() time.Duration {
 	}
 	return s.current.LastRTT()
 }
-
-// DrainCh is closed when any underlying connection receives PleaseDrain. The
-// Session will reconnect automatically; this method remains for compatibility
-// with callers that want to observe drain events.
-func (s *Session) DrainCh() <-chan struct{} { return s.drainCh }
 
 // ServerErrCh delivers fatal logical-session errors, such as non-retryable auth
 // failures during reconnect. Transient control-stream failures are consumed by
@@ -1002,8 +994,6 @@ func (s *Session) swapCurrent(h *sessionConn) {
 }
 
 func (s *Session) parkDraining(old *sessionConn, grace time.Duration) {
-	s.drainOnce.Do(func() { close(s.drainCh) })
-
 	closeNow := false
 	s.mu.Lock()
 	if s.ctx.Err() != nil {
