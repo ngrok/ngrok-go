@@ -763,6 +763,9 @@ func (s *Session) ServerErrCh() <-chan error { return s.serverErrCh }
 //     syscall.ECONNREFUSED — analogous to a refused TCP connect.
 //   - other codes carry no sentinel; recover the ngrok code with
 //     errors.As(err, &nerr) where nerr is a privatedial.Error.
+//
+// Dialing on a Session that has been closed, or torn down by a fatal
+// session error, fails with a *net.OpError wrapping ErrSessionClosed.
 func (s *Session) DialContext(ctx context.Context, network string, addr string) (net.Conn, error) {
 	if network != "tcp" {
 		// we only support tcp endpoints
@@ -832,7 +835,7 @@ func (s *Session) dial(ctx context.Context, addr dialAddr) (net.Conn, error) {
 func (s *Session) waitForCurrent(ctx context.Context, budget <-chan time.Time) (*sessionConn, error) {
 	for {
 		if err := s.ctx.Err(); err != nil {
-			return nil, errors.New("private-dial: session closed")
+			return nil, ErrSessionClosed
 		}
 		cur, ready, fatal := s.snapshot()
 		if fatal != nil {
@@ -848,7 +851,7 @@ func (s *Session) waitForCurrent(ctx context.Context, budget <-chan time.Time) (
 		case <-budget:
 			return nil, context.DeadlineExceeded
 		case <-s.ctx.Done():
-			return nil, errors.New("private-dial: session closed")
+			return nil, ErrSessionClosed
 		}
 	}
 }
@@ -1235,6 +1238,11 @@ type Error interface {
 	Code() string
 }
 
+// ErrSessionClosed is reported by DialContext when the Session has been torn
+// down, either by Close or by a fatal session error. It arrives wrapped in a
+// *net.OpError; match it with errors.Is(err, ErrSessionClosed).
+var ErrSessionClosed = errors.New("private-dial: session closed")
+
 const ngrokErrorsURL = "https://ngrok.com/docs/errors"
 
 // serverError is the concrete Error rehydrated from the dial/session trailers.
@@ -1353,9 +1361,9 @@ func (h *sessionConn) close() error {
 	return nil
 }
 
-// errSessionClosed is returned by sendControlFrame when the session has
-// been closed or the controlSender goroutine has exited.
-var errSessionClosed = errors.New("private-dial: session closed")
+// errConnClosed is returned by sendControlFrame when the conn has been
+// closed or the controlSender goroutine has exited.
+var errConnClosed = errors.New("private-dial: conn closed")
 
 // sendControlFrame hands frame to the controlSender goroutine. It
 // respects ctx, so a stalled wire (which can park the underlying
@@ -1369,9 +1377,9 @@ func (h *sessionConn) sendControlFrame(ctx context.Context, frame *pbpd.ControlF
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-h.stopCh:
-		return errSessionClosed
+		return errConnClosed
 	case <-h.sendDone:
-		return errSessionClosed
+		return errConnClosed
 	}
 }
 
@@ -1404,7 +1412,7 @@ func (h *sessionConn) controlSender() {
 //
 // Each tick uses a per-send timeout of pingInterval so a stuck sender
 // can't pin successive ticks; transient timeouts just skip a ping and
-// let the next tick try again. Terminal errSessionClosed exits the loop.
+// let the next tick try again. Terminal errConnClosed exits the loop.
 func (h *sessionConn) pingLoop() {
 	tick := time.NewTicker(h.pingInterval)
 	defer tick.Stop()
@@ -1419,7 +1427,7 @@ func (h *sessionConn) pingLoop() {
 				Frame: &pbpd.ControlFrame_Ping{Ping: &pbpd.Ping{Token: token}},
 			})
 			cancel()
-			if errors.Is(err, errSessionClosed) {
+			if errors.Is(err, errConnClosed) {
 				return
 			}
 		}
