@@ -34,7 +34,7 @@ import (
 	"golang.org/x/net/http2"
 	"google.golang.org/protobuf/encoding/protodelim"
 
-	pbpd "golang.ngrok.com/ngrok/privatedial/pb_private_dial"
+	pbpd "golang.ngrok.com/ngrok/privatedial/internal/pb_private_dial"
 )
 
 // Protocol selects the transport used to reach the private-dial server.
