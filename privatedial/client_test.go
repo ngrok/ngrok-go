@@ -63,7 +63,7 @@ func newTestSessionWithClock(t *testing.T, openFn func(context.Context) (*sessio
 		current:     first,
 		openFn:      openFn,
 		clock:       clk,
-		serverErrCh: make(chan error, 1),
+		done:        make(chan struct{}),
 	}
 	go s.supervise()
 	t.Cleanup(func() { _ = s.Close() })
@@ -192,6 +192,15 @@ func TestAuthFatalStopsReconnect(t *testing.T) {
 		_, _, ferr := s.snapshot()
 		return ferr != nil
 	})
+
+	select {
+	case <-s.Done():
+	case <-time.After(time.Second):
+		t.Fatal("Done not closed after fatal error")
+	}
+	if err := s.Err(); !errors.Is(err, fatal) {
+		t.Fatalf("Err = %v, want auth fatal", err)
+	}
 
 	_, err := s.DialContext(context.Background(), "tcp", "x.private:80")
 	if err == nil {
@@ -355,7 +364,7 @@ func TestDialSkipsDrainedCurrent(t *testing.T) {
 		openFn:      openFn,
 		clock:       clk,
 		dialWait:    200 * time.Millisecond,
-		serverErrCh: make(chan error, 1),
+		done:        make(chan struct{}),
 	}
 	t.Cleanup(func() { _ = s.Close() })
 
@@ -442,7 +451,7 @@ func TestParkDrainingNoOpAfterClose(t *testing.T) {
 		ready:       make(chan struct{}),
 		dialWait:    50 * time.Millisecond,
 		openFn:      func(context.Context) (*sessionConn, error) { return nil, errors.New("never") },
-		serverErrCh: make(chan error, 1),
+		done:        make(chan struct{}),
 	}
 	cancel()
 
@@ -459,8 +468,23 @@ func TestDialFailsImmediatelyAfterClose(t *testing.T) {
 		return newFakeConn("conn-1"), nil
 	})
 	s.dialWait = 5 * time.Second
+
+	if err := s.Err(); err != nil {
+		t.Fatalf("Err = %v before Close, want nil", err)
+	}
+	if isClosed(s.Done()) {
+		t.Fatal("Done closed before Close")
+	}
+
 	if err := s.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
+	}
+
+	if !isClosed(s.Done()) {
+		t.Fatal("Done not closed after Close")
+	}
+	if err := s.Err(); !errors.Is(err, ErrSessionClosed) {
+		t.Fatalf("Err = %v, want ErrSessionClosed", err)
 	}
 
 	_, err := s.DialContext(context.Background(), "tcp", "x.private:80")

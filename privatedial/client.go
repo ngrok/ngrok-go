@@ -220,11 +220,11 @@ func New(cfg Config) *Dialer {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Dialer{
-		cfg:         cfg,
-		ctx:         ctx,
-		cancel:      cancel,
-		ready:       make(chan struct{}),
-		serverErrCh: make(chan error, 1),
+		cfg:    cfg,
+		ctx:    ctx,
+		cancel: cancel,
+		ready:  make(chan struct{}),
+		done:   make(chan struct{}),
 	}
 }
 
@@ -483,7 +483,7 @@ func (d *Dialer) openConn(ctx context.Context, p Protocol) (*sessionConn, error)
 		// The server can reject a session by committing to a 200 and then
 		// reporting the failure via trailers instead of sending a
 		// SessionAck. Because this read is synchronous, that error surfaces
-		// straight out of the initial Connect rather than later on ServerErrCh.
+		// straight out of the initial Connect rather than later via Done/Err.
 		if rerr := errorFromTrailer(resp.Trailer); rerr != nil {
 			return nil, rerr
 		}
@@ -669,7 +669,10 @@ type Dialer struct {
 
 	dialWait time.Duration
 
-	serverErrCh chan error
+	// done is closed (via doneOnce) when the Dialer is permanently done
+	// dialing: on Close, or on a fatal session error.
+	doneOnce sync.Once
+	done     chan struct{}
 
 	closeOnce sync.Once
 }
@@ -810,10 +813,27 @@ func (d *Dialer) LastRTT() time.Duration {
 	return d.current.LastRTT()
 }
 
-// ServerErrCh delivers fatal logical-session errors, such as non-retryable auth
-// failures during reconnect. Transient control-stream failures are consumed by
-// the reconnect supervisor.
-func (d *Dialer) ServerErrCh() <-chan error { return d.serverErrCh }
+// Done returns a channel that is closed when the Dialer is permanently done
+// dialing: after Close, or after a fatal session error such as a
+// non-retryable auth failure during reconnect. Err reports why. Transient
+// control-stream failures are consumed by the reconnect supervisor and do
+// not close the channel.
+func (d *Dialer) Done() <-chan struct{} { return d.done }
+
+// Err returns the reason the Dialer is done: the fatal session error that
+// tore it down, ErrSessionClosed after a deliberate Close, or nil while the
+// Dialer is still usable.
+func (d *Dialer) Err() error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.fatalErr != nil {
+		return d.fatalErr
+	}
+	if d.ctx.Err() != nil {
+		return ErrSessionClosed
+	}
+	return nil
+}
 
 // DialContext opens a new stream targeting addr (of the form 'host:port').
 // The port _must_ be numeric, and the host must refer to a private endpoint
@@ -1124,10 +1144,7 @@ func (d *Dialer) setFatal(err error) {
 	d.mu.Lock()
 	if d.fatalErr == nil {
 		d.fatalErr = err
-		select {
-		case d.serverErrCh <- err:
-		default:
-		}
+		d.doneOnce.Do(func() { close(d.done) })
 	}
 	d.signalReadyLocked()
 	d.mu.Unlock()
@@ -1145,6 +1162,7 @@ func (d *Dialer) signalReadyLocked() {
 func (d *Dialer) Close() error {
 	d.closeOnce.Do(func() {
 		d.cancel()
+		d.doneOnce.Do(func() { close(d.done) })
 		d.mu.Lock()
 		cur := d.current
 		d.current = nil
