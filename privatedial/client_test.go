@@ -18,7 +18,7 @@ import (
 
 	"google.golang.org/protobuf/encoding/protodelim"
 
-	pbpd "golang.ngrok.com/ngrok/privatedial/pb_private_dial"
+	pbpd "golang.ngrok.com/ngrok/privatedial/internal/pb_private_dial"
 )
 
 func newFakeConn(id string) *sessionConn {
@@ -40,13 +40,13 @@ func sequentialOpener() func(context.Context) (*sessionConn, error) {
 	}
 }
 
-func newTestSession(t *testing.T, openFn func(context.Context) (*sessionConn, error)) *Session {
+func newTestSession(t *testing.T, openFn func(context.Context) (*sessionConn, error)) *Dialer {
 	t.Helper()
 	s, _ := newTestSessionWithClock(t, openFn)
 	return s
 }
 
-func newTestSessionWithClock(t *testing.T, openFn func(context.Context) (*sessionConn, error)) (*Session, *manualClock) {
+func newTestSessionWithClock(t *testing.T, openFn func(context.Context) (*sessionConn, error)) (*Dialer, *manualClock) {
 	t.Helper()
 	first, err := openFn(context.Background())
 	if err != nil {
@@ -54,16 +54,16 @@ func newTestSessionWithClock(t *testing.T, openFn func(context.Context) (*sessio
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	clk := newManualClock(time.Now())
-	s := &Session{
+	s := &Dialer{
 		ctx:         ctx,
 		cancel:      cancel,
 		proto:       ProtocolH2,
 		ready:       make(chan struct{}),
+		connected:   true,
 		current:     first,
 		openFn:      openFn,
 		clock:       clk,
-		drainCh:     make(chan struct{}),
-		serverErrCh: make(chan error, 1),
+		done:        make(chan struct{}),
 	}
 	go s.supervise()
 	t.Cleanup(func() { _ = s.Close() })
@@ -192,6 +192,15 @@ func TestAuthFatalStopsReconnect(t *testing.T) {
 		_, _, ferr := s.snapshot()
 		return ferr != nil
 	})
+
+	select {
+	case <-s.Done():
+	case <-time.After(time.Second):
+		t.Fatal("Done not closed after fatal error")
+	}
+	if err := s.Err(); !errors.Is(err, fatal) {
+		t.Fatalf("Err = %v, want auth fatal", err)
+	}
 
 	_, err := s.DialContext(context.Background(), "tcp", "x.private:80")
 	if err == nil {
@@ -345,17 +354,17 @@ func TestDialSkipsDrainedCurrent(t *testing.T) {
 		return first, nil
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	s := &Session{
+	s := &Dialer{
 		ctx:         ctx,
 		cancel:      cancel,
 		proto:       ProtocolH2,
 		ready:       make(chan struct{}),
+		connected:   true,
 		current:     first,
 		openFn:      openFn,
 		clock:       clk,
 		dialWait:    200 * time.Millisecond,
-		drainCh:     make(chan struct{}),
-		serverErrCh: make(chan error, 1),
+		done:        make(chan struct{}),
 	}
 	t.Cleanup(func() { _ = s.Close() })
 
@@ -436,14 +445,13 @@ func TestSessionConnDialRefusesAfterClose(t *testing.T) {
 
 func TestParkDrainingNoOpAfterClose(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	s := &Session{
+	s := &Dialer{
 		ctx:         ctx,
 		cancel:      cancel,
 		ready:       make(chan struct{}),
 		dialWait:    50 * time.Millisecond,
 		openFn:      func(context.Context) (*sessionConn, error) { return nil, errors.New("never") },
-		drainCh:     make(chan struct{}),
-		serverErrCh: make(chan error, 1),
+		done:        make(chan struct{}),
 	}
 	cancel()
 
@@ -460,8 +468,23 @@ func TestDialFailsImmediatelyAfterClose(t *testing.T) {
 		return newFakeConn("conn-1"), nil
 	})
 	s.dialWait = 5 * time.Second
+
+	if err := s.Err(); err != nil {
+		t.Fatalf("Err = %v before Close, want nil", err)
+	}
+	if isClosed(s.Done()) {
+		t.Fatal("Done closed before Close")
+	}
+
 	if err := s.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
+	}
+
+	if !isClosed(s.Done()) {
+		t.Fatal("Done not closed after Close")
+	}
+	if err := s.Err(); !errors.Is(err, ErrSessionClosed) {
+		t.Fatalf("Err = %v, want ErrSessionClosed", err)
 	}
 
 	_, err := s.DialContext(context.Background(), "tcp", "x.private:80")
@@ -870,10 +893,10 @@ func (t *manualTimer) Stop() bool {
 	return true
 }
 
-func (s *Session) snapshotCurrentForTest() *sessionConn {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.current
+func (d *Dialer) snapshotCurrentForTest() *sessionConn {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.current
 }
 
 func idFor(i int32) string {
@@ -902,3 +925,25 @@ var _ = func() bool {
 	err := &net.OpError{Err: &os.SyscallError{Syscall: "connect", Err: syscall.ECONNREFUSED}}
 	return errors.Is(err, syscall.ECONNREFUSED)
 }()
+
+func TestConnectRequiresServerAddr(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		cfg  Config
+		want string
+	}{
+		{"forced h2", Config{ForceProtocol: ProtocolH2}, "H2ServerAddr"},
+		{"forced quic", Config{ForceProtocol: ProtocolQUIC}, "QUICServerAddr"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			d := New(tc.cfg)
+			defer func() { _ = d.Close() }()
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			err := d.Connect(ctx)
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("Connect = %v, want error mentioning %s", err, tc.want)
+			}
+		})
+	}
+}

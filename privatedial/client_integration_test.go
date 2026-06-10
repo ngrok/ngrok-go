@@ -26,7 +26,7 @@ import (
 	"golang.org/x/net/http2"
 	"google.golang.org/protobuf/encoding/protodelim"
 
-	pbpd "golang.ngrok.com/ngrok/privatedial/pb_private_dial"
+	pbpd "golang.ngrok.com/ngrok/privatedial/internal/pb_private_dial"
 )
 
 // These tests stand up real HTTP/2 and HTTP/3 servers that speak the
@@ -52,7 +52,7 @@ func TestRaceQUICWins(t *testing.T) {
 	quicAddr := startH3Server(t, cert, privateDialHandler(&quicHits))
 	h2Addr := startH2Server(t, cert, privateDialHandler(&h2Hits))
 
-	sess := mustOpenSession(t, ClientOpts{
+	sess := mustConnect(t, Config{
 		QUICServerAddr: quicAddr,
 		H2ServerAddr:   h2Addr,
 		AuthToken:      "test-token",
@@ -83,7 +83,7 @@ func TestRaceFallsBackToH2(t *testing.T) {
 	h2Addr := startH2Server(t, cert, privateDialHandler(&h2Hits))
 
 	start := time.Now()
-	sess := mustOpenSession(t, ClientOpts{
+	sess := mustConnect(t, Config{
 		QUICServerAddr: quicAddr,
 		H2ServerAddr:   h2Addr,
 		AuthToken:      "test-token",
@@ -111,7 +111,7 @@ func TestStickyProtocolReused(t *testing.T) {
 	quicAddr := startH3Server(t, cert, privateDialHandler(&quicHits))
 	h2Addr := startH2Server(t, cert, privateDialHandler(&h2Hits))
 
-	opts := ClientOpts{
+	opts := Config{
 		QUICServerAddr: quicAddr,
 		H2ServerAddr:   h2Addr,
 		AuthToken:      "test-token",
@@ -119,7 +119,7 @@ func TestStickyProtocolReused(t *testing.T) {
 	}
 
 	// First session races and settles on QUIC.
-	sess1 := mustOpenSession(t, opts)
+	sess1 := mustConnect(t, opts)
 	defer sess1.Close()
 	if got := stickyProtocol.Load(); got == nil || *got != ProtocolQUIC {
 		t.Fatalf("first session should settle on QUIC, sticky = %v", got)
@@ -127,7 +127,7 @@ func TestStickyProtocolReused(t *testing.T) {
 
 	// A second session must reuse the sticky choice without racing, so
 	// HTTP/2 is still never touched.
-	sess2 := mustOpenSession(t, opts)
+	sess2 := mustConnect(t, opts)
 	defer sess2.Close()
 	if n := h2Hits.Load(); n != 0 {
 		t.Fatalf("sticky reuse should not touch HTTP/2, got %d hits", n)
@@ -146,7 +146,7 @@ func TestForceProtocol(t *testing.T) {
 		quicAddr := startH3Server(t, cert, privateDialHandler(&quicHits))
 		h2Addr := startH2Server(t, cert, privateDialHandler(&h2Hits))
 
-		sess := mustOpenSession(t, ClientOpts{
+		sess := mustConnect(t, Config{
 			QUICServerAddr: quicAddr,
 			H2ServerAddr:   h2Addr,
 			AuthToken:      "test-token",
@@ -177,7 +177,7 @@ func TestForceProtocol(t *testing.T) {
 		quicAddr := startH3Server(t, cert, privateDialHandler(&quicHits))
 		h2Addr := startH2Server(t, cert, privateDialHandler(&h2Hits))
 
-		sess := mustOpenSession(t, ClientOpts{
+		sess := mustConnect(t, Config{
 			QUICServerAddr: quicAddr,
 			H2ServerAddr:   h2Addr,
 			AuthToken:      "test-token",
@@ -219,7 +219,7 @@ func TestDialEcho(t *testing.T) {
 			quicAddr := startH3Server(t, cert, privateDialHandler(&hits))
 			h2Addr := startH2Server(t, cert, privateDialHandler(&hits))
 
-			sess := mustOpenSession(t, ClientOpts{
+			sess := mustConnect(t, Config{
 				QUICServerAddr: quicAddr,
 				H2ServerAddr:   h2Addr,
 				AuthToken:      "test-token",
@@ -302,7 +302,7 @@ func TestDialTrailerError(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			resetSticky()
-			sess := mustOpenSession(t, clientOptsForProtocol(t, tc.proto, cert, dialErrorHandler()))
+			sess := mustConnect(t, configForProtocol(t, tc.proto, cert, dialErrorHandler()))
 			defer sess.Close()
 
 			conn := mustDial(t, sess, "foo.private:80")
@@ -335,7 +335,7 @@ func TestDialTrailerError(t *testing.T) {
 
 // TestSessionTrailerError proves that a session rejected via trailers (a 200
 // with an error trailer and no SessionAck) is rehydrated and returned straight
-// out of OpenSession, since the handshake reads the SessionAck synchronously.
+// out of Connect, since the handshake reads the SessionAck synchronously.
 func TestSessionTrailerError(t *testing.T) {
 	cert := genTLSCert(t)
 
@@ -366,14 +366,15 @@ func TestSessionTrailerError(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			resetSticky()
-			opts := clientOptsForProtocol(t, tc.proto, cert, sessionErrorHandler())
+			opts := configForProtocol(t, tc.proto, cert, sessionErrorHandler())
 
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			sess, err := NewClient(opts).OpenSession(ctx)
+			dialer := New(opts)
+			defer dialer.Close()
+			err := dialer.Connect(ctx)
 			if err == nil {
-				_ = sess.Close()
-				t.Fatal("OpenSession succeeded, want trailer error")
+				t.Fatal("Connect succeeded, want trailer error")
 			}
 			var nerr Error
 			if !errors.As(err, &nerr) {
@@ -432,7 +433,7 @@ func TestDrainReconnect(t *testing.T) {
 			})
 			mux.HandleFunc("/dial", echoDialHandler)
 
-			sess := mustOpenSession(t, clientOptsForProtocol(t, tc.proto, cert, mux))
+			sess := mustConnect(t, configForProtocol(t, tc.proto, cert, mux))
 			defer sess.Close()
 
 			if got := sess.Protocol(); got != tc.proto {
@@ -498,7 +499,7 @@ func TestAbruptControlStreamReconnect(t *testing.T) {
 			})
 			mux.HandleFunc("/dial", echoDialHandler)
 
-			sess := mustOpenSession(t, clientOptsForProtocol(t, tc.proto, cert, mux))
+			sess := mustConnect(t, configForProtocol(t, tc.proto, cert, mux))
 			defer sess.Close()
 
 			if got := sess.Protocol(); got != tc.proto {
@@ -517,9 +518,9 @@ func TestAbruptControlStreamReconnect(t *testing.T) {
 	}
 }
 
-func clientOptsForProtocol(t *testing.T, proto Protocol, cert tls.Certificate, h http.Handler) ClientOpts {
+func configForProtocol(t *testing.T, proto Protocol, cert tls.Certificate, h http.Handler) Config {
 	t.Helper()
-	opts := ClientOpts{
+	opts := Config{
 		AuthToken:     "test-token",
 		ForceProtocol: proto,
 		TLSConfig:     &tls.Config{InsecureSkipVerify: true},
@@ -535,20 +536,20 @@ func clientOptsForProtocol(t *testing.T, proto Protocol, cert tls.Certificate, h
 	return opts
 }
 
-// mustOpenSession opens a session with the given opts, failing the test on
-// error.
-func mustOpenSession(t *testing.T, opts ClientOpts) *Session {
+// mustConnect returns a connected Dialer for the given config, failing the
+// test on error.
+func mustConnect(t *testing.T, cfg Config) *Dialer {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	sess, err := NewClient(opts).OpenSession(ctx)
-	if err != nil {
-		t.Fatalf("OpenSession: %v", err)
+	dialer := New(cfg)
+	if err := dialer.Connect(ctx); err != nil {
+		t.Fatalf("Connect: %v", err)
 	}
-	return sess
+	return dialer
 }
 
-func mustDial(t *testing.T, sess *Session, addr string) net.Conn {
+func mustDial(t *testing.T, sess *Dialer, addr string) net.Conn {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

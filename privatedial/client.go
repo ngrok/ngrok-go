@@ -1,10 +1,10 @@
 // Package privatedial implements a client to allow dialing private ngrok
 // endpoints. It authenticates with an API Key as its authtoken and then multiplexes
 // per-target net.Conn streams over a single HTTP/2 or HTTP/3
-// connection. A Session transparently reconnects on server drain or abrupt
-// control-stream failure; new Dial calls follow the freshest underlying
-// transport while in-flight streams ride out the server-advertised drain grace
-// period on the old one.
+// connection. A Dialer connects lazily on first use and transparently
+// reconnects on server drain or abrupt control-stream failure; new Dial
+// calls follow the freshest underlying transport while in-flight streams
+// ride out the server-advertised drain grace period on the old one.
 package privatedial
 
 import (
@@ -34,7 +34,7 @@ import (
 	"golang.org/x/net/http2"
 	"google.golang.org/protobuf/encoding/protodelim"
 
-	pbpd "golang.ngrok.com/ngrok/privatedial/pb_private_dial"
+	pbpd "golang.ngrok.com/ngrok/privatedial/internal/pb_private_dial"
 )
 
 // Protocol selects the transport used to reach the private-dial server.
@@ -77,12 +77,12 @@ const (
 )
 
 // stickyProtocol records the first protocol the race settled on in this
-// process. Once set, OpenSession reuses it for every subsequent session
-// (including reconnects) and skips the happy-eyeballs race entirely.
+// process. Once set, every subsequent connect (including reconnects) reuses
+// it and skips the happy-eyeballs race entirely.
 var stickyProtocol atomic.Pointer[Protocol]
 
 // roundTripCloser is the subset of transport behavior the session relies on.
-// Holding the transport behind this interface lets a single Session
+// Holding the transport behind this interface lets a single Dialer
 // implementation drive either protocol.
 type roundTripCloser interface {
 	RoundTrip(*http.Request) (*http.Response, error)
@@ -163,20 +163,18 @@ func newReadCloseByteReader(rc io.ReadCloser) *readCloseByteReader {
 
 func (r *readCloseByteReader) Close() error { return r.closer.Close() }
 
-// ClientOpts configures a Client.
-type ClientOpts struct {
-	// ServerAddr is the "host:port" endpoint that serves the private-dial
-	// protocol (e.g. "h2.connect-endpoint.ngrok.com:443"). The net.Dial to
-	// this address must reach a mux PrivateDialIngresses listener. It is the
-	// default for both QUICServerAddr and H2ServerAddr.
-	ServerAddr string
-
-	// QUICServerAddr is the "host:port" used for the HTTP/3 (QUIC) attempt
-	// (e.g. "quic.connect-endpoint.ngrok.com:443"). Defaults to ServerAddr.
+// Config configures a Dialer. The server addresses are endpoints serving the
+// private-dial protocol; the net.Dial to them must reach a mux
+// PrivateDialIngresses listener.
+type Config struct {
+	// QUICServerAddr is the "host:port" used for the HTTP/3 (QUIC)
+	// transport (e.g. "quic.connect-endpoint.ngrok.com:443"). Required
+	// unless ForceProtocol is ProtocolH2.
 	QUICServerAddr string
 
-	// H2ServerAddr is the "host:port" used for the HTTP/2 attempt
-	// (e.g. "h2.connect-endpoint.ngrok.com:443"). Defaults to ServerAddr.
+	// H2ServerAddr is the "host:port" used for the HTTP/2 transport
+	// (e.g. "h2.connect-endpoint.ngrok.com:443"). Required unless
+	// ForceProtocol is ProtocolQUIC.
 	H2ServerAddr string
 
 	// ForceProtocol, when not ProtocolAuto, skips the Happy-Eyeballs race
@@ -184,17 +182,15 @@ type ClientOpts struct {
 	// UDP (force ProtocolH2) or TCP (force ProtocolQUIC) is unavailable.
 	ForceProtocol Protocol
 
-	// ServerName overrides the SNI name used when negotiating TLS. When
-	// empty, the SNI defaults to the host portion of the per-protocol
-	// server address.
-	ServerName string
-
 	// AuthToken is the auth token to use. During development, this is an ngrok
 	// API Key, it'll be a proper token eventually.
 	AuthToken string
 
-	// TLSConfig overrides the default TLS config. MinVersion and NextProtos
-	// are forced to TLS 1.3 / h2 respectively regardless.
+	// TLSConfig overrides the default TLS config. Its ServerName, when set,
+	// overrides the SNI, which otherwise defaults to the host portion of
+	// the per-protocol server address. MinVersion defaults to TLS 1.3 when
+	// unset, and NextProtos is always set to match the negotiated transport
+	// (h2 or h3).
 	TLSConfig *tls.Config
 
 	// ClientVersion is metadata about this client.
@@ -206,48 +202,40 @@ type ClientOpts struct {
 	Metadata map[string]string
 }
 
-// Client is a reusable factory for private-dial sessions.
-type Client struct {
-	opts ClientOpts
+// New returns a Dialer for the configured server. It does not open any
+// connection: the first DialContext establishes one, or call Connect to
+// establish it eagerly. The caller must Close the Dialer to release the
+// connection.
+func New(cfg Config) *Dialer {
+	ctx, cancel := context.WithCancel(context.Background())
+	return &Dialer{
+		cfg:    cfg,
+		ctx:    ctx,
+		cancel: cancel,
+		ready:  make(chan struct{}),
+		done:   make(chan struct{}),
+	}
 }
 
-// NewClient returns a Client. It does not open any connection.
-func NewClient(opts ClientOpts) *Client {
-	if opts.QUICServerAddr == "" {
-		opts.QUICServerAddr = opts.ServerAddr
-	}
-	if opts.H2ServerAddr == "" {
-		opts.H2ServerAddr = opts.ServerAddr
-	}
-	return &Client{opts: opts}
-}
-
-// serverNameFor returns the SNI to use for a given server address: the
-// explicit ServerName override when set, otherwise the host portion of addr.
-func (c *Client) serverNameFor(addr string) string {
-	if c.opts.ServerName != "" {
-		return c.opts.ServerName
-	}
+// serverNameFor returns the default SNI for a server address: its host
+// portion. Callers override it via Config.TLSConfig.ServerName.
+func serverNameFor(addr string) string {
 	if host, _, err := net.SplitHostPort(addr); err == nil {
 		return host
 	}
 	return addr
 }
 
-// OpenSession establishes a single connection to the server, opens the
-// control stream (/session), authenticates, and returns a Session. The
-// caller must Close the Session to release the connection. The Session
-// reconnects on server PleaseDrain or abrupt control-stream failure.
+// open establishes the initial connection to the server, opens the control
+// stream (/session), and authenticates, returning the conn and the protocol
+// it settled on.
 //
 // Transport selection follows the spec's Happy-Eyeballs-like algorithm: by
 // default it races HTTP/3 (QUIC) against HTTP/2, preferring QUIC, and
-// remembers the winning protocol process-wide so later sessions skip the
-// race. ClientOpts.ForceProtocol overrides this.
-//
-// The caller's ctx scopes the initial handshake only. Once OpenSession returns,
-// canceling ctx has no effect on the Session.
-func (c *Client) OpenSession(ctx context.Context) (*Session, error) {
-	proto := c.opts.ForceProtocol
+// remembers the winning protocol process-wide so later connects skip the
+// race. Config.ForceProtocol overrides this.
+func (d *Dialer) open(ctx context.Context) (*sessionConn, Protocol, error) {
+	proto := d.cfg.ForceProtocol
 	if proto == ProtocolAuto {
 		stickyProto := stickyProtocol.Load()
 		if stickyProto != nil {
@@ -257,20 +245,21 @@ func (c *Client) OpenSession(ctx context.Context) (*Session, error) {
 	switch proto {
 	case ProtocolQUIC, ProtocolH2:
 		// Forced, or a previous race already settled on a protocol.
-		return c.openProtocol(ctx, proto)
+		conn, err := d.openConn(ctx, proto)
+		return conn, proto, err
 	default:
-		return c.race(ctx)
+		return d.race(ctx)
 	}
 }
 
 // race implements the spec's staggered Happy-Eyeballs algorithm: start the
 // QUIC attempt, give it a head start, then stagger in the HTTP/2 attempt;
-// the first to produce a usable Session wins (QUIC preferred), the loser is
-// cancelled and any session it raced through is closed.
-func (c *Client) race(ctx context.Context) (*Session, error) {
+// the first to produce a usable conn wins (QUIC preferred), the loser is
+// cancelled and any conn it raced through is closed.
+func (d *Dialer) race(ctx context.Context) (*sessionConn, Protocol, error) {
 	type result struct {
 		proto Protocol
-		sess  *Session
+		conn  *sessionConn
 		err   error
 	}
 
@@ -278,19 +267,19 @@ func (c *Client) race(ctx context.Context) (*Session, error) {
 		attemptCtx, cancel := context.WithTimeout(ctx, dialTimeout)
 		ch := make(chan result, 1)
 		go func() {
-			sess, err := c.openProtocol(attemptCtx, p)
-			ch <- result{proto: p, sess: sess, err: err}
+			conn, err := d.openConn(attemptCtx, p)
+			ch <- result{proto: p, conn: conn, err: err}
 		}()
 		return ch, cancel
 	}
 
-	// closeLoser cancels a still-running attempt and closes the session it
+	// closeLoser cancels a still-running attempt and closes the conn it
 	// produced if it happened to win the race after we'd already committed.
 	closeLoser := func(ch chan result, cancel context.CancelFunc) {
 		cancel()
 		go func() {
-			if r := <-ch; r.sess != nil {
-				_ = r.sess.Close()
+			if r := <-ch; r.conn != nil {
+				_ = r.conn.close()
 			}
 		}()
 	}
@@ -309,7 +298,7 @@ func (c *Client) race(ctx context.Context) (*Session, error) {
 		if r.err == nil {
 			quicCancel()
 			stickyProtocol.CompareAndSwap(nil, new(ProtocolQUIC))
-			return r.sess, nil
+			return r.conn, ProtocolQUIC, nil
 		}
 		quicErr = r.err
 	case <-timer.C:
@@ -340,7 +329,7 @@ func (c *Client) race(ctx context.Context) (*Session, error) {
 					closeLoser(h2Ch, h2Cancel)
 				}
 				stickyProtocol.CompareAndSwap(nil, new(ProtocolQUIC))
-				return r.sess, nil
+				return r.conn, ProtocolQUIC, nil
 			}
 			quicErr = r.err
 		case r := <-h2Ch:
@@ -353,7 +342,7 @@ func (c *Client) race(ctx context.Context) (*Session, error) {
 					closeLoser(quicCh, quicCancel)
 				}
 				stickyProtocol.CompareAndSwap(nil, new(ProtocolH2))
-				return r.sess, nil
+				return r.conn, ProtocolH2, nil
 			}
 			h2Err = r.err
 		}
@@ -361,7 +350,7 @@ func (c *Client) race(ctx context.Context) (*Session, error) {
 
 	quicCancel()
 	h2Cancel()
-	return nil, bothTransportsFailed(quicErr, h2Err)
+	return nil, ProtocolAuto, bothTransportsFailed(quicErr, h2Err)
 }
 
 // bothTransportsFailed combines the per-transport failures from the race into
@@ -377,32 +366,7 @@ func bothTransportsFailed(quicErr, h2Err error) error {
 	return fmt.Errorf("private-dial: both transports failed: quic=%v, h2=%v", quicErr, h2Err)
 }
 
-// openProtocol builds the transport for p and runs the /session handshake
-// over it.
-func (c *Client) openProtocol(ctx context.Context, p Protocol) (*Session, error) {
-	first, err := c.openConn(ctx, p)
-	if err != nil {
-		return nil, err
-	}
-
-	sessCtx, cancel := context.WithCancel(context.Background())
-	s := &Session{
-		ctx:         sessCtx,
-		cancel:      cancel,
-		proto:       p,
-		ready:       make(chan struct{}),
-		current:     first,
-		drainCh:     make(chan struct{}),
-		serverErrCh: make(chan error, 1),
-		openFn: func(ctx context.Context) (*sessionConn, error) {
-			return c.openConn(ctx, p)
-		},
-	}
-	go s.supervise()
-	return s, nil
-}
-
-func (c *Client) openConn(ctx context.Context, p Protocol) (*sessionConn, error) {
+func (d *Dialer) openConn(ctx context.Context, p Protocol) (*sessionConn, error) {
 	var (
 		transport  roundTripCloser
 		serverAddr string
@@ -412,14 +376,20 @@ func (c *Client) openConn(ctx context.Context, p Protocol) (*sessionConn, error)
 	)
 	switch p {
 	case ProtocolQUIC:
-		transport, rec = c.newH3Transport()
-		serverAddr = c.opts.QUICServerAddr
+		if d.cfg.QUICServerAddr == "" {
+			return nil, errors.New("private-dial: Config.QUICServerAddr is required for HTTP/3")
+		}
+		transport, rec = d.newH3Transport()
+		serverAddr = d.cfg.QUICServerAddr
 	case ProtocolH2:
-		transport, remoteAddr, err = c.newH2Transport(ctx)
+		if d.cfg.H2ServerAddr == "" {
+			return nil, errors.New("private-dial: Config.H2ServerAddr is required for HTTP/2")
+		}
+		transport, remoteAddr, err = d.newH2Transport(ctx)
 		if err != nil {
 			return nil, err
 		}
-		serverAddr = c.opts.H2ServerAddr
+		serverAddr = d.cfg.H2ServerAddr
 	default:
 		return nil, fmt.Errorf("private-dial: unsupported protocol %d", p)
 	}
@@ -445,10 +415,10 @@ func (c *Client) openConn(ctx context.Context, p Protocol) (*sessionConn, error)
 		_ = h.close()
 		return nil, fmt.Errorf("build /session request: %w", err)
 	}
-	req.Header.Set("Authorization", "Bearer "+c.opts.AuthToken)
+	req.Header.Set("Authorization", "Bearer "+d.cfg.AuthToken)
 	req.Header.Set("Content-Type", "application/x-protobuf")
-	if c.opts.ClientVersion != "" {
-		req.Header.Set("User-Agent", c.opts.ClientVersion)
+	if d.cfg.ClientVersion != "" {
+		req.Header.Set("User-Agent", d.cfg.ClientVersion)
 	}
 
 	// Write SessionReq concurrently with RoundTrip — the server reads
@@ -456,8 +426,8 @@ func (c *Client) openConn(ctx context.Context, p Protocol) (*sessionConn, error)
 	// hits the wire.
 	go func() {
 		_, err := protodelim.MarshalTo(bodyWriter, &pbpd.SessionReq{
-			ClientVersion: c.opts.ClientVersion,
-			Metadata:      c.opts.Metadata,
+			ClientVersion: d.cfg.ClientVersion,
+			Metadata:      d.cfg.Metadata,
 		})
 		if err != nil {
 			_ = bodyWriter.CloseWithError(err)
@@ -505,7 +475,7 @@ func (c *Client) openConn(ctx context.Context, p Protocol) (*sessionConn, error)
 		// The server can reject a session by committing to a 200 and then
 		// reporting the failure via trailers instead of sending a
 		// SessionAck. Because this read is synchronous, that error surfaces
-		// straight out of OpenSession rather than later on ServerErrCh.
+		// straight out of the initial Connect rather than later via Done/Err.
 		if rerr := errorFromTrailer(resp.Trailer); rerr != nil {
 			return nil, rerr
 		}
@@ -518,7 +488,7 @@ func (c *Client) openConn(ctx context.Context, p Protocol) (*sessionConn, error)
 	h.serverID = ack.GetServerId()
 	h.pingInterval = ack.GetPingInterval().AsDuration()
 	h.dialURL = dialURL
-	h.authToken = c.opts.AuthToken
+	h.authToken = d.cfg.AuthToken
 	h.controlResp = resp
 	h.controlRespBody = respBody
 	h.sendCh = make(chan *pbpd.ControlFrame)
@@ -537,12 +507,14 @@ func (c *Client) openConn(ctx context.Context, p Protocol) (*sessionConn, error)
 
 // tlsConfigFor clones the configured TLS settings and pins them for the
 // given server address and ALPN protocol.
-func (c *Client) tlsConfigFor(serverAddr string, nextProtos ...string) *tls.Config {
+func (d *Dialer) tlsConfigFor(serverAddr string, nextProtos ...string) *tls.Config {
 	tlsCfg := &tls.Config{}
-	if c.opts.TLSConfig != nil {
-		tlsCfg = c.opts.TLSConfig.Clone()
+	if d.cfg.TLSConfig != nil {
+		tlsCfg = d.cfg.TLSConfig.Clone()
 	}
-	tlsCfg.ServerName = c.serverNameFor(serverAddr)
+	if tlsCfg.ServerName == "" {
+		tlsCfg.ServerName = serverNameFor(serverAddr)
+	}
 	tlsCfg.NextProtos = nextProtos
 	if tlsCfg.MinVersion == 0 {
 		tlsCfg.MinVersion = tls.VersionTLS13
@@ -573,9 +545,9 @@ func (r *connAddrRecorder) get() string {
 // newH2Transport builds an owned HTTP/2 ClientConn for one private-dial
 // control stream and its /dial streams. This avoids http2.Transport pooling
 // across logical sessions.
-func (c *Client) newH2Transport(ctx context.Context) (roundTripCloser, string, error) {
-	tlsConn, err := (&tls.Dialer{Config: c.tlsConfigFor(c.opts.H2ServerAddr, "h2")}).
-		DialContext(ctx, "tcp", c.opts.H2ServerAddr)
+func (d *Dialer) newH2Transport(ctx context.Context) (roundTripCloser, string, error) {
+	tlsConn, err := (&tls.Dialer{Config: d.tlsConfigFor(d.cfg.H2ServerAddr, "h2")}).
+		DialContext(ctx, "tcp", d.cfg.H2ServerAddr)
 	if err != nil {
 		return nil, "", fmt.Errorf("private-dial: tls dial: %w", err)
 	}
@@ -596,10 +568,10 @@ func (c *Client) newH2Transport(ctx context.Context) (roundTripCloser, string, e
 // address the QUIC connection lands on. KeepAlivePeriod is the QUIC analogue
 // of the h2 keepalive PINGs: it keeps the single multiplexing connection alive
 // and surfaces a dead peer to stuck stream writers.
-func (c *Client) newH3Transport() (roundTripCloser, *connAddrRecorder) {
+func (d *Dialer) newH3Transport() (roundTripCloser, *connAddrRecorder) {
 	rec := &connAddrRecorder{}
 	t := &http3.Transport{
-		TLSClientConfig: c.tlsConfigFor(c.opts.QUICServerAddr, "h3"),
+		TLSClientConfig: d.tlsConfigFor(d.cfg.QUICServerAddr, "h3"),
 		QUICConfig: &quic.Config{
 			KeepAlivePeriod: 30 * time.Second,
 		},
@@ -655,25 +627,35 @@ type authFatalError struct {
 func (e *authFatalError) Error() string { return e.err.Error() }
 func (e *authFatalError) Unwrap() error { return e.err }
 
-// Session represents an authenticated private-dial session. It reconnects on
-// server drain and control-stream failures while routing new Dial calls to the
-// freshest underlying transport.
-type Session struct {
+// Dialer dials private ngrok endpoints over a single authenticated
+// private-dial session. It connects lazily on the first DialContext (or
+// eagerly via Connect), reconnects on server drain and control-stream
+// failures, and routes new Dial calls to the freshest underlying transport.
+type Dialer struct {
+	cfg Config
+
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	// proto is the transport this session settled on (ProtocolQUIC or
-	// ProtocolH2). Set once at open time.
-	proto Protocol
-
-	// openFn opens replacement per-transport connections.
+	// openFn opens replacement per-transport connections. It is set when
+	// the initial connect settles on a protocol, before the supervisor
+	// starts, and never mutated afterwards.
 	openFn func(context.Context) (*sessionConn, error)
 
 	clock sessionClock
 
 	drainGroup sync.WaitGroup
 
-	mu       sync.Mutex
+	mu sync.Mutex
+	// connecting tracks an in-flight initial connect so concurrent callers
+	// coalesce onto a single handshake.
+	connecting *connectAttempt
+	// connected is set once the initial connect has succeeded and the
+	// reconnect supervisor owns the connection.
+	connected bool
+	// proto is the transport this dialer settled on (ProtocolQUIC or
+	// ProtocolH2). ProtocolAuto until the initial connect completes.
+	proto    Protocol
 	current  *sessionConn
 	fatalErr error
 	// ready is closed every time current is replaced or fatalErr is set.
@@ -681,78 +663,152 @@ type Session struct {
 
 	dialWait time.Duration
 
-	drainOnce   sync.Once
-	drainCh     chan struct{}
-	serverErrCh chan error
+	// done is closed (via doneOnce) when the Dialer is permanently done
+	// dialing: on Close, or on a fatal session error.
+	doneOnce sync.Once
+	done     chan struct{}
 
 	closeOnce sync.Once
+}
+
+// connectAttempt is a single in-flight initial connect. err is only valid
+// once done is closed.
+type connectAttempt struct {
+	done chan struct{}
+	err  error
+}
+
+// Connect forces the Dialer to establish its connection to the server,
+// returning any fatal authentication or session errors. It is safe to call
+// concurrently and repeatedly: concurrent calls coalesce onto a single
+// handshake, an already-connected Dialer waits only for a usable connection
+// (immediate unless a reconnect is in flight), and a Dialer whose initial
+// connect failed retries it. Calling Connect is optional — DialContext
+// connects on first use.
+//
+// ctx bounds only this call. Once established, the connection is scoped to
+// the Dialer and is released by Close.
+func (d *Dialer) Connect(ctx context.Context) error {
+	if err := d.ensureConnected(ctx); err != nil {
+		return err
+	}
+	_, err := d.waitForCurrent(ctx, nil)
+	return err
+}
+
+// ensureConnected runs the initial connect, coalescing concurrent callers
+// onto a single handshake. A failed attempt leaves the Dialer unconnected so
+// a later call can retry. Once an attempt succeeds the reconnect supervisor
+// owns the connection and ensureConnected returns nil without waiting.
+func (d *Dialer) ensureConnected(ctx context.Context) error {
+	d.mu.Lock()
+	if d.connected {
+		d.mu.Unlock()
+		return nil
+	}
+	if d.ctx.Err() != nil {
+		d.mu.Unlock()
+		return ErrSessionClosed
+	}
+	if a := d.connecting; a != nil {
+		d.mu.Unlock()
+		select {
+		case <-a.done:
+			return a.err
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-d.ctx.Done():
+			return ErrSessionClosed
+		}
+	}
+	a := &connectAttempt{done: make(chan struct{})}
+	d.connecting = a
+	d.mu.Unlock()
+
+	first, proto, err := d.open(ctx)
+
+	d.mu.Lock()
+	d.connecting = nil
+	if err == nil && d.ctx.Err() != nil {
+		// Closed while the handshake was in flight.
+		_ = first.close()
+		err = ErrSessionClosed
+	}
+	if err == nil {
+		d.proto = proto
+		d.openFn = func(ctx context.Context) (*sessionConn, error) {
+			return d.openConn(ctx, proto)
+		}
+		d.current = first
+		d.connected = true
+		d.signalReadyLocked()
+		go d.supervise()
+	}
+	a.err = err
+	close(a.done)
+	d.mu.Unlock()
+	return err
 }
 
 const defaultDialWait = 5 * time.Second
 
 // ServerID returns the opaque identifier the server emitted in the most recent
 // SessionAck, or the empty string if no conn is currently established.
-func (s *Session) ServerID() string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.current == nil {
+func (d *Dialer) ServerID() string {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.current == nil {
 		return ""
 	}
-	return s.current.serverID
+	return d.current.serverID
 }
 
-// Protocol returns the transport this session settled on — ProtocolQUIC
-// (HTTP/3) or ProtocolH2 (HTTP/2).
-func (s *Session) Protocol() Protocol { return s.proto }
+// Protocol returns the transport this dialer settled on — ProtocolQUIC
+// (HTTP/3) or ProtocolH2 (HTTP/2) — or ProtocolAuto if it has not yet
+// connected.
+func (d *Dialer) Protocol() Protocol {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.proto
+}
 
 // RemoteAddr returns the server address (host:port) the current underlying
 // transport connection landed on. It returns an empty string if no connection
 // is currently established.
-func (s *Session) RemoteAddr() string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.current == nil {
+func (d *Dialer) RemoteAddr() string {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.current == nil {
 		return ""
 	}
-	return s.current.remoteAddr
+	return d.current.remoteAddr
 }
 
-// PingInterval is the cadence at which the server expects to send and receive
-// Ping frames on the current control stream. Zero if no conn is established.
-func (s *Session) PingInterval() time.Duration {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.current == nil {
-		return 0
+// Done returns a channel that is closed when the Dialer is permanently done
+// dialing: after Close, or after a fatal session error such as a
+// non-retryable auth failure during reconnect. Err reports why. Transient
+// control-stream failures are consumed by the reconnect supervisor and do
+// not close the channel.
+func (d *Dialer) Done() <-chan struct{} { return d.done }
+
+// Err returns the reason the Dialer is done: the fatal session error that
+// tore it down, ErrSessionClosed after a deliberate Close, or nil while the
+// Dialer is still usable.
+func (d *Dialer) Err() error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.fatalErr != nil {
+		return d.fatalErr
 	}
-	return s.current.pingInterval
-}
-
-// LastRTT returns the most recent round-trip time measured by the client-side
-// ping loop on the current conn. Zero before the first pong arrives, and reset
-// to zero across reconnects.
-func (s *Session) LastRTT() time.Duration {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.current == nil {
-		return 0
+	if d.ctx.Err() != nil {
+		return ErrSessionClosed
 	}
-	return s.current.LastRTT()
+	return nil
 }
-
-// DrainCh is closed when any underlying connection receives PleaseDrain. The
-// Session will reconnect automatically; this method remains for compatibility
-// with callers that want to observe drain events.
-func (s *Session) DrainCh() <-chan struct{} { return s.drainCh }
-
-// ServerErrCh delivers fatal logical-session errors, such as non-retryable auth
-// failures during reconnect. Transient control-stream failures are consumed by
-// the reconnect supervisor.
-func (s *Session) ServerErrCh() <-chan error { return s.serverErrCh }
 
 // DialContext opens a new stream targeting addr (of the form 'host:port').
 // The port _must_ be numeric, and the host must refer to a private endpoint
-// within this Session's associated account. For example, if this account has
+// within this Dialer's associated account. For example, if this account has
 // an endpoint created with 'ngrok http --url "http://foo.internal" 8080', the
 // expected invocation to reach that endpoint would be:
 //
@@ -770,7 +826,14 @@ func (s *Session) ServerErrCh() <-chan error { return s.serverErrCh }
 //     syscall.ECONNREFUSED — analogous to a refused TCP connect.
 //   - other codes carry no sentinel; recover the ngrok code with
 //     errors.As(err, &nerr) where nerr is a privatedial.Error.
-func (s *Session) DialContext(ctx context.Context, network string, addr string) (net.Conn, error) {
+//
+// On a Dialer that has not connected yet, DialContext first calls Connect;
+// an error establishing that initial connection is returned as a
+// *net.OpError wrapping the Connect error.
+//
+// Dialing on a Dialer that has been closed, or torn down by a fatal
+// session error, fails with a *net.OpError wrapping ErrSessionClosed.
+func (d *Dialer) DialContext(ctx context.Context, network string, addr string) (net.Conn, error) {
 	if network != "tcp" {
 		// we only support tcp endpoints
 		return nil, net.UnknownNetworkError(network)
@@ -783,18 +846,21 @@ func (s *Session) DialContext(ctx context.Context, network string, addr string) 
 	if err != nil {
 		return nil, &net.OpError{Op: "dial", Net: network, Err: fmt.Errorf("invalid addr port: %w", err)}
 	}
+	if err := d.ensureConnected(ctx); err != nil {
+		return nil, &net.OpError{Op: "dial", Net: network, Err: err}
+	}
 
 	// we validated 'addr' is well formed, so we can just return it up to callers
 	// and save having to format in the port each time.
-	return s.dial(ctx, dialAddr{
+	return d.dial(ctx, dialAddr{
 		addr: addr,
 		host: host,
 		port: int(port),
 	})
 }
 
-func (s *Session) dial(ctx context.Context, addr dialAddr) (net.Conn, error) {
-	timer := s.sessionClock().NewTimer(s.dialWaitTimeout())
+func (d *Dialer) dial(ctx context.Context, addr dialAddr) (net.Conn, error) {
+	timer := d.sessionClock().NewTimer(d.dialWaitTimeout())
 	defer timer.Stop()
 
 	dialErrFor := func(err error) error {
@@ -818,7 +884,7 @@ func (s *Session) dial(ctx context.Context, addr dialAddr) (net.Conn, error) {
 		if err := ctx.Err(); err != nil {
 			return nil, dialErrFor(err)
 		}
-		cur, err := s.waitForCurrent(ctx, timer.C())
+		cur, err := d.waitForCurrent(ctx, timer.C())
 		if err != nil {
 			return nil, dialErrFor(err)
 		}
@@ -836,12 +902,12 @@ func (s *Session) dial(ctx context.Context, addr dialAddr) (net.Conn, error) {
 	}
 }
 
-func (s *Session) waitForCurrent(ctx context.Context, budget <-chan time.Time) (*sessionConn, error) {
+func (d *Dialer) waitForCurrent(ctx context.Context, budget <-chan time.Time) (*sessionConn, error) {
 	for {
-		if err := s.ctx.Err(); err != nil {
-			return nil, errors.New("private-dial: session closed")
+		if err := d.ctx.Err(); err != nil {
+			return nil, ErrSessionClosed
 		}
-		cur, ready, fatal := s.snapshot()
+		cur, ready, fatal := d.snapshot()
 		if fatal != nil {
 			return nil, fatal
 		}
@@ -854,8 +920,8 @@ func (s *Session) waitForCurrent(ctx context.Context, budget <-chan time.Time) (
 			return nil, ctx.Err()
 		case <-budget:
 			return nil, context.DeadlineExceeded
-		case <-s.ctx.Done():
-			return nil, errors.New("private-dial: session closed")
+		case <-d.ctx.Done():
+			return nil, ErrSessionClosed
 		}
 	}
 }
@@ -878,59 +944,59 @@ func newStaleConnError(addr dialAddr) *staleConnError {
 	return &staleConnError{addr: addr}
 }
 
-func (s *Session) dialWaitTimeout() time.Duration {
-	if s.dialWait > 0 {
-		return s.dialWait
+func (d *Dialer) dialWaitTimeout() time.Duration {
+	if d.dialWait > 0 {
+		return d.dialWait
 	}
 	return defaultDialWait
 }
 
-func (s *Session) snapshot() (*sessionConn, <-chan struct{}, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.current, s.ready, s.fatalErr
+func (d *Dialer) snapshot() (*sessionConn, <-chan struct{}, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.current, d.ready, d.fatalErr
 }
 
-func (s *Session) supervise() {
+func (d *Dialer) supervise() {
 	for {
-		s.mu.Lock()
-		cur := s.current
-		s.mu.Unlock()
+		d.mu.Lock()
+		cur := d.current
+		d.mu.Unlock()
 		if cur == nil {
-			next, err := s.reconnect()
+			next, err := d.reconnect()
 			if err != nil {
 				return
 			}
-			s.swapCurrent(next)
+			d.swapCurrent(next)
 			continue
 		}
 		select {
-		case <-s.ctx.Done():
+		case <-d.ctx.Done():
 			return
 		case <-cur.drainCh:
-			s.parkDraining(cur, cur.drainGrace)
+			d.parkDraining(cur, cur.drainGrace)
 		case <-cur.serverErrCh:
 			select {
 			case <-cur.drainCh:
-				s.parkDraining(cur, cur.drainGrace)
+				d.parkDraining(cur, cur.drainGrace)
 			default:
-				s.removeCurrent(cur)
+				d.removeCurrent(cur)
 			}
 		}
 	}
 }
 
-func (s *Session) reconnect() (*sessionConn, error) {
-	boff := newReconnectBackoff(reconnectBackoffMinDelay, reconnectBackoffMaxDelay, s.sessionClock())
+func (d *Dialer) reconnect() (*sessionConn, error) {
+	boff := newReconnectBackoff(reconnectBackoffMinDelay, reconnectBackoffMaxDelay, d.sessionClock())
 	for {
-		if err := s.ctx.Err(); err != nil {
+		if err := d.ctx.Err(); err != nil {
 			return nil, err
 		}
-		attemptCtx, cancel := context.WithTimeout(s.ctx, dialTimeout)
-		h, err := s.openFn(attemptCtx)
+		attemptCtx, cancel := context.WithTimeout(d.ctx, dialTimeout)
+		h, err := d.openFn(attemptCtx)
 		cancel()
 		if err == nil {
-			if cerr := s.ctx.Err(); cerr != nil {
+			if cerr := d.ctx.Err(); cerr != nil {
 				_ = h.close()
 				return nil, cerr
 			}
@@ -938,10 +1004,10 @@ func (s *Session) reconnect() (*sessionConn, error) {
 		}
 		var fatal *authFatalError
 		if errors.As(err, &fatal) {
-			s.setFatal(err)
+			d.setFatal(err)
 			return nil, err
 		}
-		if err := boff.Wait(s.ctx); err != nil {
+		if err := boff.Wait(d.ctx); err != nil {
 			return nil, err
 		}
 	}
@@ -982,103 +1048,101 @@ func (b *reconnectBackoff) Wait(ctx context.Context) error {
 	}
 }
 
-func (s *Session) sessionClock() sessionClock {
-	if s.clock != nil {
-		return s.clock
+func (d *Dialer) sessionClock() sessionClock {
+	if d.clock != nil {
+		return d.clock
 	}
 	return realClock{}
 }
 
-func (s *Session) swapCurrent(h *sessionConn) {
-	s.mu.Lock()
-	if s.ctx.Err() != nil {
-		s.mu.Unlock()
+func (d *Dialer) swapCurrent(h *sessionConn) {
+	d.mu.Lock()
+	if d.ctx.Err() != nil {
+		d.mu.Unlock()
 		_ = h.close()
 		return
 	}
-	s.current = h
-	s.signalReadyLocked()
-	s.mu.Unlock()
+	d.current = h
+	d.signalReadyLocked()
+	d.mu.Unlock()
 }
 
-func (s *Session) parkDraining(old *sessionConn, grace time.Duration) {
-	s.drainOnce.Do(func() { close(s.drainCh) })
-
+func (d *Dialer) parkDraining(old *sessionConn, grace time.Duration) {
 	closeNow := false
-	s.mu.Lock()
-	if s.ctx.Err() != nil {
+	d.mu.Lock()
+	if d.ctx.Err() != nil {
 		closeNow = true
 	} else {
-		if s.current == old {
-			s.current = nil
+		if d.current == old {
+			d.current = nil
 		}
-		s.signalReadyLocked()
+		d.signalReadyLocked()
 
 		if grace <= 0 {
 			closeNow = true
 		} else {
-			clk := s.sessionClock()
-			s.drainGroup.Add(1)
+			clk := d.sessionClock()
+			d.drainGroup.Add(1)
 			go func() {
-				defer s.drainGroup.Done()
+				defer d.drainGroup.Done()
 				timer := clk.NewTimer(grace)
 				defer timer.Stop()
 				select {
 				case <-timer.C():
-				case <-s.ctx.Done():
+				case <-d.ctx.Done():
 				}
 				_ = old.close()
 			}()
 		}
 	}
-	s.mu.Unlock()
+	d.mu.Unlock()
 	if closeNow {
 		_ = old.close()
 	}
 }
 
-func (s *Session) removeCurrent(cur *sessionConn) {
-	s.mu.Lock()
-	if s.current == cur {
-		s.current = nil
-		s.signalReadyLocked()
+func (d *Dialer) removeCurrent(cur *sessionConn) {
+	d.mu.Lock()
+	if d.current == cur {
+		d.current = nil
+		d.signalReadyLocked()
 	}
-	s.mu.Unlock()
+	d.mu.Unlock()
 	_ = cur.close()
 }
 
-func (s *Session) setFatal(err error) {
-	s.mu.Lock()
-	if s.fatalErr == nil {
-		s.fatalErr = err
-		select {
-		case s.serverErrCh <- err:
-		default:
-		}
+func (d *Dialer) setFatal(err error) {
+	d.mu.Lock()
+	if d.fatalErr == nil {
+		d.fatalErr = err
+		d.doneOnce.Do(func() { close(d.done) })
 	}
-	s.signalReadyLocked()
-	s.mu.Unlock()
+	d.signalReadyLocked()
+	d.mu.Unlock()
 }
 
-func (s *Session) signalReadyLocked() {
-	close(s.ready)
-	s.ready = make(chan struct{})
+func (d *Dialer) signalReadyLocked() {
+	close(d.ready)
+	d.ready = make(chan struct{})
 }
 
-// Close tears down the supervisor, the active conn, and any conns still in
-// their drain grace window. In-flight Dial streams will see read/write errors.
-func (s *Session) Close() error {
-	s.closeOnce.Do(func() {
-		s.cancel()
-		s.mu.Lock()
-		cur := s.current
-		s.current = nil
-		s.signalReadyLocked()
-		s.mu.Unlock()
+// Close tears down the Dialer: the supervisor, the active conn, and any conns
+// still in their drain grace window. In-flight Dial streams will see
+// read/write errors, and subsequent Connect or DialContext calls fail with
+// ErrSessionClosed.
+func (d *Dialer) Close() error {
+	d.closeOnce.Do(func() {
+		d.cancel()
+		d.doneOnce.Do(func() { close(d.done) })
+		d.mu.Lock()
+		cur := d.current
+		d.current = nil
+		d.signalReadyLocked()
+		d.mu.Unlock()
 		if cur != nil {
 			_ = cur.close()
 		}
-		s.drainGroup.Wait()
+		d.drainGroup.Wait()
 	})
 	return nil
 }
@@ -1117,16 +1181,7 @@ type sessionConn struct {
 
 	stopCh chan struct{}
 
-	rttMu   sync.Mutex
-	lastRTT time.Duration
-
 	closeOnce sync.Once
-}
-
-func (h *sessionConn) LastRTT() time.Duration {
-	h.rttMu.Lock()
-	defer h.rttMu.Unlock()
-	return h.lastRTT
 }
 
 func (h *sessionConn) dial(ctx context.Context, addr dialAddr) (net.Conn, error) {
@@ -1243,6 +1298,12 @@ type Error interface {
 	// It is empty if the server did not send one.
 	Code() string
 }
+
+// ErrSessionClosed is reported by Connect and DialContext when the Dialer has
+// been torn down, either by Close or by a fatal session error. From
+// DialContext it arrives wrapped in a *net.OpError; match it with
+// errors.Is(err, ErrSessionClosed).
+var ErrSessionClosed = errors.New("private-dial: session closed")
 
 const ngrokErrorsURL = "https://ngrok.com/docs/errors"
 
@@ -1362,9 +1423,9 @@ func (h *sessionConn) close() error {
 	return nil
 }
 
-// errSessionClosed is returned by sendControlFrame when the session has
-// been closed or the controlSender goroutine has exited.
-var errSessionClosed = errors.New("private-dial: session closed")
+// errConnClosed is returned by sendControlFrame when the conn has been
+// closed or the controlSender goroutine has exited.
+var errConnClosed = errors.New("private-dial: conn closed")
 
 // sendControlFrame hands frame to the controlSender goroutine. It
 // respects ctx, so a stalled wire (which can park the underlying
@@ -1378,9 +1439,9 @@ func (h *sessionConn) sendControlFrame(ctx context.Context, frame *pbpd.ControlF
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-h.stopCh:
-		return errSessionClosed
+		return errConnClosed
 	case <-h.sendDone:
-		return errSessionClosed
+		return errConnClosed
 	}
 }
 
@@ -1408,12 +1469,12 @@ func (h *sessionConn) controlSender() {
 	}
 }
 
-// pingLoop sends a Ping every pingInterval and records RTT when the
+// pingLoop sends a Ping every pingInterval and resolves the token when the
 // matching Pong arrives. It stops on Close.
 //
 // Each tick uses a per-send timeout of pingInterval so a stuck sender
 // can't pin successive ticks; transient timeouts just skip a ping and
-// let the next tick try again. Terminal errSessionClosed exits the loop.
+// let the next tick try again. Terminal errConnClosed exits the loop.
 func (h *sessionConn) pingLoop() {
 	tick := time.NewTicker(h.pingInterval)
 	defer tick.Stop()
@@ -1428,7 +1489,7 @@ func (h *sessionConn) pingLoop() {
 				Frame: &pbpd.ControlFrame_Ping{Ping: &pbpd.Ping{Token: token}},
 			})
 			cancel()
-			if errors.Is(err, errSessionClosed) {
+			if errors.Is(err, errConnClosed) {
 				return
 			}
 		}
@@ -1458,7 +1519,7 @@ func (h *sessionConn) completePing(token uint64, now time.Time) (time.Duration, 
 
 // readControl pumps ControlFrames from the server until EOF or error.
 // It closes drainCh on PleaseDrain, echoes Pong on inbound Ping (so the
-// server can measure its RTT to us), records client-side RTT on Pong,
+// server can measure its RTT to us), resolves outstanding pings on Pong,
 // and forwards terminal errors to serverErrCh.
 func (h *sessionConn) readControl() {
 	defer func() {
@@ -1504,16 +1565,14 @@ func (h *sessionConn) readControl() {
 				Frame: &pbpd.ControlFrame_Pong{Pong: &pbpd.Pong{Token: f.Ping.GetToken()}},
 			})
 		case *pbpd.ControlFrame_Pong:
-			if rtt, ok := h.completePing(f.Pong.GetToken(), time.Now()); ok {
-				h.rttMu.Lock()
-				h.lastRTT = rtt
-				h.rttMu.Unlock()
-			}
+			// completePing keeps the outstanding-ping map from growing; the
+			// measured RTT is not currently surfaced anywhere.
+			_, _ = h.completePing(f.Pong.GetToken(), time.Now())
 		}
 	}
 }
 
-// dialConn is the net.Conn returned from Session.DialContext. Read pulls
+// dialConn is the net.Conn returned from Dialer.DialContext. Read pulls
 // from the response body; Write pushes into the request body. Close terminates
 // both sides.
 //
