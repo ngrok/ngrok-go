@@ -18,7 +18,7 @@ import (
 
 	"google.golang.org/protobuf/encoding/protodelim"
 
-	pbpd "golang.ngrok.com/ngrok/privatedial/pb_private_dial"
+	pbpd "golang.ngrok.com/ngrok/privatedial/internal/pb_private_dial"
 )
 
 func newFakeConn(id string) *sessionConn {

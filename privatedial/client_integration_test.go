@@ -26,7 +26,7 @@ import (
 	"golang.org/x/net/http2"
 	"google.golang.org/protobuf/encoding/protodelim"
 
-	pbpd "golang.ngrok.com/ngrok/privatedial/pb_private_dial"
+	pbpd "golang.ngrok.com/ngrok/privatedial/internal/pb_private_dial"
 )
 
 // These tests stand up real HTTP/2 and HTTP/3 servers that speak the
