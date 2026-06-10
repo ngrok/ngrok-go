@@ -163,20 +163,18 @@ func newReadCloseByteReader(rc io.ReadCloser) *readCloseByteReader {
 
 func (r *readCloseByteReader) Close() error { return r.closer.Close() }
 
-// Config configures a Dialer.
+// Config configures a Dialer. The server addresses are endpoints serving the
+// private-dial protocol; the net.Dial to them must reach a mux
+// PrivateDialIngresses listener.
 type Config struct {
-	// ServerAddr is the "host:port" endpoint that serves the private-dial
-	// protocol (e.g. "h2.connect-endpoint.ngrok.com:443"). The net.Dial to
-	// this address must reach a mux PrivateDialIngresses listener. It is the
-	// default for both QUICServerAddr and H2ServerAddr.
-	ServerAddr string
-
-	// QUICServerAddr is the "host:port" used for the HTTP/3 (QUIC) attempt
-	// (e.g. "quic.connect-endpoint.ngrok.com:443"). Defaults to ServerAddr.
+	// QUICServerAddr is the "host:port" used for the HTTP/3 (QUIC)
+	// transport (e.g. "quic.connect-endpoint.ngrok.com:443"). Required
+	// unless ForceProtocol is ProtocolH2.
 	QUICServerAddr string
 
-	// H2ServerAddr is the "host:port" used for the HTTP/2 attempt
-	// (e.g. "h2.connect-endpoint.ngrok.com:443"). Defaults to ServerAddr.
+	// H2ServerAddr is the "host:port" used for the HTTP/2 transport
+	// (e.g. "h2.connect-endpoint.ngrok.com:443"). Required unless
+	// ForceProtocol is ProtocolQUIC.
 	H2ServerAddr string
 
 	// ForceProtocol, when not ProtocolAuto, skips the Happy-Eyeballs race
@@ -184,18 +182,15 @@ type Config struct {
 	// UDP (force ProtocolH2) or TCP (force ProtocolQUIC) is unavailable.
 	ForceProtocol Protocol
 
-	// ServerName overrides the SNI name used when negotiating TLS. When
-	// empty, the SNI defaults to the host portion of the per-protocol
-	// server address.
-	ServerName string
-
 	// AuthToken is the auth token to use. During development, this is an ngrok
 	// API Key, it'll be a proper token eventually.
 	AuthToken string
 
-	// TLSConfig overrides the default TLS config. MinVersion defaults to
-	// TLS 1.3 when unset, and NextProtos is always set to match the
-	// negotiated transport (h2 or h3).
+	// TLSConfig overrides the default TLS config. Its ServerName, when set,
+	// overrides the SNI, which otherwise defaults to the host portion of
+	// the per-protocol server address. MinVersion defaults to TLS 1.3 when
+	// unset, and NextProtos is always set to match the negotiated transport
+	// (h2 or h3).
 	TLSConfig *tls.Config
 
 	// ClientVersion is metadata about this client.
@@ -212,12 +207,6 @@ type Config struct {
 // establish it eagerly. The caller must Close the Dialer to release the
 // connection.
 func New(cfg Config) *Dialer {
-	if cfg.QUICServerAddr == "" {
-		cfg.QUICServerAddr = cfg.ServerAddr
-	}
-	if cfg.H2ServerAddr == "" {
-		cfg.H2ServerAddr = cfg.ServerAddr
-	}
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Dialer{
 		cfg:    cfg,
@@ -228,12 +217,9 @@ func New(cfg Config) *Dialer {
 	}
 }
 
-// serverNameFor returns the SNI to use for a given server address: the
-// explicit ServerName override when set, otherwise the host portion of addr.
-func (d *Dialer) serverNameFor(addr string) string {
-	if d.cfg.ServerName != "" {
-		return d.cfg.ServerName
-	}
+// serverNameFor returns the default SNI for a server address: its host
+// portion. Callers override it via Config.TLSConfig.ServerName.
+func serverNameFor(addr string) string {
 	if host, _, err := net.SplitHostPort(addr); err == nil {
 		return host
 	}
@@ -390,9 +376,15 @@ func (d *Dialer) openConn(ctx context.Context, p Protocol) (*sessionConn, error)
 	)
 	switch p {
 	case ProtocolQUIC:
+		if d.cfg.QUICServerAddr == "" {
+			return nil, errors.New("private-dial: Config.QUICServerAddr is required for HTTP/3")
+		}
 		transport, rec = d.newH3Transport()
 		serverAddr = d.cfg.QUICServerAddr
 	case ProtocolH2:
+		if d.cfg.H2ServerAddr == "" {
+			return nil, errors.New("private-dial: Config.H2ServerAddr is required for HTTP/2")
+		}
 		transport, remoteAddr, err = d.newH2Transport(ctx)
 		if err != nil {
 			return nil, err
@@ -520,7 +512,9 @@ func (d *Dialer) tlsConfigFor(serverAddr string, nextProtos ...string) *tls.Conf
 	if d.cfg.TLSConfig != nil {
 		tlsCfg = d.cfg.TLSConfig.Clone()
 	}
-	tlsCfg.ServerName = d.serverNameFor(serverAddr)
+	if tlsCfg.ServerName == "" {
+		tlsCfg.ServerName = serverNameFor(serverAddr)
+	}
 	tlsCfg.NextProtos = nextProtos
 	if tlsCfg.MinVersion == 0 {
 		tlsCfg.MinVersion = tls.VersionTLS13
