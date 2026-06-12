@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -25,6 +26,7 @@ import (
 
 func newFakeConn(id string) *sessionConn {
 	return &sessionConn{
+		log:         slog.New(slog.DiscardHandler),
 		serverID:    id,
 		proto:       ProtocolH2,
 		drainCh:     make(chan struct{}),
@@ -57,6 +59,7 @@ func newTestSessionWithClock(t *testing.T, openFn func(context.Context) (*sessio
 	ctx, cancel := context.WithCancel(context.Background())
 	clk := newManualClock(time.Now())
 	s := &Dialer{
+		log:       slog.New(slog.DiscardHandler),
 		ctx:       ctx,
 		cancel:    cancel,
 		proto:     ProtocolH2,
@@ -75,6 +78,7 @@ func newTestSessionWithClock(t *testing.T, openFn func(context.Context) (*sessio
 func newBareDialerForTest(current *sessionConn, dialWait time.Duration) *Dialer {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Dialer{
+		log:       slog.New(slog.DiscardHandler),
 		ctx:       ctx,
 		cancel:    cancel,
 		proto:     ProtocolH2,
@@ -500,6 +504,7 @@ func TestDialBudgetBoundsHangingRoundTrip(t *testing.T) {
 func TestParkDrainingNoOpAfterClose(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	s := &Dialer{
+		log:      slog.New(slog.DiscardHandler),
 		ctx:      ctx,
 		cancel:   cancel,
 		ready:    make(chan struct{}),
