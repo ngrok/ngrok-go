@@ -120,16 +120,29 @@ func MakeHTTPRequest(ctx context.Context, tb testing.TB, url string, message str
 	return resp, nil
 }
 
-// WaitForForwarderReady polls the forwarder endpoint until it responds or times out
+// WaitForForwarderReady polls the forwarder endpoint until ngrok's edge is
+// actually routing traffic to it, or the timeout elapses.
+//
+// A freshly-created endpoint takes time to propagate to ngrok's edge. Until it
+// has, the edge responds with 404 even though the agent session is up, so a
+// successful HTTP response alone does not mean the endpoint is ready - we must
+// keep polling until the edge stops returning 404. Any other status (200 from a
+// healthy upstream, 502 from an upstream that intentionally fails, etc.) means
+// the edge is routing to the endpoint.
 func WaitForForwarderReady(t *testing.T, url string) {
-	client := &http.Client{Timeout: 100 * time.Millisecond}
-	for start := time.Now(); time.Since(start) < 500*time.Millisecond; {
+	t.Helper()
+	client := &http.Client{Timeout: 5 * time.Second}
+	deadline := time.Now().Add(30 * time.Second)
+	for time.Now().Before(deadline) {
 		resp, err := client.Get(url)
 		if err == nil {
+			status := resp.StatusCode
 			resp.Body.Close()
-			return
+			if status != http.StatusNotFound {
+				return
+			}
 		}
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(250 * time.Millisecond)
 	}
 	t.Logf("Forwarder endpoint didn't become ready in expected time, continuing anyway")
 }

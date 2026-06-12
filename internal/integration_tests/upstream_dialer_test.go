@@ -69,6 +69,12 @@ func TestUpstreamDialer(t *testing.T) {
 	ngrokURL := forwarder.URL().String()
 	t.Logf("Forwarder URL: %s", ngrokURL)
 
+	// Wait until ngrok's edge is routing traffic to the endpoint. This also
+	// drives a request through to our custom dialer (which fails, so the edge
+	// returns 502, not 404), so the endpoint is guaranteed to be reachable
+	// before we rely on the dialer being called.
+	WaitForForwarderReady(t, ngrokURL)
+
 	// Now make a request to trigger the dialer
 	t.Logf("Making request to trigger upstream connection...")
 	// The request will fail, but we'll ignore that since we expect it to fail
@@ -79,7 +85,7 @@ func TestUpstreamDialer(t *testing.T) {
 
 	// Wait for our dialer to be called with a timeout
 	t.Log("Waiting for dialer to be called...")
-	customDialer.WaitForCall(t, 3*time.Second)
+	customDialer.WaitForCall(t, 10*time.Second)
 
 	// If we got here, the test passed (WaitForCall would have failed if the dialer wasn't called)
 	t.Log("Custom dialer was successfully called")
