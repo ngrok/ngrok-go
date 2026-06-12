@@ -59,6 +59,8 @@ func TestForward(t *testing.T) {
 	// Signal that forwarding is ready
 	forwarderReady.Signal()
 
+	WaitForForwarderReady(t, ngrokURL)
+
 	// Send a request to the ngrok URL
 	expectedMessage := "Hello from forward test!"
 	resp, err := MakeHTTPRequest(ctx, t, ngrokURL, expectedMessage)
