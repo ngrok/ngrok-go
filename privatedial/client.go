@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	mathrand "math/rand/v2"
 	"net"
 	"net/http"
@@ -208,6 +209,11 @@ type Config struct {
 	// available (TODO) in the cel environment of endpoints receiving requests
 	// from this client.
 	Metadata map[string]string
+
+	// Logger, when set, receives debug-level logs of connection lifecycle
+	// events: protocol selection, session establishment, reconnects, drains,
+	// and per-stream dials. A nil Logger disables logging.
+	Logger *slog.Logger
 }
 
 // New returns a Dialer for the configured server. It does not open any
@@ -215,9 +221,14 @@ type Config struct {
 // establish it eagerly. The caller must Close the Dialer to release the
 // connection.
 func New(cfg Config) *Dialer {
+	logger := cfg.Logger
+	if logger == nil {
+		logger = slog.New(slog.DiscardHandler)
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Dialer{
 		cfg:    cfg,
+		log:    logger,
 		ctx:    ctx,
 		cancel: cancel,
 		ready:  make(chan struct{}),
@@ -248,6 +259,7 @@ func (d *Dialer) open(ctx context.Context) (*sessionConn, Protocol, error) {
 		stickyProto := stickyProtocol.Load()
 		if stickyProto != nil {
 			proto = *stickyProto
+			d.log.Debug("reusing protocol from earlier race", "protocol", proto)
 		}
 	}
 	switch proto {
@@ -256,6 +268,7 @@ func (d *Dialer) open(ctx context.Context) (*sessionConn, Protocol, error) {
 		conn, err := d.openConn(ctx, proto)
 		return conn, proto, err
 	default:
+		d.log.Debug("racing HTTP/3 against HTTP/2", "quic_head_start", quicHeadStart)
 		return d.race(ctx)
 	}
 }
@@ -276,6 +289,9 @@ func (d *Dialer) race(ctx context.Context) (*sessionConn, Protocol, error) {
 		ch := make(chan result, 1)
 		go func() {
 			conn, err := d.openConn(attemptCtx, p)
+			if err != nil {
+				d.log.Debug("race attempt failed", "protocol", p, "error", err)
+			}
 			ch <- result{proto: p, conn: conn, err: err}
 		}()
 		return ch, cancel
@@ -306,11 +322,13 @@ func (d *Dialer) race(ctx context.Context) (*sessionConn, Protocol, error) {
 		if r.err == nil {
 			quicCancel()
 			stickyProtocol.CompareAndSwap(nil, new(ProtocolQUIC))
+			d.log.Debug("race settled within head start", "protocol", ProtocolQUIC)
 			return r.conn, ProtocolQUIC, nil
 		}
 		quicErr = r.err
 	case <-timer.C:
 		// QUIC still in flight; stagger in HTTP/2 below.
+		d.log.Debug("HTTP/3 head start elapsed, staggering in HTTP/2")
 	}
 
 	// Phase 2: HTTP/2 joins the race. First success wins, QUIC preferred.
@@ -337,6 +355,7 @@ func (d *Dialer) race(ctx context.Context) (*sessionConn, Protocol, error) {
 					closeLoser(h2Ch, h2Cancel)
 				}
 				stickyProtocol.CompareAndSwap(nil, new(ProtocolQUIC))
+				d.log.Debug("race settled", "protocol", ProtocolQUIC)
 				return r.conn, ProtocolQUIC, nil
 			}
 			quicErr = r.err
@@ -350,6 +369,7 @@ func (d *Dialer) race(ctx context.Context) (*sessionConn, Protocol, error) {
 					closeLoser(quicCh, quicCancel)
 				}
 				stickyProtocol.CompareAndSwap(nil, new(ProtocolH2))
+				d.log.Debug("race settled", "protocol", ProtocolH2)
 				return r.conn, ProtocolH2, nil
 			}
 			h2Err = r.err
@@ -402,7 +422,10 @@ func (d *Dialer) openConn(ctx context.Context, p Protocol) (*sessionConn, error)
 		return nil, fmt.Errorf("private-dial: unsupported protocol %d", p)
 	}
 
+	d.log.Debug("opening session", "protocol", p, "server_addr", serverAddr)
+
 	h := &sessionConn{
+		log:        d.log.With("protocol", p),
 		proto:      p,
 		transport:  transport,
 		remoteAddr: remoteAddr,
@@ -494,6 +517,7 @@ func (d *Dialer) openConn(ctx context.Context, p Protocol) (*sessionConn, error)
 		h.remoteAddr = rec.get()
 	}
 	h.serverID = ack.GetServerId()
+	h.log = h.log.With("server_id", h.serverID)
 	h.pingInterval = ack.GetPingInterval().AsDuration()
 	h.dialURL = dialURL
 	h.authToken = d.cfg.AuthToken
@@ -504,6 +528,11 @@ func (d *Dialer) openConn(ctx context.Context, p Protocol) (*sessionConn, error)
 	h.pings = map[uint64]time.Time{}
 	h.drainCh = make(chan struct{})
 	h.serverErrCh = make(chan error, 1)
+
+	h.log.Debug("session established",
+		"remote_addr", h.remoteAddr,
+		"ping_interval", h.pingInterval,
+	)
 
 	go h.controlSender()
 	go h.readControl()
@@ -642,6 +671,7 @@ func (e *authFatalError) Unwrap() error { return e.err }
 // failures, and routes new Dial calls to the freshest underlying transport.
 type Dialer struct {
 	cfg Config
+	log *slog.Logger
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -756,6 +786,9 @@ func (d *Dialer) ensureConnected(ctx context.Context) error {
 	a.err = err
 	close(a.done)
 	d.mu.Unlock()
+	if err != nil {
+		d.log.Debug("initial connect failed", "error", err)
+	}
 	return err
 }
 
@@ -916,6 +949,7 @@ func (d *Dialer) dial(ctx context.Context, addr dialAddr) (net.Conn, error) {
 		if !errors.As(dialErr, &stale) {
 			return nil, dialErr
 		}
+		d.log.Debug("dial raced a stale conn, retrying on a fresh one", "addr", addr.addr, "error", dialErr)
 	}
 }
 
@@ -990,11 +1024,12 @@ func (d *Dialer) supervise() {
 			return
 		case <-cur.drainCh:
 			d.parkDraining(cur, cur.drainGrace)
-		case <-cur.serverErrCh:
+		case err := <-cur.serverErrCh:
 			select {
 			case <-cur.drainCh:
 				d.parkDraining(cur, cur.drainGrace)
 			default:
+				cur.log.Debug("control stream failed, reconnecting", "error", err)
 				d.removeCurrent(cur)
 			}
 		}
@@ -1015,13 +1050,16 @@ func (d *Dialer) reconnect() (*sessionConn, error) {
 				_ = h.close()
 				return nil, cerr
 			}
+			h.log.Debug("reconnected")
 			return h, nil
 		}
 		var fatal *authFatalError
 		if errors.As(err, &fatal) {
+			d.log.Debug("reconnect failed with fatal auth error, giving up", "error", err)
 			d.setFatal(err)
 			return nil, err
 		}
+		d.log.Debug("reconnect attempt failed, backing off", "error", err, "backoff", boff.next)
 		if err := boff.Wait(d.ctx); err != nil {
 			return nil, err
 		}
@@ -1096,6 +1134,7 @@ func (d *Dialer) parkDraining(old *sessionConn, grace time.Duration) {
 		if grace <= 0 {
 			closeNow = true
 		} else {
+			old.log.Debug("server requested drain, parking connection", "grace", grace)
 			clk := d.sessionClock()
 			d.drainGroup.Add(1)
 			go func() {
@@ -1106,6 +1145,7 @@ func (d *Dialer) parkDraining(old *sessionConn, grace time.Duration) {
 				case <-timer.C():
 				case <-d.ctx.Done():
 				}
+				old.log.Debug("drain grace period over, closing parked connection")
 				_ = old.close()
 			}()
 		}
@@ -1147,6 +1187,7 @@ func (d *Dialer) signalReadyLocked() {
 // ErrSessionClosed.
 func (d *Dialer) Close() error {
 	d.closeOnce.Do(func() {
+		d.log.Debug("closing dialer")
 		d.cancel()
 		d.doneOnce.Do(func() { close(d.done) })
 		d.mu.Lock()
@@ -1163,6 +1204,7 @@ func (d *Dialer) Close() error {
 }
 
 type sessionConn struct {
+	log          *slog.Logger
 	serverID     string
 	pingInterval time.Duration
 	proto        Protocol
@@ -1200,6 +1242,7 @@ type sessionConn struct {
 }
 
 func (h *sessionConn) dial(ctx context.Context, addr dialAddr) (net.Conn, error) {
+	h.log.Debug("dialing endpoint", "addr", addr.addr)
 	reqReader, reqWriter := io.Pipe()
 	reqCtx, reqCancel := context.WithCancel(context.Background())
 	req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, h.dialURL.String(), reqReader)
@@ -1415,6 +1458,7 @@ func (h *sessionConn) acceptsStreams() bool {
 
 func (h *sessionConn) close() error {
 	h.closeOnce.Do(func() {
+		h.log.Debug("closing session conn")
 		h.markClosed()
 		close(h.stopCh)
 		if h.controlReqBody != nil {
@@ -1551,14 +1595,18 @@ func (h *sessionConn) readControl() {
 				// deferred send would otherwise forward.
 				if h.controlResp != nil {
 					if rerr := errorFromTrailer(h.controlResp.Trailer); rerr != nil {
+						h.log.Debug("control stream ended with server-reported error", "error", rerr)
 						select {
 						case h.serverErrCh <- rerr:
 						default:
 						}
+						return
 					}
 				}
+				h.log.Debug("control stream ended")
 				return
 			}
+			h.log.Debug("control stream read failed", "error", err)
 			select {
 			case h.serverErrCh <- err:
 			default:
@@ -1567,8 +1615,11 @@ func (h *sessionConn) readControl() {
 		}
 		switch f := frame.Frame.(type) {
 		case *pbpd.ControlFrame_PleaseDrain:
-			h.markDraining(time.Duration(f.PleaseDrain.GetGracePeriodSeconds()) * time.Second)
+			grace := time.Duration(f.PleaseDrain.GetGracePeriodSeconds()) * time.Second
+			h.log.Debug("received PleaseDrain", "grace", grace)
+			h.markDraining(grace)
 		case *pbpd.ControlFrame_SessionError:
+			h.log.Debug("received SessionError", "message", f.SessionError.GetMessage())
 			select {
 			case h.serverErrCh <- fmt.Errorf("server session error: %s", f.SessionError.GetMessage()):
 			default:
@@ -1580,8 +1631,10 @@ func (h *sessionConn) readControl() {
 			})
 		case *pbpd.ControlFrame_Pong:
 			// completePing keeps the outstanding-ping map from growing; the
-			// measured RTT is not currently surfaced anywhere.
-			_, _ = h.completePing(f.Pong.GetToken(), time.Now())
+			// measured RTT is not otherwise surfaced anywhere.
+			if rtt, ok := h.completePing(f.Pong.GetToken(), time.Now()); ok {
+				h.log.Debug("ping round-trip completed", "rtt", rtt)
+			}
 		}
 	}
 }

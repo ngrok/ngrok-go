@@ -36,6 +36,8 @@ func TestWebSocketUpgrade(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(ngrokURL, "http")
 	t.Logf("WebSocket URL: %s", wsURL)
 
+	WaitForForwarderReady(t, ngrokURL)
+
 	t.Run("echo message", func(t *testing.T) {
 		ws, err := websocket.Dial(wsURL, "", ngrokURL)
 		require.NoError(t, err, "Failed to connect WebSocket")

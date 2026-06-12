@@ -66,6 +66,8 @@ func TestUpstreamProtocolHTTP2(t *testing.T) {
 		ngrokURL := forwarder.URL().String()
 		t.Logf("Forwarder URL: %s", ngrokURL)
 
+		WaitForForwarderReady(t, ngrokURL)
+
 		// Send a request to the ngrok URL
 		message := "Testing HTTP version"
 		resp, err := MakeHTTPRequest(ctx, t, ngrokURL, message)
