@@ -90,6 +90,27 @@ var errDialWaitTimeout = errors.New("private-dial: dial wait timeout")
 // it and skips the happy-eyeballs race entirely.
 var stickyProtocol atomic.Pointer[Protocol]
 
+// probeBuffers reports whether a QUIC socket could obtain the UDP buffer sizes
+// quic-go wants; a non-nil error means it could not and HTTP/2 should be forced
+// instead of racing. It is a var so tests can drive a deterministic outcome
+// regardless of the host kernel's buffer tuning.
+var probeBuffers = probeQUICBuffers
+
+// The buffer-probe outcome is a host/kernel property — identical for every
+// Dialer in the process — so it is memoized here, lazily and exactly once.
+var (
+	probeOnce sync.Once
+	probeErr  error
+)
+
+// quicBuffersUsable runs the UDP-buffer probe at most once per process and
+// returns its (cached) result. A non-nil error means a QUIC connection would be
+// degraded, so the caller should force HTTP/2.
+func quicBuffersUsable() error {
+	probeOnce.Do(func() { probeErr = probeBuffers() })
+	return probeErr
+}
+
 // roundTripCloser is the subset of transport behavior the session relies on.
 // Holding the transport behind this interface lets a single Dialer
 // implementation drive either protocol.
@@ -260,6 +281,11 @@ func (d *Dialer) open(ctx context.Context) (*sessionConn, Protocol, error) {
 		if stickyProto != nil {
 			proto = *stickyProto
 			d.log.Debug("reusing protocol from earlier race", "protocol", proto)
+		} else if err := quicBuffersUsable(); err != nil {
+			// Force H2 if quic buffers are small.
+			// See https://github.com/quic-go/quic-go/wiki/UDP-Buffer-Sizes
+			proto = ProtocolH2
+			d.log.Debug("UDP buffer probe failed, forcing HTTP/2", "error", err)
 		}
 	}
 	switch proto {
