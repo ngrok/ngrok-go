@@ -236,6 +236,13 @@ func TestDialEcho(t *testing.T) {
 			}
 			defer conn.Close()
 
+			// The server reports the resolved endpoint ID in the DialResp frame.
+			if pc, ok := conn.(Conn); !ok {
+				t.Fatalf("conn %T does not implement privatedial.Conn", conn)
+			} else if pc.EndpointID() != "ep_test" {
+				t.Fatalf("EndpointID() = %q, want %q", pc.EndpointID(), "ep_test")
+			}
+
 			payload := []byte("hello private dial over " + tc.name)
 			if _, err := conn.Write(payload); err != nil {
 				t.Fatalf("Write: %v", err)
@@ -256,10 +263,11 @@ func TestDialEcho(t *testing.T) {
 	}
 }
 
-// TestDialTrailerError proves an end-to-end dial failure reported via HTTP
-// trailers is rehydrated into a privatedial.Error and surfaced on the first
-// Read of the returned conn (the server commits to a 200 before it knows the
-// dial outcome, so the error can only ride out on the trailers).
+// TestDialTrailerError proves an end-to-end pre-bridge dial failure reported
+// via HTTP trailers is rehydrated into a privatedial.Error and surfaced from
+// DialContext itself: the server commits a 200 with no DialResp frame and an
+// empty body, so reading the (absent) success frame fails and the client
+// consults the trailers before returning the conn.
 func TestDialTrailerError(t *testing.T) {
 	cert := genTLSCert(t)
 
@@ -283,8 +291,9 @@ func TestDialTrailerError(t *testing.T) {
 				http.Error(w, "bad DialReq", http.StatusBadRequest)
 				return
 			}
-			// Commit to a 200, then report the dial failure via trailers
-			// with no body, mirroring an immediate server-side failure.
+			// Commit to a 200, then report the dial failure via trailers with
+			// no DialResp and no body, mirroring an immediate server-side
+			// failure (e.g. endpoint not found).
 			w.Header().Set(http.TrailerPrefix+dialErrorCodeTrailer, errCodeSessionDraining)
 			w.Header().Set(http.TrailerPrefix+dialErrorMessageTrailer, "session draining")
 			w.WriteHeader(http.StatusOK)
@@ -305,31 +314,104 @@ func TestDialTrailerError(t *testing.T) {
 			sess := mustConnect(t, configForProtocol(t, tc.proto, cert, dialErrorHandler()))
 			defer sess.Close()
 
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_, err := sess.DialContext(ctx, "tcp", "foo.private:80")
+			if err == nil {
+				t.Fatal("DialContext succeeded, want trailer error")
+			}
+			assertDialTrailerError(t, err)
+		})
+	}
+}
+
+// TestDialMidStreamTrailerError proves a failure that occurs after the stream
+// is established (a successful DialResp, then bytes, then an error trailer)
+// surfaces on the first failing Read rather than from DialContext.
+func TestDialMidStreamTrailerError(t *testing.T) {
+	cert := genTLSCert(t)
+
+	midStreamErrorHandler := func() http.Handler {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/session", func(w http.ResponseWriter, r *http.Request) {
+			var req pbpd.SessionReq
+			if err := protodelimUnmarshaler.UnmarshalFrom(bufio.NewReader(r.Body), &req); err != nil {
+				http.Error(w, "bad SessionReq", http.StatusBadRequest)
+				return
+			}
+			if _, err := protodelim.MarshalTo(w, &pbpd.SessionAck{ServerId: "midstream-srv"}); err != nil {
+				return
+			}
+			flush(w)
+			<-r.Context().Done()
+		})
+		mux.HandleFunc("/dial", func(w http.ResponseWriter, r *http.Request) {
+			var dreq pbpd.DialReq
+			if err := protodelimUnmarshaler.UnmarshalFrom(bufio.NewReader(r.Body), &dreq); err != nil {
+				http.Error(w, "bad DialReq", http.StatusBadRequest)
+				return
+			}
+			// Succeed (DialResp + some bytes), then fail via trailers.
+			w.Header().Set(http.TrailerPrefix+dialErrorCodeTrailer, errCodeSessionDraining)
+			w.Header().Set(http.TrailerPrefix+dialErrorMessageTrailer, "session draining")
+			w.WriteHeader(http.StatusOK)
+			if _, err := protodelim.MarshalTo(w, &pbpd.DialResp{EndpointId: "ep_test"}); err != nil {
+				return
+			}
+			_, _ = w.Write([]byte("partial"))
+			flush(w)
+		})
+		return mux
+	}
+
+	for _, tc := range []struct {
+		name  string
+		proto Protocol
+	}{
+		{"h2", ProtocolH2},
+		{"quic", ProtocolQUIC},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			resetSticky()
+			sess := mustConnect(t, configForProtocol(t, tc.proto, cert, midStreamErrorHandler()))
+			defer sess.Close()
+
+			// The dial itself succeeds — the error only appears once the stream ends.
 			conn := mustDial(t, sess, "foo.private:80")
 			defer conn.Close()
 
-			_, err := io.ReadAll(conn)
+			got, err := io.ReadAll(conn)
+			if string(got) != "partial" {
+				t.Fatalf("read %q, want the pre-error bytes %q", got, "partial")
+			}
 			if err == nil {
 				t.Fatal("Read succeeded, want trailer error")
 			}
 			if errors.Is(err, io.EOF) {
 				t.Fatalf("Read returned io.EOF, want trailer error")
 			}
-			var nerr Error
-			if !errors.As(err, &nerr) {
-				t.Fatalf("error %T not assignable to privatedial.Error", err)
-			}
-			if nerr.Code() != errCodeSessionDraining {
-				t.Fatalf("Code() = %q, want %q", nerr.Code(), errCodeSessionDraining)
-			}
-			if !strings.Contains(nerr.Error(), "session draining") {
-				t.Fatalf("Error() = %q, want to contain message", nerr.Error())
-			}
-			// The code's net sentinel must bubble end-to-end.
-			if !errors.Is(err, syscall.ECONNREFUSED) {
-				t.Fatalf("want ECONNREFUSED to bubble, got %v", err)
-			}
+			assertDialTrailerError(t, err)
 		})
+	}
+}
+
+// assertDialTrailerError checks that err is the rehydrated session-draining
+// trailer error, carrying its ngrok code, message, and net sentinel.
+func assertDialTrailerError(t *testing.T, err error) {
+	t.Helper()
+	var nerr Error
+	if !errors.As(err, &nerr) {
+		t.Fatalf("error %T not assignable to privatedial.Error", err)
+	}
+	if nerr.Code() != errCodeSessionDraining {
+		t.Fatalf("Code() = %q, want %q", nerr.Code(), errCodeSessionDraining)
+	}
+	if !strings.Contains(nerr.Error(), "session draining") {
+		t.Fatalf("Error() = %q, want to contain message", nerr.Error())
+	}
+	// The code's net sentinel must bubble end-to-end.
+	if !errors.Is(err, syscall.ECONNREFUSED) {
+		t.Fatalf("want ECONNREFUSED to bubble, got %v", err)
 	}
 }
 
@@ -620,6 +702,10 @@ func privateDialHandler(counter *atomic.Int64) http.Handler {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
+		// The success frame precedes the raw stream.
+		if _, err := protodelim.MarshalTo(w, &pbpd.DialResp{EndpointId: "ep_test"}); err != nil {
+			return
+		}
 		flush(w)
 		// The stream is now raw TCP: echo everything the client sends.
 		// br may hold bytes already read past the DialReq, so copy from it.
@@ -637,6 +723,10 @@ func echoDialHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
+	// The success frame precedes the raw stream.
+	if _, err := protodelim.MarshalTo(w, &pbpd.DialResp{EndpointId: "ep_test"}); err != nil {
+		return
+	}
 	flush(w)
 	_, _ = io.Copy(flushWriter{w}, br)
 }
