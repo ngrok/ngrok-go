@@ -856,14 +856,18 @@ func (d *Dialer) Err() error {
 //
 //	conn, err := dialer.DialContext(ctx, "tcp", "foo.internal:80")
 //
-// The returned net.Conn is a bidirectional byte stream.
+// The returned net.Conn is a bidirectional byte stream. It is also a
+// privatedial.Conn, so it can be type-asserted to read the resolved endpoint
+// ID the server reported (conn.(privatedial.Conn).EndpointID()).
 //
-// The server commits to the stream before it knows the dial outcome, so a
-// server-side dial failure is reported via HTTP trailers and surfaces on the
-// first Read of the returned conn (in place of io.EOF) rather than from
-// DialContext itself. That error is a *net.OpError wrapping a
+// A dial failure the server detects before bridging the stream (auth,
+// endpoint-not-found, draining) is reported via HTTP trailers and surfaces
+// from DialContext itself, since the success-signalling DialResp frame is read
+// synchronously here. A failure that occurs after the stream is established
+// (mid-stream) instead surfaces on the first failing Read (in place of
+// io.EOF). In both cases the error is a *net.OpError wrapping a
 // privatedial.Error, and — for error codes with a net analogue — also wrapping
-// a standard sentinel so callers can branch with errors.Is/As as before:
+// a standard sentinel so callers can branch with errors.Is/As:
 //   - an unauthorized or "session draining" rejection wraps
 //     syscall.ECONNREFUSED — analogous to a refused TCP connect.
 //   - other codes carry no sentinel; recover the ngrok code with
@@ -1322,11 +1326,39 @@ func (h *sessionConn) dial(ctx context.Context, addr dialAddr) (net.Conn, error)
 		}
 	}
 
+	// On success the server writes a length-prefixed DialResp as the first
+	// body frame, carrying the resolved endpoint ID; the rest of the stream
+	// is then raw bytes. We must consume that frame here so it doesn't corrupt
+	// the byte stream the caller reads. A failure detected before the stream
+	// is bridged (auth, endpoint-not-found, draining) instead leaves the body
+	// empty and reports the error via trailers, which become readable once the
+	// body hits EOF. So if we can't read a DialResp, consult the trailers and
+	// surface the server's structured error from the dial itself — mirroring
+	// how the /session handshake surfaces SessionAck failures from Connect.
+	// Errors that occur after a successful DialResp (mid-stream) still ride out
+	// on the trailers and surface on the first failing Read.
+	respBody := newReadCloseByteReader(resp.Body)
+	dresp := new(pbpd.DialResp)
+	if err := protodelimUnmarshaler.UnmarshalFrom(respBody, dresp); err != nil {
+		_ = resp.Body.Close()
+		_ = reqWriter.Close()
+		reqCancel()
+		if rerr := errorFromTrailer(resp.Trailer); rerr != nil {
+			// Wrap as *net.OpError so the failure category bubbles via
+			// errors.Is/errors.As, matching dialConn.Read's trailer path.
+			return nil, &net.OpError{Op: "dial", Net: addr.Network(), Addr: addr, Err: rerr}
+		}
+		se := newStaleConnError(addr)
+		se.wrapped = fmt.Errorf("read DialResp: %w", err)
+		return nil, se
+	}
+
 	return &dialConn{
 		remoteAddr: addr,
+		endpointID: dresp.GetEndpointId(),
 		reqBody:    reqWriter,
 		resp:       resp,
-		respBody:   resp.Body,
+		respBody:   respBody,
 		reqCancel:  reqCancel,
 	}, nil
 }
@@ -1639,25 +1671,49 @@ func (h *sessionConn) readControl() {
 	}
 }
 
+// Conn is the concrete type of the net.Conn returned from
+// Dialer.DialContext. Callers can type-assert to it to read private-dial
+// metadata about the established stream, e.g.:
+//
+//	conn, err := dialer.DialContext(ctx, "tcp", "foo.private:80")
+//	if pc, ok := conn.(privatedial.Conn); ok {
+//		log.Printf("connected to endpoint %s", pc.EndpointID())
+//	}
+type Conn interface {
+	net.Conn
+	// EndpointID returns the ngrok endpoint ID (e.g. "ep_...") the dial
+	// resolved to, as reported by the server in the DialResp frame. It is
+	// empty when the server did not report one.
+	EndpointID() string
+}
+
 // dialConn is the net.Conn returned from Dialer.DialContext. Read pulls
 // from the response body; Write pushes into the request body. Close terminates
 // both sides.
 //
-// Because the server commits to a 200 before it knows whether the dial will
-// succeed, dial failures are reported via HTTP trailers that only become
-// readable once the response body reaches EOF. Read therefore inspects the
-// trailers on EOF: a server-reported failure surfaces as a privatedial.Error
-// in place of io.EOF, while a clean stream termination surfaces as io.EOF.
+// The DialResp success frame is consumed in dial before the conn is returned,
+// so pre-bridge failures surface from DialContext (see Dialer.DialContext). A
+// failure that occurs mid-stream is reported via HTTP trailers that only
+// become readable once the response body reaches EOF. Read therefore inspects
+// the trailers on EOF: a server-reported failure surfaces as a
+// privatedial.Error in place of io.EOF, while a clean stream termination
+// surfaces as io.EOF.
 type dialConn struct {
-	reqBody   *io.PipeWriter
-	resp      *http.Response
-	respBody  io.ReadCloser
-	reqCancel context.CancelFunc
+	reqBody    *io.PipeWriter
+	resp       *http.Response
+	respBody   io.ReadCloser
+	reqCancel  context.CancelFunc
+	endpointID string
 
 	remoteAddr dialAddr
 
 	closeOnce sync.Once
 }
+
+// EndpointID returns the resolved ngrok endpoint ID reported by the server.
+func (c *dialConn) EndpointID() string { return c.endpointID }
+
+var _ Conn = (*dialConn)(nil)
 
 func (c *dialConn) Read(p []byte) (int, error) {
 	n, err := c.respBody.Read(p)
