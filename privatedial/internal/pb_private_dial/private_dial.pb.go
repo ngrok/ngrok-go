@@ -531,6 +531,62 @@ func (x *DialReq) GetSessionReq() *SessionReq {
 	return nil
 }
 
+// DialResp is the first message the server sends on a dial stream (POST
+// /dial) body, after auth and endpoint resolution succeed and before the
+// stream becomes raw bytes. Its presence is itself the success signal; dial
+// failures are reported via DialTrailer instead.
+type DialResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	EndpointId    string                 `protobuf:"bytes,1,opt,name=endpoint_id,json=endpointId,proto3" json:"endpoint_id,omitempty"`
+	Metadata      map[string]string      `protobuf:"bytes,2,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DialResp) Reset() {
+	*x = DialResp{}
+	mi := &file_lib_private_dial_private_dial_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DialResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DialResp) ProtoMessage() {}
+
+func (x *DialResp) ProtoReflect() protoreflect.Message {
+	mi := &file_lib_private_dial_private_dial_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DialResp.ProtoReflect.Descriptor instead.
+func (*DialResp) Descriptor() ([]byte, []int) {
+	return file_lib_private_dial_private_dial_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *DialResp) GetEndpointId() string {
+	if x != nil {
+		return x.EndpointId
+	}
+	return ""
+}
+
+func (x *DialResp) GetMetadata() map[string]string {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
 // DialTrailer is sent via HTTP/2 trailers when the dial stream terminates.
 type DialTrailer struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -542,7 +598,7 @@ type DialTrailer struct {
 
 func (x *DialTrailer) Reset() {
 	*x = DialTrailer{}
-	mi := &file_lib_private_dial_private_dial_proto_msgTypes[8]
+	mi := &file_lib_private_dial_private_dial_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -554,7 +610,7 @@ func (x *DialTrailer) String() string {
 func (*DialTrailer) ProtoMessage() {}
 
 func (x *DialTrailer) ProtoReflect() protoreflect.Message {
-	mi := &file_lib_private_dial_private_dial_proto_msgTypes[8]
+	mi := &file_lib_private_dial_private_dial_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -567,7 +623,7 @@ func (x *DialTrailer) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DialTrailer.ProtoReflect.Descriptor instead.
 func (*DialTrailer) Descriptor() ([]byte, []int) {
-	return file_lib_private_dial_private_dial_proto_rawDescGZIP(), []int{8}
+	return file_lib_private_dial_private_dial_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *DialTrailer) GetErrorCode() string {
@@ -624,6 +680,13 @@ const file_lib_private_dial_private_dial_proto_rawDesc = "" +
 	"sessionReq\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xaa\x01\n" +
+	"\bDialResp\x12\x1f\n" +
+	"\vendpoint_id\x18\x01 \x01(\tR\n" +
+	"endpointId\x12@\n" +
+	"\bmetadata\x18\x02 \x03(\v2$.private_dial.DialResp.MetadataEntryR\bmetadata\x1a;\n" +
+	"\rMetadataEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"Q\n" +
 	"\vDialTrailer\x12\x1d\n" +
 	"\n" +
@@ -642,7 +705,7 @@ func file_lib_private_dial_private_dial_proto_rawDescGZIP() []byte {
 	return file_lib_private_dial_private_dial_proto_rawDescData
 }
 
-var file_lib_private_dial_private_dial_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_lib_private_dial_private_dial_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_lib_private_dial_private_dial_proto_goTypes = []any{
 	(*SessionReq)(nil),          // 0: private_dial.SessionReq
 	(*SessionAck)(nil),          // 1: private_dial.SessionAck
@@ -652,25 +715,28 @@ var file_lib_private_dial_private_dial_proto_goTypes = []any{
 	(*SessionError)(nil),        // 5: private_dial.SessionError
 	(*ControlFrame)(nil),        // 6: private_dial.ControlFrame
 	(*DialReq)(nil),             // 7: private_dial.DialReq
-	(*DialTrailer)(nil),         // 8: private_dial.DialTrailer
-	nil,                         // 9: private_dial.SessionReq.MetadataEntry
-	nil,                         // 10: private_dial.DialReq.MetadataEntry
-	(*durationpb.Duration)(nil), // 11: google.protobuf.Duration
+	(*DialResp)(nil),            // 8: private_dial.DialResp
+	(*DialTrailer)(nil),         // 9: private_dial.DialTrailer
+	nil,                         // 10: private_dial.SessionReq.MetadataEntry
+	nil,                         // 11: private_dial.DialReq.MetadataEntry
+	nil,                         // 12: private_dial.DialResp.MetadataEntry
+	(*durationpb.Duration)(nil), // 13: google.protobuf.Duration
 }
 var file_lib_private_dial_private_dial_proto_depIdxs = []int32{
-	9,  // 0: private_dial.SessionReq.metadata:type_name -> private_dial.SessionReq.MetadataEntry
-	11, // 1: private_dial.SessionAck.ping_interval:type_name -> google.protobuf.Duration
+	10, // 0: private_dial.SessionReq.metadata:type_name -> private_dial.SessionReq.MetadataEntry
+	13, // 1: private_dial.SessionAck.ping_interval:type_name -> google.protobuf.Duration
 	2,  // 2: private_dial.ControlFrame.ping:type_name -> private_dial.Ping
 	4,  // 3: private_dial.ControlFrame.please_drain:type_name -> private_dial.PleaseDrain
 	5,  // 4: private_dial.ControlFrame.session_error:type_name -> private_dial.SessionError
 	3,  // 5: private_dial.ControlFrame.pong:type_name -> private_dial.Pong
-	10, // 6: private_dial.DialReq.metadata:type_name -> private_dial.DialReq.MetadataEntry
+	11, // 6: private_dial.DialReq.metadata:type_name -> private_dial.DialReq.MetadataEntry
 	0,  // 7: private_dial.DialReq.session_req:type_name -> private_dial.SessionReq
-	8,  // [8:8] is the sub-list for method output_type
-	8,  // [8:8] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	12, // 8: private_dial.DialResp.metadata:type_name -> private_dial.DialResp.MetadataEntry
+	9,  // [9:9] is the sub-list for method output_type
+	9,  // [9:9] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_lib_private_dial_private_dial_proto_init() }
@@ -690,7 +756,7 @@ func file_lib_private_dial_private_dial_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lib_private_dial_private_dial_proto_rawDesc), len(file_lib_private_dial_private_dial_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   11,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
