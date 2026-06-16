@@ -16,6 +16,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"testing"
@@ -40,9 +41,15 @@ import (
 // between cases and must not run in parallel.
 
 // resetSticky clears the process-global protocol decision so each test
-// starts from ProtocolAuto.
+// starts from ProtocolAuto. It also resets the memoized UDP-buffer probe and
+// forces it to succeed so the race runs regardless of the host kernel's buffer
+// tuning; tests that want to exercise the probe-driven HTTP/2 fallback override
+// probeBuffers after calling this.
 func resetSticky() {
 	stickyProtocol.Store(nil)
+	probeBuffers = func() error { return nil }
+	probeOnce = sync.Once{}
+	probeErr = nil
 }
 
 func TestRaceQUICWins(t *testing.T) {
@@ -101,6 +108,63 @@ func TestRaceFallsBackToH2(t *testing.T) {
 	// session can't have come up before quicHeadStart elapsed.
 	if elapsed := time.Since(start); elapsed < quicHeadStart {
 		t.Fatalf("fallback completed in %v, expected at least the %v head start", elapsed, quicHeadStart)
+	}
+}
+
+func TestBufferProbeForcesH2(t *testing.T) {
+	resetSticky()
+	// Simulate a host where QUIC can't obtain the UDP buffer sizes it wants.
+	// The probe should short-circuit the race and force HTTP/2 without ever
+	// touching QUIC.
+	probeBuffers = func() error { return errors.New("failed to increase receive buffer size") }
+
+	cert := genTLSCert(t)
+	var quicHits, h2Hits atomic.Int64
+	quicAddr := startH3Server(t, cert, privateDialHandler(&quicHits))
+	h2Addr := startH2Server(t, cert, privateDialHandler(&h2Hits))
+
+	sess := mustConnect(t, Config{
+		QUICServerAddr: quicAddr,
+		H2ServerAddr:   h2Addr,
+		AuthToken:      "test-token",
+		TLSConfig:      &tls.Config{InsecureSkipVerify: true},
+	})
+	defer sess.Close()
+
+	if got := sess.Protocol(); got != ProtocolH2 {
+		t.Fatalf("expected the buffer probe to force HTTP/2, Protocol = %v", got)
+	}
+	// The probe is decoupled from stickyProtocol: it forces HTTP/2 for this
+	// dialer without writing the process-global race decision.
+	if got := stickyProtocol.Load(); got != nil {
+		t.Fatalf("buffer probe should not set sticky protocol, got %v", *got)
+	}
+	if n := quicHits.Load(); n != 0 {
+		t.Fatalf("expected QUIC to be skipped entirely, got %d hits", n)
+	}
+	if h2Hits.Load() == 0 {
+		t.Fatal("expected the HTTP/2 server to receive the /session request")
+	}
+}
+
+func TestBufferProbeMemoized(t *testing.T) {
+	resetSticky()
+	// The probe answer is a host property, so it must run at most once per
+	// process regardless of how many connects (or Dialers) consult it. This is
+	// memoized independently of stickyProtocol so it survives changes to where
+	// the protocol decision is cached.
+	var calls atomic.Int64
+	probeBuffers = func() error {
+		calls.Add(1)
+		return errors.New("probe failed")
+	}
+	for range 3 {
+		if err := quicBuffersUsable(); err == nil {
+			t.Fatal("expected the memoized probe to keep returning its error")
+		}
+	}
+	if got := calls.Load(); got != 1 {
+		t.Fatalf("probe should run exactly once, ran %d times", got)
 	}
 }
 
