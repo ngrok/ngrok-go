@@ -501,6 +501,42 @@ func TestDialBudgetBoundsHangingRoundTrip(t *testing.T) {
 	})
 }
 
+// reserveRefusingTransport accepts streams but never reserves a request.
+type reserveRefusingTransport struct{}
+
+func (reserveRefusingTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, errors.New("RoundTrip should not be reached")
+}
+func (reserveRefusingTransport) CloseIdleConnections()   {}
+func (reserveRefusingTransport) ReserveNewRequest() bool { return false }
+
+// TestGetHostBudgetBoundsStaleSpin proves GetHost stops at its budget instead of
+// spinning when every unaryRoundTrip returns a staleConnError.
+func TestGetHostBudgetBoundsStaleSpin(t *testing.T) {
+	h := newFakeConn("conn-1")
+	h.transport = reserveRefusingTransport{}
+	h.authToken = "tok"
+	h.getHostURL = &url.URL{Scheme: "https", Host: "fake.invalid", Path: "/get-host"}
+
+	s := newBareDialerForTest(h, 50*time.Millisecond)
+	defer s.Close() //nolint:errcheck
+
+	errCh := make(chan error, 1)
+	go func() {
+		_, err := s.GetHost(context.Background(), "x.private")
+		errCh <- err
+	}()
+
+	select {
+	case err := <-errCh:
+		if err == nil {
+			t.Fatal("GetHost succeeded on a conn that never reserves, want error")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("GetHost did not return within budget; it is spinning indefinitely")
+	}
+}
+
 func TestParkDrainingNoOpAfterClose(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	s := &Dialer{
