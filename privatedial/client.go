@@ -193,6 +193,61 @@ func newReadCloseByteReader(rc io.ReadCloser) *readCloseByteReader {
 
 func (r *readCloseByteReader) Close() error { return r.closer.Close() }
 
+// IPProtocol restricts the IP version used when resolving and dialing the
+// private-dial server. It pins the network family of the underlying transport
+// dial so a host with both A and AAAA records can be forced onto one or the
+// other.
+type IPProtocol int
+
+const (
+	// IPProtocolAny lets the resolver pick either IPv4 or IPv6 (the Go
+	// default). This is the zero value.
+	IPProtocolAny IPProtocol = iota
+	// IPProtocolV4 forces IPv4-only resolution and dialing.
+	IPProtocolV4
+	// IPProtocolV6 forces IPv6-only resolution and dialing.
+	IPProtocolV6
+)
+
+// String returns "any", "ipv4", or "ipv6".
+func (p IPProtocol) String() string {
+	switch p {
+	case IPProtocolAny:
+		return "any"
+	case IPProtocolV4:
+		return "ipv4"
+	case IPProtocolV6:
+		return "ipv6"
+	default:
+		return fmt.Sprintf("IPProtocol(%d)", int(p))
+	}
+}
+
+// tcpNetwork returns the "tcp"/"tcp4"/"tcp6" network string for net.Dial.
+func (p IPProtocol) tcpNetwork() string {
+	switch p {
+	case IPProtocolV4:
+		return "tcp4"
+	case IPProtocolV6:
+		return "tcp6"
+	default:
+		return "tcp"
+	}
+}
+
+// udpNetwork returns the "udp"/"udp4"/"udp6" network string used to pin the
+// QUIC (HTTP/3) dial to an IP family.
+func (p IPProtocol) udpNetwork() string {
+	switch p {
+	case IPProtocolV4:
+		return "udp4"
+	case IPProtocolV6:
+		return "udp6"
+	default:
+		return "udp"
+	}
+}
+
 // Config configures a Dialer. The server addresses are endpoints serving the
 // private-dial protocol; the net.Dial to them must reach a mux
 // PrivateDialIngresses listener.
@@ -215,6 +270,11 @@ type Config struct {
 	// AuthToken is the auth token to use. During development, this is an ngrok
 	// API Key, it'll be a proper token eventually.
 	AuthToken string
+
+	// IPProtocol, when not IPProtocolAny, pins the server dial to IPv4 or
+	// IPv6 only. It controls the network family used for both transports:
+	// the TCP socket for HTTP/2 and the UDP socket for HTTP/3 (QUIC).
+	IPProtocol IPProtocol
 
 	// TLSConfig overrides the default TLS config. Its ServerName, when set,
 	// overrides the SNI, which otherwise defaults to the host portion of
@@ -610,7 +670,7 @@ func (r *connAddrRecorder) get() string {
 // across logical sessions.
 func (d *Dialer) newH2Transport(ctx context.Context) (roundTripCloser, string, error) {
 	tlsConn, err := (&tls.Dialer{Config: d.tlsConfigFor(d.cfg.H2ServerAddr, "h2")}).
-		DialContext(ctx, "tcp", d.cfg.H2ServerAddr)
+		DialContext(ctx, d.cfg.IPProtocol.tcpNetwork(), d.cfg.H2ServerAddr)
 	if err != nil {
 		return nil, "", fmt.Errorf("private-dial: tls dial: %w", err)
 	}
@@ -640,12 +700,15 @@ func (d *Dialer) newH3Transport() (roundTripCloser, *connAddrRecorder) {
 			MaxIdleTimeout:  quicMaxIdleTimeout,
 		},
 	}
+	network := d.cfg.IPProtocol.udpNetwork()
 	t.Dial = func(ctx context.Context, addr string, tlsCfg *tls.Config, cfg *quic.Config) (*quic.Conn, error) {
-		udpAddr, err := resolveUDPAddr(ctx, addr)
+		udpAddr, err := resolveUDPAddr(ctx, network, addr)
 		if err != nil {
 			return nil, err
 		}
-		pc, err := net.ListenUDP("udp", nil)
+		// Bind the local socket to the same family. ListenUDP with a nil
+		// laddr binds the wildcard address for the requested family.
+		pc, err := net.ListenUDP(network, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -661,23 +724,32 @@ func (d *Dialer) newH3Transport() (roundTripCloser, *connAddrRecorder) {
 	return t, rec
 }
 
-// resolveUDPAddr resolves a "host:port" to a single *net.UDPAddr, honoring ctx
-// for cancellation. It mirrors the resolution the default http3 dial performs.
-func resolveUDPAddr(ctx context.Context, addr string) (*net.UDPAddr, error) {
+// resolveUDPAddr resolves a "host:port" to a single *net.UDPAddr of the family
+// implied by network ("udp", "udp4", or "udp6"), honoring ctx for cancellation.
+// It mirrors the resolution the default http3 dial performs, pinned to one IP
+// family when network is "udp4"/"udp6".
+func resolveUDPAddr(ctx context.Context, network, addr string) (*net.UDPAddr, error) {
 	host, portStr, err := net.SplitHostPort(addr)
 	if err != nil {
 		return nil, err
 	}
-	port, err := net.LookupPort("udp", portStr)
+	port, err := net.LookupPort(network, portStr)
 	if err != nil {
 		return nil, err
 	}
-	ips, err := net.DefaultResolver.LookupNetIP(ctx, "ip", host)
+	ipNetwork := "ip"
+	switch network {
+	case "udp4":
+		ipNetwork = "ip4"
+	case "udp6":
+		ipNetwork = "ip6"
+	}
+	ips, err := net.DefaultResolver.LookupNetIP(ctx, ipNetwork, host)
 	if err != nil {
 		return nil, err
 	}
 	if len(ips) == 0 {
-		return nil, fmt.Errorf("no address for %s", host)
+		return nil, fmt.Errorf("no %s address for %s", ipNetwork, host)
 	}
 	return net.UDPAddrFromAddrPort(netip.AddrPortFrom(ips[0].Unmap(), uint16(port))), nil
 }
