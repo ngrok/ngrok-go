@@ -228,7 +228,7 @@ func handleTCPConnection(t *testing.T, conn net.Conn, reader *bufio.Reader, srcA
 func connectHTTPSClient(ctx context.Context, t *testing.T, endpointURL string) {
 	// Use MakeHTTPRequest to send test message
 	message := "Test message for PROXY protocol"
-	resp, err := MakeHTTPRequest(ctx, t, endpointURL, message)
+	resp, err := MakeHTTPRequestWhenEndpointReady(ctx, t, endpointURL, message)
 	if err != nil {
 		t.Fatal(err)
 	}

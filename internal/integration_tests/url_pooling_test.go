@@ -237,7 +237,7 @@ func TestListenWithURLAndPooling(t *testing.T) {
 			message := fmt.Sprintf("Request %d", requestCount)
 
 			// Make HTTP request with a new connection each time
-			resp, err := MakeHTTPRequest(ctx, t, url, message)
+			resp, err := MakeHTTPRequestWhenEndpointReady(ctx, t, url, message)
 			if err != nil {
 				t.Errorf("Request %d: %v", requestCount, err)
 				goto sleepUntilNextRequest

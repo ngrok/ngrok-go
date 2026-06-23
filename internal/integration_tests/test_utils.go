@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -17,6 +18,16 @@ import (
 	"golang.ngrok.com/ngrok/v2"
 	"golang.ngrok.com/ngrok/v2/internal/testcontext"
 )
+
+type httpStatusError struct {
+	URL        string
+	Status     string
+	StatusCode int
+}
+
+func (e *httpStatusError) Error() string {
+	return fmt.Sprintf("post %s: http %s", e.URL, e.Status)
+}
 
 // SkipIfOffline skips the test if NGROK_TEST_ONLINE environment variable is not set
 func SkipIfOffline(t *testing.T) {
@@ -115,21 +126,112 @@ func MakeHTTPRequest(ctx context.Context, tb testing.TB, url string, message str
 		return resp, fmt.Errorf("post %s: %v", url, err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return resp, fmt.Errorf("post %s: http %s", url, resp.Status)
+		return resp, &httpStatusError{
+			URL:        url,
+			Status:     resp.Status,
+			StatusCode: resp.StatusCode,
+		}
 	}
 	return resp, nil
 }
 
-// WaitForForwarderReady polls the forwarder endpoint until it responds or times out
-func WaitForForwarderReady(t *testing.T, url string) {
-	client := &http.Client{Timeout: 100 * time.Millisecond}
-	for start := time.Now(); time.Since(start) < 500*time.Millisecond; {
-		resp, err := client.Get(url)
+// MakeHTTPRequestWhenEndpointReady retries transient 404 responses that can
+// occur while a freshly-created endpoint is propagating through ngrok's edge.
+func MakeHTTPRequestWhenEndpointReady(ctx context.Context, tb testing.TB, url string, message string) (*http.Response, error) {
+	tb.Helper()
+
+	deadline := time.Now().Add(30 * time.Second)
+	for {
+		resp, err := MakeHTTPRequest(ctx, tb, url, message)
 		if err == nil {
+			return resp, nil
+		}
+		if resp != nil {
 			resp.Body.Close()
+		}
+
+		var statusErr *httpStatusError
+		if !errors.As(err, &statusErr) || statusErr.StatusCode != http.StatusNotFound {
+			return nil, err
+		}
+		if err := ctx.Err(); err != nil {
+			return nil, fmt.Errorf("post %s: endpoint did not become ready: %w", url, err)
+		}
+		if time.Now().After(deadline) {
+			return nil, fmt.Errorf("post %s: endpoint did not become ready after 30s: %w", url, err)
+		}
+
+		time.Sleep(250 * time.Millisecond)
+	}
+}
+
+type httpListenerResult struct {
+	message string
+	err     error
+}
+
+func serveOneHTTPRequest(listener ngrok.EndpointListener) <-chan httpListenerResult {
+	result := make(chan httpListenerResult, 1)
+	go func() {
+		conn, err := listener.Accept()
+		if err != nil {
+			result <- httpListenerResult{err: fmt.Errorf("accept connection: %w", err)}
 			return
 		}
-		time.Sleep(10 * time.Millisecond)
+		defer conn.Close()
+
+		message, err := handleHTTPRequest(conn)
+		if err != nil {
+			result <- httpListenerResult{err: fmt.Errorf("handle HTTP request: %w", err)}
+			return
+		}
+
+		result <- httpListenerResult{message: message}
+	}()
+	return result
+}
+
+func MakeListenerHTTPRequest(ctx context.Context, tb testing.TB, listener ngrok.EndpointListener, message string) string {
+	tb.Helper()
+
+	result := serveOneHTTPRequest(listener)
+	resp, err := MakeHTTPRequestWhenEndpointReady(ctx, tb, listener.URL().String(), message)
+	require.NoError(tb, err)
+	defer resp.Body.Close()
+
+	select {
+	case handled := <-result:
+		require.NoError(tb, handled.err)
+		return handled.message
+	case <-time.After(5 * time.Second):
+		tb.Fatal("timed out waiting for request processing")
+		return ""
+	}
+}
+
+// WaitForForwarderReady polls the forwarder endpoint until ngrok's edge is
+// actually routing traffic to it, or the timeout elapses.
+//
+// A freshly-created endpoint takes time to propagate to ngrok's edge. Until it
+// has, the edge responds with 404 even though the agent session is up, so a
+// successful HTTP response alone does not mean the endpoint is ready - we must
+// keep polling until the edge stops returning 404. Any other status (200 from a
+// healthy upstream, 502 from an upstream that intentionally fails, etc.) means
+// the edge is routing to the endpoint.
+func WaitForForwarderReady(t *testing.T, url string) {
+	t.Helper()
+	client := &http.Client{Timeout: 5 * time.Second}
+	deadline := time.Now().Add(30 * time.Second)
+	for time.Now().Before(deadline) {
+		resp, err := client.Get(url)
+		if err == nil {
+			status := resp.StatusCode
+			resp.Body.Close()
+			if status != http.StatusNotFound {
+				return
+			}
+		}
+		time.Sleep(250 * time.Millisecond)
 	}
 	t.Logf("Forwarder endpoint didn't become ready in expected time, continuing anyway")
 }
@@ -149,8 +251,12 @@ func MakeTCPConnection(t *testing.T, ctx context.Context, address string) (io.Re
 }
 
 // HandleHTTPRequest processes an HTTP request from a connection and sends a response
-func HandleHTTPRequest(t *testing.T, conn net.Conn) (string, error) {
+func HandleHTTPRequest(t testing.TB, conn net.Conn) (string, error) {
 	t.Helper()
+	return handleHTTPRequest(conn)
+}
+
+func handleHTTPRequest(conn net.Conn) (string, error) {
 	// Create a buffered reader for the connection
 	reader := bufio.NewReader(conn)
 

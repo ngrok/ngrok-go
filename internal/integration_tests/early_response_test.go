@@ -46,6 +46,7 @@ func TestEarlyResponseLargeUpload(t *testing.T) {
 
 	ngrokURL := forwarder.URL().String()
 	t.Logf("Forwarder URL: %s", ngrokURL)
+	WaitForForwarderReady(t, ngrokURL)
 
 	t.Run("small body succeeds", func(t *testing.T) {
 		resp, err := MakeHTTPRequest(ctx, t, ngrokURL, "small payload")

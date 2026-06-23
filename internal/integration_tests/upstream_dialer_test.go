@@ -69,6 +69,11 @@ func TestUpstreamDialer(t *testing.T) {
 	ngrokURL := forwarder.URL().String()
 	t.Logf("Forwarder URL: %s", ngrokURL)
 
+	// Wait until the edge is routing to the endpoint. Until it propagates the
+	// edge returns 404 without ever dialing the upstream, so the dialer would
+	// never be invoked.
+	WaitForForwarderReady(t, ngrokURL)
+
 	// Now make a request to trigger the dialer
 	t.Logf("Making request to trigger upstream connection...")
 	// The request will fail, but we'll ignore that since we expect it to fail
