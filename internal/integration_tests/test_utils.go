@@ -140,7 +140,9 @@ func MakeHTTPRequest(ctx context.Context, tb testing.TB, url string, message str
 func MakeHTTPRequestWhenEndpointReady(ctx context.Context, tb testing.TB, url string, message string) (*http.Response, error) {
 	tb.Helper()
 
-	deadline := time.Now().Add(30 * time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
 	for {
 		resp, err := MakeHTTPRequest(ctx, tb, url, message)
 		if err == nil {
@@ -157,9 +159,6 @@ func MakeHTTPRequestWhenEndpointReady(ctx context.Context, tb testing.TB, url st
 		if err := ctx.Err(); err != nil {
 			return nil, fmt.Errorf("post %s: endpoint did not become ready: %w", url, err)
 		}
-		if time.Now().After(deadline) {
-			return nil, fmt.Errorf("post %s: endpoint did not become ready after 30s: %w", url, err)
-		}
 
 		time.Sleep(250 * time.Millisecond)
 	}
@@ -170,8 +169,14 @@ type httpListenerResult struct {
 	err     error
 }
 
-func serveOneHTTPRequest(listener ngrok.EndpointListener) <-chan httpListenerResult {
+func serveOneHTTPRequest(ctx context.Context, listener ngrok.EndpointListener) <-chan httpListenerResult {
 	result := make(chan httpListenerResult, 1)
+
+	go func() {
+		<-ctx.Done()
+		_ = listener.Close()
+	}()
+
 	go func() {
 		conn, err := listener.Accept()
 		if err != nil {
@@ -194,7 +199,10 @@ func serveOneHTTPRequest(listener ngrok.EndpointListener) <-chan httpListenerRes
 func MakeListenerHTTPRequest(ctx context.Context, tb testing.TB, listener ngrok.EndpointListener, message string) string {
 	tb.Helper()
 
-	result := serveOneHTTPRequest(listener)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	result := serveOneHTTPRequest(ctx, listener)
 	resp, err := MakeHTTPRequestWhenEndpointReady(ctx, tb, listener.URL().String(), message)
 	require.NoError(tb, err)
 	defer resp.Body.Close()
