@@ -302,6 +302,13 @@ func handleHTTPRequest(conn net.Conn) (string, error) {
 // HandleTCPConnection reads data from a TCP connection and sends a response
 func HandleTCPConnection(t *testing.T, conn io.ReadWriteCloser) (string, error) {
 	t.Helper()
+	return serveTCPMessage(conn)
+}
+
+// serveTCPMessage is the testing.T-free core of HandleTCPConnection so it can be
+// called from background goroutines without risking testing.T use after the test
+// has completed.
+func serveTCPMessage(conn io.ReadWriteCloser) (string, error) {
 	// Read data from the connection
 	buf := make([]byte, 1024)
 	n, err := conn.Read(buf)

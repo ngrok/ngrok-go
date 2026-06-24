@@ -40,12 +40,6 @@ func (d *erroringDialer) DialContext(ctx context.Context, network, address strin
 	return nil, errors.New("custom dialer test error")
 }
 
-// WaitForCall waits for the dialer to be called with a specified timeout
-func (d *erroringDialer) WaitForCall(t testing.TB, timeout time.Duration) {
-	success := d.syncPoint.WaitTimeout(t, timeout)
-	require.True(t, success, "Timed out waiting for dialer to be called")
-}
-
 // TestUpstreamDialer tests the WithUpstreamDialer functionality
 func TestUpstreamDialer(t *testing.T) {
 	// Mark this test for parallel execution
@@ -69,23 +63,25 @@ func TestUpstreamDialer(t *testing.T) {
 	ngrokURL := forwarder.URL().String()
 	t.Logf("Forwarder URL: %s", ngrokURL)
 
-	// Wait until the edge is routing to the endpoint. Until it propagates the
-	// edge returns 404 without ever dialing the upstream, so the dialer would
-	// never be invoked.
-	WaitForForwarderReady(t, ngrokURL)
-
-	// Now make a request to trigger the dialer
-	t.Logf("Making request to trigger upstream connection...")
-	// The request will fail, but we'll ignore that since we expect it to fail
-	// We're just triggering the ngrok service to use our dialer
-	go func() {
-		_, _ = http.Get(ngrokURL)
-	}()
-
-	// Wait for our dialer to be called with a timeout
+	// A freshly created endpoint takes time to propagate to ngrok's edge; until
+	// it does, requests are rejected at the edge without ever reaching the
+	// agent's dialer. Any request that does reach the agent invokes the custom
+	// dialer, so a dialer call is both our readiness signal and the assertion
+	// under test. Issue requests synchronously (each fully drained, so nothing
+	// outlives the test) until the dialer fires.
 	t.Log("Waiting for dialer to be called...")
-	customDialer.WaitForCall(t, 3*time.Second)
+	client := &http.Client{Timeout: 5 * time.Second}
+	deadline := time.Now().Add(30 * time.Second)
+	for {
+		resp, err := client.Get(ngrokURL)
+		if err == nil {
+			_ = resp.Body.Close()
+		}
+		if customDialer.syncPoint.WaitTimeout(t, 250*time.Millisecond) {
+			break
+		}
+		require.False(t, time.Now().After(deadline), "Timed out waiting for custom dialer to be called")
+	}
 
-	// If we got here, the test passed (WaitForCall would have failed if the dialer wasn't called)
 	t.Log("Custom dialer was successfully called")
 }
