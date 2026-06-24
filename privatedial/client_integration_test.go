@@ -327,6 +327,93 @@ func TestDialEcho(t *testing.T) {
 	}
 }
 
+// TestGetHost exercises /get-host over each transport: a known host, an unknown
+// host (not-found code), a non-not-found in-band error, and a server rejection.
+func TestGetHost(t *testing.T) {
+	cert := genTLSCert(t)
+
+	getHostHandler := func() http.Handler {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/session", func(w http.ResponseWriter, r *http.Request) {
+			var req pbpd.SessionReq
+			if err := protodelimUnmarshaler.UnmarshalFrom(bufio.NewReader(r.Body), &req); err != nil {
+				http.Error(w, "bad SessionReq", http.StatusBadRequest)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			if _, err := protodelim.MarshalTo(w, &pbpd.SessionAck{ServerId: "gethost-srv"}); err != nil {
+				return
+			}
+			flush(w)
+			<-r.Context().Done()
+		})
+		mux.HandleFunc("/get-host", func(w http.ResponseWriter, r *http.Request) {
+			var req pbpd.GetHostReq
+			if err := protodelimUnmarshaler.UnmarshalFrom(bufio.NewReader(r.Body), &req); err != nil {
+				http.Error(w, "bad GetHostReq", http.StatusBadRequest)
+				return
+			}
+			if req.GetHost() == "denied.private" {
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
+			resp := &pbpd.GetHostResp{}
+			switch req.GetHost() {
+			case "missing.private":
+				resp.Error = &pbpd.Error{Code: errCodeEndpointNotFound, Message: "no such host"}
+			case "servfail.private":
+				// A non-not-found in-band error.
+				resp.Error = &pbpd.Error{Code: "ERR_NGROK_999", Message: "lookup failed"}
+			}
+			w.WriteHeader(http.StatusOK)
+			if _, err := protodelim.MarshalTo(w, resp); err != nil {
+				return
+			}
+			flush(w)
+		})
+		return mux
+	}
+
+	for _, tc := range []struct {
+		name  string
+		proto Protocol
+	}{
+		{"quic", ProtocolQUIC},
+		{"h2", ProtocolH2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			resetSticky()
+			sess := mustConnect(t, configForProtocol(t, tc.proto, cert, getHostHandler()))
+			defer sess.Close()
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			if exists, err := sess.GetHost(ctx, "foo.private"); err != nil || !exists {
+				t.Fatalf("GetHost(foo.private) = (%v, %v), want (true, nil)", exists, err)
+			}
+			if exists, err := sess.GetHost(ctx, "missing.private"); err != nil || exists {
+				t.Fatalf("GetHost(missing.private) = (%v, %v), want (false, nil)", exists, err)
+			}
+			// A non-not-found in-band error surfaces as a privatedial.Error.
+			exists, err := sess.GetHost(ctx, "servfail.private")
+			if err == nil || exists {
+				t.Fatalf("GetHost(servfail.private) = (%v, %v), want (false, non-nil)", exists, err)
+			}
+			var nerr Error
+			if !errors.As(err, &nerr) {
+				t.Fatalf("GetHost(servfail.private) error %v is not a privatedial.Error", err)
+			}
+			if nerr.Code() != "ERR_NGROK_999" {
+				t.Fatalf("GetHost(servfail.private) code = %q, want %q", nerr.Code(), "ERR_NGROK_999")
+			}
+			if exists, err := sess.GetHost(ctx, "denied.private"); err == nil || exists {
+				t.Fatalf("GetHost(denied.private) = (%v, %v), want (false, non-nil)", exists, err)
+			}
+		})
+	}
+}
+
 // TestDialTrailerError proves an end-to-end pre-bridge dial failure reported
 // via HTTP trailers is rehydrated into a privatedial.Error and surfaced from
 // DialContext itself: the server commits a 200 with no DialResp frame and an

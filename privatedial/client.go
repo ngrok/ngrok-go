@@ -9,6 +9,7 @@ package privatedial
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	cryptorand "crypto/rand"
 	"crypto/tls"
@@ -34,6 +35,7 @@ import (
 	"github.com/quic-go/quic-go/http3"
 	"golang.org/x/net/http2"
 	"google.golang.org/protobuf/encoding/protodelim"
+	"google.golang.org/protobuf/proto"
 
 	pbpd "golang.ngrok.com/ngrok/privatedial/internal/pb_private_dial"
 )
@@ -520,6 +522,7 @@ func (d *Dialer) openConn(ctx context.Context, p Protocol) (*sessionConn, error)
 
 	controlURL := &url.URL{Scheme: "https", Host: serverAddr, Path: "/session"}
 	dialURL := &url.URL{Scheme: "https", Host: serverAddr, Path: "/dial"}
+	getHostURL := &url.URL{Scheme: "https", Host: serverAddr, Path: "/get-host"}
 
 	// io.Pipe for the request body — first frame is SessionReq, then
 	// the body is reused for client-→server ControlFrames (Ping/Pong).
@@ -606,6 +609,7 @@ func (d *Dialer) openConn(ctx context.Context, p Protocol) (*sessionConn, error)
 	h.log = h.log.With("server_id", h.serverID)
 	h.pingInterval = ack.GetPingInterval().AsDuration()
 	h.dialURL = dialURL
+	h.getHostURL = getHostURL
 	h.authToken = d.cfg.AuthToken
 	h.controlResp = resp
 	h.controlRespBody = respBody
@@ -1055,6 +1059,69 @@ func (d *Dialer) dial(ctx context.Context, addr dialAddr) (net.Conn, error) {
 	}
 }
 
+// GetHost reports whether host has a private endpoint reachable by this Dialer,
+// without dialing it. It returns whether an endpoint exists, or an error. If a
+// returned error has an ngrok error code associated with it, it will be of type
+// [Error].
+func (d *Dialer) GetHost(ctx context.Context, host string) (bool, error) {
+	if err := d.ensureConnected(ctx); err != nil {
+		return false, err
+	}
+
+	budgetCtx, cancel := context.WithTimeoutCause(ctx, d.dialWaitTimeout(), errDialWaitTimeout)
+	defer cancel()
+
+	// budgetExpired bounds the retry loop: stale conns can return immediately,
+	// so the loop must check the deadline itself.
+	budgetExpired := func() bool {
+		return errors.Is(context.Cause(budgetCtx), errDialWaitTimeout)
+	}
+
+	for {
+		if err := ctx.Err(); err != nil {
+			return false, err
+		}
+		if budgetExpired() {
+			return false, context.DeadlineExceeded
+		}
+		cur, err := d.waitForCurrent(budgetCtx)
+		if err != nil {
+			return false, err
+		}
+		resp := new(pbpd.GetHostResp)
+		err = cur.unaryRoundTrip(budgetCtx, cur.getHostURL, &pbpd.GetHostReq{Host: host}, resp)
+		if err == nil {
+			// The in-band Error reports the outcome: nil exists, the
+			// not-found code means it doesn't, anything else is a real
+			// failure surfaced as a privatedial.Error.
+			e := resp.GetError()
+			switch {
+			case e == nil:
+				return true, nil
+			case e.GetCode() == errCodeEndpointNotFound:
+				return false, nil
+			default:
+				return false, &serverError{
+					code:    e.GetCode(),
+					message: e.GetMessage(),
+					wrapped: netSentinelForCode(e.GetCode()),
+				}
+			}
+		}
+		if budgetExpired() {
+			return false, context.DeadlineExceeded
+		}
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return false, err
+		}
+		var stale *staleConnError
+		if !errors.As(err, &stale) {
+			return false, err
+		}
+		d.log.Debug("get-host raced a stale conn, retrying on a fresh one", "host", host, "error", err)
+	}
+}
+
 func (d *Dialer) waitForCurrent(ctx context.Context) (*sessionConn, error) {
 	for {
 		if err := d.ctx.Err(); err != nil {
@@ -1318,8 +1385,9 @@ type sessionConn struct {
 	lifeClosed  bool
 	lifeDrained bool
 
-	dialURL   *url.URL
-	authToken string
+	dialURL    *url.URL
+	getHostURL *url.URL
+	authToken  string
 
 	controlResp     *http.Response
 	controlRespBody *readCloseByteReader
@@ -1461,6 +1529,58 @@ func (h *sessionConn) dial(ctx context.Context, addr dialAddr) (net.Conn, error)
 	}, nil
 }
 
+// unaryRoundTrip sends req to a unary /get-* endpoint and decodes the single
+// response frame into resp. A drained/lost conn is reported as *staleConnError
+// so the caller can retry on a fresh session.
+func (h *sessionConn) unaryRoundTrip(ctx context.Context, u *url.URL, req, resp proto.Message) error {
+	var body bytes.Buffer
+	if _, err := protodelim.MarshalTo(&body, req); err != nil {
+		return fmt.Errorf("marshal %s request: %w", u.Path, err)
+	}
+
+	if !h.acceptsStreams() {
+		return &staleConnError{}
+	}
+	if reserver, ok := h.transport.(requestReserver); ok && !reserver.ReserveNewRequest() {
+		return &staleConnError{}
+	}
+
+	// The body is known up front, so a bytes.Reader avoids the writer
+	// goroutine the streaming /dial path needs. The request is bounded by ctx,
+	// so RoundTrip can run synchronously.
+	reqWithContext, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), bytes.NewReader(body.Bytes()))
+	if err != nil {
+		return fmt.Errorf("build %s request: %w", u.Path, err)
+	}
+	reqWithContext.Header.Set("Authorization", "Bearer "+h.authToken)
+	reqWithContext.Header.Set("Content-Type", "application/octet-stream")
+
+	httpResp, err := h.transport.RoundTrip(reqWithContext)
+	if err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return err
+		}
+		return &staleConnError{wrapped: err}
+	}
+	defer func() { _ = httpResp.Body.Close() }()
+
+	if httpResp.StatusCode != http.StatusOK {
+		snippet, _ := io.ReadAll(io.LimitReader(httpResp.Body, 512))
+		return fmt.Errorf("private-dial %s status %d: %s", u.Path, httpResp.StatusCode, strings.TrimSpace(string(snippet)))
+	}
+
+	respBody := newReadCloseByteReader(httpResp.Body)
+	if err := protodelimUnmarshaler.UnmarshalFrom(respBody, resp); err != nil {
+		// A 200 that then fails reports the error via trailers, readable once
+		// the body hits EOF (as with /session and /dial).
+		if rerr := errorFromTrailer(httpResp.Trailer); rerr != nil {
+			return rerr
+		}
+		return fmt.Errorf("read %s response: %w", u.Path, err)
+	}
+	return nil
+}
+
 // The HTTP trailer names a private-dial server uses to report a structured
 // ngrok error when a /dial or /session stream terminates. Because they are
 // trailers, they only become readable once the response body reaches EOF.
@@ -1536,6 +1656,11 @@ const (
 	errCodeUnauthorized    = "ERR_NGROK_709"
 	errCodeSessionDraining = "ERR_NGROK_742"
 )
+
+// errCodeEndpointNotFound is the ngrok code for a missing endpoint, reused by
+// /get-host to mean the host has no endpoint. It is the only in-band code
+// GetHost treats as "does not exist"; every other code is a real failure.
+const errCodeEndpointNotFound = "ERR_NGROK_706"
 
 // netSentinelForCode maps a private-dial ngrok error code to the net-style
 // sentinel that best matches it. The two codes with a net analogue both behave

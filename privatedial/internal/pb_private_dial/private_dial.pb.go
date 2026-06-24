@@ -640,6 +640,266 @@ func (x *DialTrailer) GetErrorMessage() string {
 	return ""
 }
 
+// Error is returned in-band on the unary /get-* response messages.
+type Error struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// code is an ERR_NGROK_X error code.
+	Code string `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
+	// message is the human readable message.
+	Message       string `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Error) Reset() {
+	*x = Error{}
+	mi := &file_lib_private_dial_private_dial_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Error) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Error) ProtoMessage() {}
+
+func (x *Error) ProtoReflect() protoreflect.Message {
+	mi := &file_lib_private_dial_private_dial_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Error.ProtoReflect.Descriptor instead.
+func (*Error) Descriptor() ([]byte, []int) {
+	return file_lib_private_dial_private_dial_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *Error) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *Error) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+// GetHostReq is the request body for /get-host.
+type GetHostReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Host          string                 `protobuf:"bytes,1,opt,name=host,proto3" json:"host,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetHostReq) Reset() {
+	*x = GetHostReq{}
+	mi := &file_lib_private_dial_private_dial_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetHostReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetHostReq) ProtoMessage() {}
+
+func (x *GetHostReq) ProtoReflect() protoreflect.Message {
+	mi := &file_lib_private_dial_private_dial_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetHostReq.ProtoReflect.Descriptor instead.
+func (*GetHostReq) Descriptor() ([]byte, []int) {
+	return file_lib_private_dial_private_dial_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *GetHostReq) GetHost() string {
+	if x != nil {
+		return x.Host
+	}
+	return ""
+}
+
+// GetHostResp is the response for /get-host. A nil error means the host exists;
+// the endpoint-not-found code (ERR_NGROK_706) means it does not.
+type GetHostResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Error         *Error                 `protobuf:"bytes,1,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetHostResp) Reset() {
+	*x = GetHostResp{}
+	mi := &file_lib_private_dial_private_dial_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetHostResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetHostResp) ProtoMessage() {}
+
+func (x *GetHostResp) ProtoReflect() protoreflect.Message {
+	mi := &file_lib_private_dial_private_dial_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetHostResp.ProtoReflect.Descriptor instead.
+func (*GetHostResp) Descriptor() ([]byte, []int) {
+	return file_lib_private_dial_private_dial_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *GetHostResp) GetError() *Error {
+	if x != nil {
+		return x.Error
+	}
+	return nil
+}
+
+// GetHostPortReq is the request body for /get-hostport.
+type GetHostPortReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Host          string                 `protobuf:"bytes,1,opt,name=host,proto3" json:"host,omitempty"`
+	Port          int64                  `protobuf:"varint,2,opt,name=port,proto3" json:"port,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetHostPortReq) Reset() {
+	*x = GetHostPortReq{}
+	mi := &file_lib_private_dial_private_dial_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetHostPortReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetHostPortReq) ProtoMessage() {}
+
+func (x *GetHostPortReq) ProtoReflect() protoreflect.Message {
+	mi := &file_lib_private_dial_private_dial_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetHostPortReq.ProtoReflect.Descriptor instead.
+func (*GetHostPortReq) Descriptor() ([]byte, []int) {
+	return file_lib_private_dial_private_dial_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *GetHostPortReq) GetHost() string {
+	if x != nil {
+		return x.Host
+	}
+	return ""
+}
+
+func (x *GetHostPortReq) GetPort() int64 {
+	if x != nil {
+		return x.Port
+	}
+	return 0
+}
+
+// GetHostPortResp is the response for /get-hostport.
+type GetHostPortResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Error         *Error                 `protobuf:"bytes,1,opt,name=error,proto3" json:"error,omitempty"`
+	EndpointId    string                 `protobuf:"bytes,2,opt,name=endpoint_id,json=endpointId,proto3" json:"endpoint_id,omitempty"`
+	Metadata      map[string]string      `protobuf:"bytes,3,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetHostPortResp) Reset() {
+	*x = GetHostPortResp{}
+	mi := &file_lib_private_dial_private_dial_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetHostPortResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetHostPortResp) ProtoMessage() {}
+
+func (x *GetHostPortResp) ProtoReflect() protoreflect.Message {
+	mi := &file_lib_private_dial_private_dial_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetHostPortResp.ProtoReflect.Descriptor instead.
+func (*GetHostPortResp) Descriptor() ([]byte, []int) {
+	return file_lib_private_dial_private_dial_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *GetHostPortResp) GetError() *Error {
+	if x != nil {
+		return x.Error
+	}
+	return nil
+}
+
+func (x *GetHostPortResp) GetEndpointId() string {
+	if x != nil {
+		return x.EndpointId
+	}
+	return ""
+}
+
+func (x *GetHostPortResp) GetMetadata() map[string]string {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
 var File_lib_private_dial_private_dial_proto protoreflect.FileDescriptor
 
 const file_lib_private_dial_private_dial_proto_rawDesc = "" +
@@ -691,7 +951,26 @@ const file_lib_private_dial_private_dial_proto_rawDesc = "" +
 	"\vDialTrailer\x12\x1d\n" +
 	"\n" +
 	"error_code\x18\x01 \x01(\tR\terrorCode\x12#\n" +
-	"\rerror_message\x18\x02 \x01(\tR\ferrorMessageB\"Z go.ngrok.com/lib/pb_private_dialb\x06proto3"
+	"\rerror_message\x18\x02 \x01(\tR\ferrorMessage\"5\n" +
+	"\x05Error\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\tR\x04code\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\" \n" +
+	"\n" +
+	"GetHostReq\x12\x12\n" +
+	"\x04host\x18\x01 \x01(\tR\x04host\"8\n" +
+	"\vGetHostResp\x12)\n" +
+	"\x05error\x18\x01 \x01(\v2\x13.private_dial.ErrorR\x05error\"8\n" +
+	"\x0eGetHostPortReq\x12\x12\n" +
+	"\x04host\x18\x01 \x01(\tR\x04host\x12\x12\n" +
+	"\x04port\x18\x02 \x01(\x03R\x04port\"\xe3\x01\n" +
+	"\x0fGetHostPortResp\x12)\n" +
+	"\x05error\x18\x01 \x01(\v2\x13.private_dial.ErrorR\x05error\x12\x1f\n" +
+	"\vendpoint_id\x18\x02 \x01(\tR\n" +
+	"endpointId\x12G\n" +
+	"\bmetadata\x18\x03 \x03(\v2+.private_dial.GetHostPortResp.MetadataEntryR\bmetadata\x1a;\n" +
+	"\rMetadataEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\"Z go.ngrok.com/lib/pb_private_dialb\x06proto3"
 
 var (
 	file_lib_private_dial_private_dial_proto_rawDescOnce sync.Once
@@ -705,7 +984,7 @@ func file_lib_private_dial_private_dial_proto_rawDescGZIP() []byte {
 	return file_lib_private_dial_private_dial_proto_rawDescData
 }
 
-var file_lib_private_dial_private_dial_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_lib_private_dial_private_dial_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
 var file_lib_private_dial_private_dial_proto_goTypes = []any{
 	(*SessionReq)(nil),          // 0: private_dial.SessionReq
 	(*SessionAck)(nil),          // 1: private_dial.SessionAck
@@ -717,26 +996,35 @@ var file_lib_private_dial_private_dial_proto_goTypes = []any{
 	(*DialReq)(nil),             // 7: private_dial.DialReq
 	(*DialResp)(nil),            // 8: private_dial.DialResp
 	(*DialTrailer)(nil),         // 9: private_dial.DialTrailer
-	nil,                         // 10: private_dial.SessionReq.MetadataEntry
-	nil,                         // 11: private_dial.DialReq.MetadataEntry
-	nil,                         // 12: private_dial.DialResp.MetadataEntry
-	(*durationpb.Duration)(nil), // 13: google.protobuf.Duration
+	(*Error)(nil),               // 10: private_dial.Error
+	(*GetHostReq)(nil),          // 11: private_dial.GetHostReq
+	(*GetHostResp)(nil),         // 12: private_dial.GetHostResp
+	(*GetHostPortReq)(nil),      // 13: private_dial.GetHostPortReq
+	(*GetHostPortResp)(nil),     // 14: private_dial.GetHostPortResp
+	nil,                         // 15: private_dial.SessionReq.MetadataEntry
+	nil,                         // 16: private_dial.DialReq.MetadataEntry
+	nil,                         // 17: private_dial.DialResp.MetadataEntry
+	nil,                         // 18: private_dial.GetHostPortResp.MetadataEntry
+	(*durationpb.Duration)(nil), // 19: google.protobuf.Duration
 }
 var file_lib_private_dial_private_dial_proto_depIdxs = []int32{
-	10, // 0: private_dial.SessionReq.metadata:type_name -> private_dial.SessionReq.MetadataEntry
-	13, // 1: private_dial.SessionAck.ping_interval:type_name -> google.protobuf.Duration
+	15, // 0: private_dial.SessionReq.metadata:type_name -> private_dial.SessionReq.MetadataEntry
+	19, // 1: private_dial.SessionAck.ping_interval:type_name -> google.protobuf.Duration
 	2,  // 2: private_dial.ControlFrame.ping:type_name -> private_dial.Ping
 	4,  // 3: private_dial.ControlFrame.please_drain:type_name -> private_dial.PleaseDrain
 	5,  // 4: private_dial.ControlFrame.session_error:type_name -> private_dial.SessionError
 	3,  // 5: private_dial.ControlFrame.pong:type_name -> private_dial.Pong
-	11, // 6: private_dial.DialReq.metadata:type_name -> private_dial.DialReq.MetadataEntry
+	16, // 6: private_dial.DialReq.metadata:type_name -> private_dial.DialReq.MetadataEntry
 	0,  // 7: private_dial.DialReq.session_req:type_name -> private_dial.SessionReq
-	12, // 8: private_dial.DialResp.metadata:type_name -> private_dial.DialResp.MetadataEntry
-	9,  // [9:9] is the sub-list for method output_type
-	9,  // [9:9] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	17, // 8: private_dial.DialResp.metadata:type_name -> private_dial.DialResp.MetadataEntry
+	10, // 9: private_dial.GetHostResp.error:type_name -> private_dial.Error
+	10, // 10: private_dial.GetHostPortResp.error:type_name -> private_dial.Error
+	18, // 11: private_dial.GetHostPortResp.metadata:type_name -> private_dial.GetHostPortResp.MetadataEntry
+	12, // [12:12] is the sub-list for method output_type
+	12, // [12:12] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_lib_private_dial_private_dial_proto_init() }
@@ -756,7 +1044,7 @@ func file_lib_private_dial_private_dial_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lib_private_dial_private_dial_proto_rawDesc), len(file_lib_private_dial_private_dial_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   13,
+			NumMessages:   19,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
