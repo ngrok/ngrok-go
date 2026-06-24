@@ -55,6 +55,7 @@ func TestForward(t *testing.T) {
 	// Get the ngrok URL
 	ngrokURL := forwarder.URL().String()
 	t.Logf("Forwarder URL: %s", ngrokURL)
+	WaitForForwarderReady(t, ngrokURL)
 
 	// Signal that forwarding is ready
 	forwarderReady.Signal()

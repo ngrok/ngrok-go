@@ -32,6 +32,7 @@ func TestWebSocketUpgrade(t *testing.T) {
 	defer forwarder.Close()
 
 	ngrokURL := forwarder.URL().String()
+	WaitForForwarderReady(t, ngrokURL)
 	// Convert http:// to ws:// for WebSocket connection
 	wsURL := "ws" + strings.TrimPrefix(ngrokURL, "http")
 	t.Logf("WebSocket URL: %s", wsURL)
