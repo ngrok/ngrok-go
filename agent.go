@@ -158,6 +158,23 @@ func (a *agent) Connect(ctx context.Context) error {
 	agentSession.id = sess.AgentSessionID()
 	agentSession.warnings = sess.Warnings()
 
+	// legacy.Session doesn't declare these in its interface, but the
+	// concrete implementation always provides them (the same handshake
+	// fields the v3 ngrok agent reads directly off its own session type).
+	// Surfaced publicly via AgentSessionDetails.
+	type sessionExtras interface {
+		AccountName() string
+		PlanName() string
+		Region() string
+		Banner() string
+	}
+	if extras, ok := sess.(sessionExtras); ok {
+		agentSession.accountName = extras.AccountName()
+		agentSession.planName = extras.PlanName()
+		agentSession.region = extras.Region()
+		agentSession.banner = extras.Banner()
+	}
+
 	// Store in agent
 	a.sess = sess
 	a.agentSession = agentSession
