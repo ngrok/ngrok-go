@@ -99,8 +99,7 @@ func (s *ServeConnServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 // ServeConn begins serving the given connection.
 // Optionally, the provided 'state' will be made available via the
 // ExtractConnServerState function.
-// Note, the ctx is currently ignored. It should be respected in the future,
-// but it fails unit tests, so it needs some more careful consideration.
+// If ctx is cancelled, the connection is shut down gracefully.
 // If an error is returned, it will be 'http.ErrServerClosed', indicating the
 // connection was not served, or a context error.
 func (s *ServeConnServer) ServeConn(ctx context.Context, conn net.Conn, state any) error {
@@ -113,11 +112,11 @@ func (s *ServeConnServer) ServeConn(ctx context.Context, conn net.Conn, state an
 	}
 	defer s.l.RemoveConn(conn)
 
-	go func() {
-		// start terminating this connection if the `ctx` passed into ServeConn gets canceled
-		<-ctx.Done()
-		ac.shut.Shutdown()
-	}()
+	// Shut down this connection if ctx is cancelled.
+	// context.AfterFunc registers no goroutine when ctx.Done() is nil
+	// (e.g. context.Background()), and stop() unregisters on return.
+	stop := context.AfterFunc(ctx, func() { ac.shut.Shutdown() })
+	defer stop()
 
 	s.log.Debug("wait")
 	<-ac.shut.C()

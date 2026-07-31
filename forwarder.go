@@ -100,7 +100,7 @@ func (e *endpointForwarder) handleConnection(ctx context.Context, conn net.Conn)
 	proxyConn := &countingConn{Conn: conn}
 
 	if e.isHTTP() {
-		e.httpServe(proxyConn)
+		e.httpServe(ctx, proxyConn)
 		e.emitConnectionEvent(newConnectionClosed(e, remoteAddr, time.Since(start), proxyConn.bytesRead.Load(), proxyConn.bytesWritten.Load()))
 	} else {
 		backend, err := e.connectToBackend(ctx)

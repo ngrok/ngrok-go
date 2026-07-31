@@ -18,9 +18,10 @@ import (
 // It creates an http.Server with a handler that wraps ReverseProxy and a
 // statusCaptureWriter for event emission, then uses httpx.ServeConnServer
 // to serve the single proxy connection without needing a real net.Listener.
-func (e *endpointForwarder) httpServe(proxyConn net.Conn) {
+func (e *endpointForwarder) httpServe(ctx context.Context, proxyConn net.Conn) {
 	target := e.upstreamURL.Load()
 	transport := e.buildHTTPTransport()
+	defer transport.CloseIdleConnections()
 
 	rp := &httputil.ReverseProxy{
 		Rewrite: func(pr *httputil.ProxyRequest) {
@@ -52,8 +53,8 @@ func (e *endpointForwarder) httpServe(proxyConn net.Conn) {
 
 	go srv.ListenAndServe() //nolint:errcheck
 
-	srv.ServeConn(context.Background(), proxyConn, nil) //nolint:errcheck
-	server.Close()                                      //nolint:errcheck
+	srv.ServeConn(ctx, proxyConn, nil) //nolint:errcheck
+	server.Close()                     //nolint:errcheck
 }
 
 // buildHTTPTransport creates an http.Transport configured with the
@@ -73,6 +74,7 @@ func (e *endpointForwarder) buildHTTPTransport() *http.Transport {
 	transport := &http.Transport{
 		TLSClientConfig:   tlsConfig,
 		ForceAttemptHTTP2: e.upstreamProtocol == "http2",
+		IdleConnTimeout:   90 * time.Second,
 	}
 
 	if e.upstreamDialer != nil {
