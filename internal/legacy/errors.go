@@ -54,6 +54,12 @@ func (e errAuthFailed) Is(target error) bool {
 	return ok
 }
 
+// IsPermanent returns true when the auth failure came from the remote server,
+// meaning the credentials are invalid and retrying will not help.
+func (e errAuthFailed) IsPermanent() bool {
+	return e.Remote
+}
+
 // The error returned by [Tunnel]'s [net.Listener.Accept] method.
 type errAcceptFailed struct {
 	// The underlying error.

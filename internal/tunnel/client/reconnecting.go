@@ -15,6 +15,20 @@ import (
 
 var ErrSessionNotReady = errors.New("an ngrok tunnel session has not yet been established")
 
+// PermanentError is implemented by errors that should not be retried.
+// When the reconnecting session's callback returns a PermanentError,
+// the session stops reconnecting and reports the failure immediately.
+type PermanentError interface {
+	error
+	IsPermanent() bool
+}
+
+// isPermanentError reports whether err is a PermanentError that signals no retry should occur.
+func isPermanentError(err error) bool {
+	var pe PermanentError
+	return errors.As(err, &pe) && pe.IsPermanent()
+}
+
 // Wraps a RawSession so that it can be safely swapped out
 type swapRaw struct {
 	raw atomic.Pointer[RawSession]
@@ -394,6 +408,12 @@ func (s *reconnectingSession) connect(acceptErr error, connSession *session) err
 		// callback for authentication
 		desiredLegs, err := s.cb(s, raw, connSession.legNumber)
 		if err != nil {
+			if isPermanentError(err) {
+				if raw != nil {
+					raw.Close() //nolint:errcheck
+				}
+				return failPermanent(err)
+			}
 			failTemp(err, raw)
 			continue
 		}
