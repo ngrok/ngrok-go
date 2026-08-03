@@ -21,6 +21,12 @@ import (
 func (e *endpointForwarder) httpServe(proxyConn net.Conn) {
 	target := e.upstreamURL.Load()
 	transport := e.buildHTTPTransport()
+	// This transport is built per inbound connection, so it has to be torn down
+	// per inbound connection too. Nothing else ever closes it: net/http sets no
+	// finalizer on Transport, and an idle upstream connection keeps its read
+	// loop goroutine alive, so an abandoned transport holds its socket open
+	// until the upstream gives up. Deferred so it runs after server.Close().
+	defer transport.CloseIdleConnections()
 
 	rp := &httputil.ReverseProxy{
 		Rewrite: func(pr *httputil.ProxyRequest) {
@@ -73,6 +79,12 @@ func (e *endpointForwarder) buildHTTPTransport() *http.Transport {
 	transport := &http.Transport{
 		TLSClientConfig:   tlsConfig,
 		ForceAttemptHTTP2: e.upstreamProtocol == "http2",
+		// A hand-built Transport leaves this at zero, which net/http reads as
+		// "no limit" - unlike http.DefaultTransport, which uses 90s. Without
+		// it, an idle upstream socket survives for as long as the inbound
+		// connection that created it, which the ngrok edge may hold open for a
+		// long time.
+		IdleConnTimeout: 90 * time.Second,
 	}
 
 	if e.upstreamDialer != nil {
