@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"runtime"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -18,11 +19,12 @@ import (
 )
 
 // upstreamConnCounter is an upstream test server that tracks how many
-// connections are currently open. ConnState is installed before the server
-// starts so the counter is race-free.
+// connections are currently open and how many have ever been opened. ConnState
+// is installed before the server starts, so the counters are race-free.
 type upstreamConnCounter struct {
 	*httptest.Server
-	live atomic.Int64
+	live   atomic.Int64
+	opened atomic.Int64
 }
 
 func newCountingUpstream(t *testing.T, h http.Handler) *upstreamConnCounter {
@@ -34,6 +36,7 @@ func newCountingUpstream(t *testing.T, h http.Handler) *upstreamConnCounter {
 		switch state {
 		case http.StateNew:
 			u.live.Add(1)
+			u.opened.Add(1)
 		case http.StateClosed, http.StateHijacked:
 			u.live.Add(-1)
 		}
@@ -66,6 +69,8 @@ func newTestForwarder(t *testing.T, upstream string) *endpointForwarder {
 
 	e := &endpointForwarder{}
 	e.upstreamURL.Store(u)
+	// Normally forwardLoop's deferred teardown.
+	t.Cleanup(e.closeHTTPStack)
 
 	return e
 }
@@ -79,7 +84,7 @@ func serveEdgeConn(t *testing.T, e *endpointForwarder) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		e.httpServe(edgeServer)
+		e.httpServe(t.Context(), edgeServer)
 	}()
 
 	_, err := io.WriteString(edgeClient, "GET / HTTP/1.1\r\nHost: example.test\r\n\r\n")
@@ -157,7 +162,7 @@ func TestHTTPServeWebSocketUpgrade(t *testing.T) {
 		if err != nil {
 			return
 		}
-		e.httpServe(conn)
+		e.httpServe(t.Context(), conn)
 	}()
 
 	origin := "http://" + ln.Addr().String()
@@ -186,9 +191,137 @@ func TestHTTPServeWebSocketUpgrade(t *testing.T) {
 		"upstream websocket connection was not released")
 }
 
+// Because the transport is shared across the endpoint, inbound connections
+// arriving one after another should reuse a single upstream connection instead
+// of each paying a fresh handshake.
+func TestHTTPServeReusesUpstreamConns(t *testing.T) {
+	upstream := newCountingUpstream(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, "ok")
+	}))
+
+	e := newTestForwarder(t, upstream.URL)
+
+	const n = 25
+	for range n {
+		serveEdgeConn(t, e)
+	}
+
+	opened := upstream.opened.Load()
+	t.Logf("%d sequential edge connections opened %d upstream connections", n, opened)
+	assert.Equalf(t, int64(1), opened,
+		"expected sequential edge connections to reuse one pooled upstream connection, got %d for %d", opened, n)
+}
+
+// Many simultaneous inbound connections must not deadlock against the bounded
+// channel inside httpx's listener shim, and must leave nothing behind.
+func TestHTTPServeHighConcurrency(t *testing.T) {
+	upstream := newCountingUpstream(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, "ok")
+	}))
+
+	e := newTestForwarder(t, upstream.URL)
+
+	baseGoroutines := runtime.NumGoroutine()
+
+	// Comfortably past the 64-slot buffer in httpx's chanListener.
+	const n = 300
+	var wg sync.WaitGroup
+	for range n {
+		wg.Go(func() { serveEdgeConn(t, e) })
+	}
+
+	done := make(chan struct{})
+	go func() { wg.Wait(); close(done) }()
+
+	select {
+	case <-done:
+	case <-time.After(60 * time.Second):
+		t.Fatalf("%d concurrent edge connections did not complete", n)
+	}
+
+	// Endpoint teardown must release the whole upstream pool.
+	e.closeHTTPStack()
+	assert.Zerof(t, upstream.waitForLiveConns(0),
+		"upstream connections survived endpoint teardown")
+
+	deadline := time.Now().Add(5 * time.Second)
+	delta := runtime.NumGoroutine() - baseGoroutines
+	for time.Now().Before(deadline) && delta > 10 {
+		time.Sleep(25 * time.Millisecond)
+		delta = runtime.NumGoroutine() - baseGoroutines
+	}
+	assert.LessOrEqualf(t, delta, 10,
+		"goroutines grew by %d after %d concurrent connections", delta, n)
+}
+
+// The shared reverse proxy reads the upstream per request, so an update lands
+// on the next request even over an inbound connection that is already open.
+func TestHTTPServeUpdateUpstream(t *testing.T) {
+	first := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, "first")
+	}))
+	defer first.Close()
+
+	second := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, "second")
+	}))
+	defer second.Close()
+
+	e := newTestForwarder(t, first.URL)
+
+	// A single keep-alive edge connection spanning the update.
+	edgeClient, edgeServer := net.Pipe()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		e.httpServe(t.Context(), edgeServer)
+	}()
+
+	reader := bufio.NewReader(edgeClient)
+	request := func() string {
+		t.Helper()
+		_, err := io.WriteString(edgeClient, "GET / HTTP/1.1\r\nHost: example.test\r\n\r\n")
+		require.NoError(t, err)
+		resp, err := http.ReadResponse(reader, nil)
+		require.NoError(t, err)
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		require.NoError(t, resp.Body.Close())
+		return string(body)
+	}
+
+	assert.Equal(t, "first", request())
+
+	u, err := url.Parse(second.URL)
+	require.NoError(t, err)
+	e.UpdateUpstream(*u)
+
+	assert.Equal(t, "second", request(),
+		"UpdateUpstream should take effect on the next request of an open connection")
+
+	require.NoError(t, edgeClient.Close())
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("httpServe did not return after the edge connection closed")
+	}
+}
+
 // A zero IdleConnTimeout means "no limit", which lets an idle upstream socket
 // outlive any reasonable connection lifetime.
 func TestBuildHTTPTransportSetsIdleConnTimeout(t *testing.T) {
 	e := newTestForwarder(t, "http://127.0.0.1:1")
 	assert.NotZero(t, e.buildHTTPTransport().IdleConnTimeout)
+}
+
+// A nil TLSClientConfig would make net/http turn on automatic HTTP/2
+// negotiation for https upstreams, which is not what the endpoint asked for.
+func TestBuildHTTPTransportKeepsTLSConfigNonNil(t *testing.T) {
+	e := newTestForwarder(t, "https://127.0.0.1:1")
+	transport := e.buildHTTPTransport()
+
+	require.NotNil(t, transport.TLSClientConfig)
+	assert.Empty(t, transport.TLSClientConfig.ServerName,
+		"ServerName must stay unset so it is derived per request")
+	assert.False(t, transport.ForceAttemptHTTP2)
 }
