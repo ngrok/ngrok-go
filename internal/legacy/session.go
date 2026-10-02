@@ -634,6 +634,7 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 	// allow consumers to .Close() the session before a successful connect
 	session.setInner(&sessionInner{
 		Session: sess,
+		Logger:  logger,
 	})
 
 	// performs one "pump" of the session update channel
