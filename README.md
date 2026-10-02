@@ -151,7 +151,6 @@ Changes to `ngrok-go` are tracked under [CHANGELOG.md](https://github.com/ngrok/
 
 ## Join the ngrok Community
 
-- Join our [Discord community](https://ngrok.com/discord)
 - Check out [our official docs](https://ngrok.com/docs)
 - Read about updates on [our blog](https://ngrok.com/blog)
 - Open an [issue](https://github.com/ngrok/ngrok-go/issues) or [pull request](https://github.com/ngrok/ngrok-go/pulls)
