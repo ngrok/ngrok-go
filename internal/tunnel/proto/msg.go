@@ -2,6 +2,7 @@ package proto
 
 import (
 	"errors"
+	"log/slog"
 	"regexp"
 	"strings"
 	"time"
@@ -90,6 +91,16 @@ type Auth struct {
 	Extra    AuthExtra // clients may add whatever data the like to auth messages
 }
 
+// LogValue implements slog.LogValuer so that RPC debug logging does not leak
+// credentials. The wire protocol JSON-encodes this message, so redaction must
+// not happen in MarshalJSON.
+func (a Auth) LogValue() slog.Value {
+	type auth Auth // drops LogValue so the result is not resolved again
+	a.Extra.Authtoken = ObfuscatedString(redact(string(a.Extra.Authtoken)))
+	a.Extra.Cookie = redact(a.Extra.Cookie)
+	return slog.AnyValue(auth(a))
+}
+
 type ObfuscatedString string
 
 func (t ObfuscatedString) String() string {
@@ -98,6 +109,20 @@ func (t ObfuscatedString) String() string {
 
 func (t ObfuscatedString) PlainText() string {
 	return string(t)
+}
+
+// LogValue implements slog.LogValuer. Handlers that encode values by
+// reflection, like slog's JSONHandler or zap, never call String.
+func (t ObfuscatedString) LogValue() slog.Value {
+	return slog.StringValue(t.String())
+}
+
+// redact replaces a non-empty secret so logs still show whether it was set.
+func redact(s string) string {
+	if s == "" {
+		return ""
+	}
+	return "HIDDEN"
 }
 
 type AuthExtra struct {
@@ -172,6 +197,13 @@ type AuthResp struct {
 	Extra    AuthRespExtra
 }
 
+// LogValue implements slog.LogValuer. See Auth.LogValue.
+func (r AuthResp) LogValue() slog.Value {
+	type authResp AuthResp
+	r.Extra.Cookie = redact(r.Extra.Cookie)
+	return slog.AnyValue(authResp(r))
+}
+
 type AgentVersionDeprecated struct {
 	NextMin  string
 	NextDate time.Time
@@ -222,6 +254,13 @@ type Bind struct {
 	Extra         BindExtra // anything extra the application wants to send
 }
 
+// LogValue implements slog.LogValuer. See Auth.LogValue.
+func (b Bind) LogValue() slog.Value {
+	type bind Bind
+	b.Extra.Token = redact(b.Extra.Token)
+	return slog.AnyValue(bind(b))
+}
+
 type BindExtra struct {
 	Name           string
 	Token          string
@@ -241,6 +280,13 @@ type BindResp struct {
 	Opts     any           // protocol-specific options that were chosen
 	Error    string        // error message is the server failed to bind
 	Extra    BindRespExtra // application-defined extra values
+}
+
+// LogValue implements slog.LogValuer. See Auth.LogValue.
+func (r BindResp) LogValue() slog.Value {
+	type bindResp BindResp
+	r.Extra.Token = redact(r.Extra.Token)
+	return slog.AnyValue(bindResp(r))
 }
 
 type BindRespExtra struct {

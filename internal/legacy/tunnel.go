@@ -72,7 +72,7 @@ func (t *tunnelImpl) Accept() (net.Conn, error) {
 	if err != nil {
 		err = errAcceptFailed{Inner: err}
 		if s, ok := t.Sess.(*sessionImpl); ok {
-			if si := s.inner(); si != nil {
+			if si := s.inner(); si != nil && si.Logger != nil {
 				si.Logger.Info(err.Error(), "clientid", t.Tunnel.ID())
 			}
 		}
