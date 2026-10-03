@@ -40,7 +40,9 @@ type UpdateableEndpointForwarder interface {
 	EndpointForwarder
 
 	// UpdateUpstream atomically updates the upstream URL that connections are forwarded to.
-	// Connections already in progress are not affected. Only new connections use the new URL.
+	// Requests already in flight are not affected. For HTTP and HTTPS upstreams the
+	// new URL takes effect on the next request, including on inbound connections that
+	// are already open; for other upstreams it takes effect on the next connection.
 	UpdateUpstream(u url.URL)
 
 	// Update applies a partial update to the endpoint's mutable metadata fields
@@ -57,6 +59,12 @@ type endpointForwarder struct {
 	upstreamProtocol        string
 	proxyProtocol           ProxyProtoVersion
 	upstreamDialer          Dialer
+
+	// httpStack is the endpoint's shared HTTP forwarding machinery, built on
+	// the first forwarded HTTP connection and torn down when forwardLoop exits.
+	httpMu     sync.Mutex
+	httpStack  *httpStack
+	httpClosed bool
 }
 
 // Start begins forwarding connections from the listener to the upstream URL
@@ -68,6 +76,9 @@ func (e *endpointForwarder) start(ctx context.Context) {
 func (e *endpointForwarder) forwardLoop(ctx context.Context) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	// Release the endpoint's shared HTTP machinery, including its pool of
+	// upstream connections, once we stop accepting.
+	defer e.closeHTTPStack()
 	for {
 		select {
 		case <-ctx.Done():
@@ -100,7 +111,7 @@ func (e *endpointForwarder) handleConnection(ctx context.Context, conn net.Conn)
 	proxyConn := &countingConn{Conn: conn}
 
 	if e.isHTTP() {
-		e.httpServe(proxyConn)
+		e.httpServe(ctx, proxyConn)
 		e.emitConnectionEvent(newConnectionClosed(e, remoteAddr, time.Since(start), proxyConn.bytesRead.Load(), proxyConn.bytesWritten.Load()))
 	} else {
 		backend, err := e.connectToBackend(ctx)
