@@ -1,9 +1,9 @@
 name: Go
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "privatedial" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "privatedial" ]
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
