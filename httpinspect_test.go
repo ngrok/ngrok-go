@@ -186,6 +186,70 @@ func TestHTTPServeWebSocketUpgrade(t *testing.T) {
 		"upstream websocket connection was not released")
 }
 
+// The ngrok edge sets the forwarding headers, and upstream apps rely on them
+// to detect https and the client IP. httputil.ReverseProxy removes them when
+// Rewrite is set, so httpServe must put them back.
+func TestHTTPServePreservesForwardedHeaders(t *testing.T) {
+	received := make(chan http.Header, 1)
+	upstream := newCountingUpstream(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		received <- r.Header.Clone()
+	}))
+
+	e := newTestForwarder(t, upstream.URL)
+
+	edgeClient, edgeServer := net.Pipe()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		e.httpServe(edgeServer)
+	}()
+
+	_, err := io.WriteString(edgeClient, "GET / HTTP/1.1\r\n"+
+		"Host: example.test\r\n"+
+		"X-Forwarded-For: 203.0.113.7\r\n"+
+		"X-Forwarded-For: 198.51.100.2\r\n"+
+		"X-Forwarded-Host: example.test\r\n"+
+		"X-Forwarded-Proto: https\r\n"+
+		"Forwarded: for=203.0.113.7;proto=https\r\n"+
+		"\r\n")
+	require.NoError(t, err)
+
+	resp, err := http.ReadResponse(bufio.NewReader(edgeClient), nil)
+	require.NoError(t, err)
+	_, err = io.Copy(io.Discard, resp.Body)
+	require.NoError(t, err)
+	require.NoError(t, resp.Body.Close())
+	require.NoError(t, edgeClient.Close())
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("httpServe did not return after the edge connection closed")
+	}
+
+	got := <-received
+	assert.Equal(t, []string{"203.0.113.7", "198.51.100.2"}, got.Values("X-Forwarded-For"))
+	assert.Equal(t, "example.test", got.Get("X-Forwarded-Host"))
+	assert.Equal(t, "https", got.Get("X-Forwarded-Proto"))
+	assert.Equal(t, "for=203.0.113.7;proto=https", got.Get("Forwarded"))
+}
+
+// A request without forwarding headers must not gain any. In particular, the
+// agent must not append the address of its own edge connection.
+func TestHTTPServeAddsNoForwardedHeaders(t *testing.T) {
+	received := make(chan http.Header, 1)
+	upstream := newCountingUpstream(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		received <- r.Header.Clone()
+	}))
+
+	serveEdgeConn(t, newTestForwarder(t, upstream.URL))
+
+	got := <-received
+	for _, h := range []string{"X-Forwarded-For", "X-Forwarded-Host", "X-Forwarded-Proto", "Forwarded"} {
+		assert.Emptyf(t, got.Values(h), "unexpected %s header", h)
+	}
+}
+
 // A zero IdleConnTimeout means "no limit", which lets an idle upstream socket
 // outlive any reasonable connection lifetime.
 func TestBuildHTTPTransportSetsIdleConnTimeout(t *testing.T) {
