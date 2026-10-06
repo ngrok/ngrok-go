@@ -16,6 +16,10 @@ import (
 // headers. Tests shorten it.
 var httpReadHeaderTimeout = 3 * time.Second
 
+// forwardingHeaders are the headers that httputil.ReverseProxy removes from
+// the outbound request when Rewrite is set.
+var forwardingHeaders = []string{"Forwarded", "X-Forwarded-For", "X-Forwarded-Host", "X-Forwarded-Proto"}
+
 // httpServe uses httputil.ReverseProxy to forward HTTP traffic from the proxy
 // connection to the upstream backend.
 //
@@ -37,6 +41,15 @@ func (e *endpointForwarder) httpServe(proxyConn net.Conn) {
 			pr.SetURL(target)
 			// Preserve the original Host header from the inbound request
 			pr.Out.Host = pr.In.Host
+			// ReverseProxy removes the forwarding headers when Rewrite is set.
+			// The ngrok edge sets them, so restore them as received. Do not use
+			// SetXForwarded: it adds the edge connection's address, not the
+			// client's.
+			for _, h := range forwardingHeaders {
+				if v, ok := pr.In.Header[h]; ok {
+					pr.Out.Header[h] = v
+				}
+			}
 		},
 		Transport: transport,
 	}
