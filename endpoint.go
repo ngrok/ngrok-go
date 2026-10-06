@@ -87,7 +87,7 @@ type baseEndpoint struct {
 	createdAt       time.Time
 	updatedAt       time.Time
 	tunnelSessionID string
-	tunnelID        string
+	tunnelID        func() string // reads the tunnel, because a reconnect changes the ID
 }
 
 func (e *baseEndpoint) Agent() Agent {
@@ -173,7 +173,7 @@ func (e *baseEndpoint) TunnelSessionID() string {
 }
 
 func (e *baseEndpoint) TunnelID() string {
-	return e.tunnelID
+	return e.tunnelID()
 }
 
 // signalDone safely closes the done channel using sync.Once

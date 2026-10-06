@@ -289,7 +289,7 @@ func (a *agent) createListener(ctx context.Context, endpointOpts *endpointOpts) 
 			createdAt:       now,
 			updatedAt:       now,
 			tunnelSessionID: tunnelSessionID,
-			tunnelID:        tunnel.TunnelID(),
+			tunnelID:        tunnel.TunnelID,
 		},
 		tunnel: tunnel,
 	}

@@ -261,7 +261,7 @@ func (e *endpointForwarder) UpdateUpstream(u url.URL) {
 
 func (e *endpointForwarder) Update(ctx context.Context, name, description, metadata *string, poolingEnabled *bool, trafficPolicy *string) error {
 	if a, ok := e.agent.(*agent); ok {
-		if err := a.patchTunnelState(ctx, e.tunnelID, name, description, metadata, poolingEnabled, trafficPolicy); err != nil {
+		if err := a.patchTunnelState(ctx, e.TunnelID(), name, description, metadata, poolingEnabled, trafficPolicy); err != nil {
 			return err
 		}
 	}
