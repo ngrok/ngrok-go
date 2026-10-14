@@ -186,6 +186,34 @@ func TestHTTPServeWebSocketUpgrade(t *testing.T) {
 		"upstream websocket connection was not released")
 }
 
+// A client that never completes its request headers must not hold the
+// connection open forever.
+func TestHTTPServeClosesIncompleteRequest(t *testing.T) {
+	orig := httpReadHeaderTimeout
+	httpReadHeaderTimeout = 50 * time.Millisecond
+	t.Cleanup(func() { httpReadHeaderTimeout = orig })
+
+	e := newTestForwarder(t, "http://127.0.0.1:1")
+
+	edgeClient, edgeServer := net.Pipe()
+	defer edgeClient.Close() //nolint:errcheck
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		e.httpServe(edgeServer)
+	}()
+	go func() { _, _ = io.Copy(io.Discard, edgeClient) }()
+
+	_, err := io.WriteString(edgeClient, "GET / HT")
+	require.NoError(t, err)
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("httpServe kept a connection with incomplete request headers open")
+	}
+}
+
 // A zero IdleConnTimeout means "no limit", which lets an idle upstream socket
 // outlive any reasonable connection lifetime.
 func TestBuildHTTPTransportSetsIdleConnTimeout(t *testing.T) {

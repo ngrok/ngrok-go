@@ -12,6 +12,10 @@ import (
 	"golang.ngrok.com/ngrok/v2/internal/httpx"
 )
 
+// httpReadHeaderTimeout limits how long httpServe waits for each request's
+// headers. Tests shorten it.
+var httpReadHeaderTimeout = 3 * time.Second
+
 // httpServe uses httputil.ReverseProxy to forward HTTP traffic from the proxy
 // connection to the upstream backend.
 //
@@ -51,7 +55,10 @@ func (e *endpointForwarder) httpServe(proxyConn net.Conn) {
 	})
 
 	server := &http.Server{
-		Handler: handler,
+		// Without a limit, a client that never completes its request headers
+		// holds the connection and this goroutine until the edge closes it.
+		ReadHeaderTimeout: httpReadHeaderTimeout,
+		Handler:           handler,
 	}
 
 	srv := httpx.NewServeConnServer(server, slog.Default())
