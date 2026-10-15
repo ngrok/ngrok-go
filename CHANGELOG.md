@@ -1,3 +1,61 @@
+## 2.2.1
+
+Fixes:
+
+- Redact authtokens, session cookies and bind tokens from RPC debug logs.
+  Structured log handlers such as `slog.JSONHandler` previously wrote these
+  credentials verbatim.
+- Forward raw bytes for `tcp` and `tls` endpoints whose upstream URL has an
+  `http` or `https` scheme, instead of parsing the traffic as HTTP, which
+  stalled the connection. This regressed in 2.1.2.
+- Time out HTTP requests whose headers never complete
+- Don't panic when `Accept` fails before the agent first connects
+
+## 2.2.0
+
+Enhancements:
+
+- Adds `UpdateableEndpointForwarder`, reached by type assertion on an
+  `EndpointForwarder`, to change the upstream URL and to patch an endpoint's
+  name, description, metadata, pooling and Traffic Policy while it is running
+- Adds `AgentSessionDetails`, reached by type assertion on an `AgentSession`,
+  exposing the account name, plan name, region and banner of the session
+
+Fixes:
+
+- Close the upstream HTTP transport when each forwarded connection finishes,
+  instead of leaking an upstream socket and its goroutines per connection
+- Stop leaking a goroutine for each forwarded HTTP connection
+
+## 2.1.4
+
+Enhancements:
+
+- `DiagnoseResult` now includes `PeerCertificates`, the certificate chain the
+  server presented during the TLS handshake
+
+## 2.1.3
+
+Enhancements:
+
+- Adds `CreatedAt`, `UpdatedAt`, `TunnelSessionID` and `TunnelID` to `Endpoint`
+
+## 2.1.2
+
+Enhancements:
+
+- Adds `WithName` option and `Endpoint.Name`, setting a name for the endpoint
+- Adds `Endpoint.Wait`, blocking until the endpoint stops
+- Adds `AgentSession.ID`, returning the server-assigned agent session ID
+- Adds `Diagnoser`, reached by type assertion on an `Agent`, which probes
+  connectivity to the ngrok service over TCP, TLS and muxado. Use
+  `IsTCPDiagnoseFailure`, `IsTLSDiagnoseFailure` and `IsMuxadoDiagnoseFailure`
+  to tell which step failed.
+- Adds `ConnectionOpened`, `ConnectionClosed` and `HTTPRequestComplete` events,
+  reporting per-connection byte counts and durations and per-request status
+  codes. Forwarders now proxy `http` and `https` upstreams as HTTP rather than
+  copying raw bytes.
+
 ## 2.1.1
 
 Fixes:
