@@ -209,7 +209,7 @@ func (s *reconnectingSession) listenTunnel(listen func(*session) (Tunnel, error)
 		}
 		// connect this tunnel to the other legs
 		for _, session := range s.sessions[1:] {
-			if e := s.reconnectTunnelToSession(session.raw, tun.(*tunnel), make(map[string]*tunnel), tun.ID()); e != nil {
+			if e := s.reconnectTunnelToSession(session, tun.(*tunnel), make(map[string]*tunnel), tun.ID()); e != nil {
 				return nil, e
 			}
 			// use locking method
@@ -352,12 +352,11 @@ func (s *reconnectingSession) connect(acceptErr error, connSession *session) err
 	restartBinds := func(session *session) (err error) {
 		session.Lock()
 		defer session.Unlock()
-		raw := session.raw
 
 		// reconnected tunnels, which may have different IDs
 		newTunnels := make(map[string]*tunnel, len(session.tunnels))
 		for oldID, t := range session.tunnels {
-			if err := s.reconnectTunnelToSession(raw, t, newTunnels, oldID); err != nil {
+			if err := s.reconnectTunnelToSession(session, t, newTunnels, oldID); err != nil {
 				return err
 			}
 		}
@@ -427,7 +426,8 @@ func (s *reconnectingSession) connect(acceptErr error, connSession *session) err
 	}
 }
 
-func (s *reconnectingSession) reconnectTunnelToSession(raw RawSession, t *tunnel, newTunnels map[string]*tunnel, oldID string) error {
+func (s *reconnectingSession) reconnectTunnelToSession(session *session, t *tunnel, newTunnels map[string]*tunnel, oldID string) error {
+	raw := session.raw
 	// set the returned token for reconnection
 	tCfg := t.RemoteBindConfig()
 	t.bindExtra.Token = tCfg.Token
@@ -451,6 +451,11 @@ func (s *reconnectingSession) reconnectTunnelToSession(raw RawSession, t *tunnel
 			return err
 		}
 		respErr = resp.Error
+		// Each bind gets a new server tunnel ID. PatchTunnelState goes to leg 0 only,
+		// so keep the ID from leg 0.
+		if session.legNumber == 0 && resp.Extra.TunnelID != "" {
+			t.tunnelID.Store(resp.Extra.TunnelID)
+		}
 
 		newTunnels[oldID] = t
 	}
