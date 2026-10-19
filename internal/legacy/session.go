@@ -48,10 +48,24 @@ type Session interface {
 	// PatchTunnelState sends a muxado request to update mutable fields on a tunnel
 	PatchTunnelState(tunnelID string, name, description, metadata *string, poolingEnabled *bool, trafficPolicy *string) error
 
+	// AgentMetricsSettings returns the metrics settings of the current
+	// connection, or nil if the server does not accept metrics on it.
+	AgentMetricsSettings() *proto.AgentMetricsSettings
+
+	// SendAgentMetrics sends one encoded agent.AgentMetricsBatch on the
+	// current connection and returns the encoded agent.AgentMetricsBatchResult.
+	// It returns ErrAgentMetricsUnsupported if the server did not advertise
+	// metrics settings for that connection.
+	SendAgentMetrics(ctx context.Context, batch []byte) ([]byte, error)
+
 	// Close ends the ngrok session. All Tunnel objects created by Listen
 	// on this session will be closed.
 	Close() error
 }
+
+// ErrAgentMetricsUnsupported is returned by SendAgentMetrics when the current
+// connection does not accept metrics.
+var ErrAgentMetricsUnsupported = errors.New("the ngrok session does not accept agent metrics")
 
 //go:embed ngrok.ca.crt
 var defaultCACert []byte
@@ -576,6 +590,8 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 			DeprecationWarning: resp.Extra.DeprecationWarning,
 			ConnectAddresses:   resp.Extra.ConnectAddresses,
 			AgentSessionID:     resp.Extra.AgentSessionID,
+			AgentMetrics:       resp.Extra.AgentMetrics,
+			raw:                raw,
 			Logger:             logger,
 		}
 
@@ -715,6 +731,12 @@ type sessionInner struct {
 	DeprecationWarning *proto.AgentVersionDeprecated
 	ConnectAddresses   []proto.ConnectAddress
 	AgentSessionID     string
+	AgentMetrics       *proto.AgentMetricsSettings
+
+	// raw is the connection that AgentMetrics came from. Metrics go only to
+	// that connection, because a reconnect can reach a server with other
+	// settings, or with no metrics support.
+	raw tunnel_client.RawSession
 
 	Logger *slog.Logger
 }
@@ -749,6 +771,18 @@ func (s *sessionImpl) Warnings() []error {
 
 func (s *sessionImpl) PatchTunnelState(tunnelID string, name, description, metadata *string, poolingEnabled *bool, trafficPolicy *string) error {
 	return s.inner().PatchTunnelState(tunnelID, name, description, metadata, poolingEnabled, trafficPolicy)
+}
+
+func (s *sessionImpl) AgentMetricsSettings() *proto.AgentMetricsSettings {
+	return s.inner().AgentMetrics
+}
+
+func (s *sessionImpl) SendAgentMetrics(ctx context.Context, batch []byte) ([]byte, error) {
+	inner := s.inner()
+	if inner.AgentMetrics == nil {
+		return nil, ErrAgentMetricsUnsupported
+	}
+	return inner.raw.SendAgentMetrics(ctx, batch)
 }
 
 func (s *sessionImpl) Listen(ctx context.Context, cfg config.Tunnel) (Tunnel, error) {
