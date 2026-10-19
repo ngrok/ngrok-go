@@ -310,15 +310,15 @@ func TestSendAgentMetrics(t *testing.T) {
 		receive(second)
 	})
 
-	t.Run("rejects a batch larger than the stream window", func(t *testing.T) {
+	t.Run("rejects a batch larger than MaxAgentMetricsBatchBytes", func(t *testing.T) {
 		done := make(chan struct{})
 		t.Cleanup(func() { close(done) })
 		// The server accepts the stream but never reads it, so a write larger
 		// than the window waits for a window update that never comes.
 		raw := newAgentMetricsSession(t, func(muxado.TypedStream) { <-done })
 
-		_, err := raw.SendAgentMetrics(metricsContext(t, time.Minute), make([]byte, maxAgentMetricsWriteBytes))
-		require.Error(t, err)
+		_, err := raw.SendAgentMetrics(metricsContext(t, time.Minute), make([]byte, MaxAgentMetricsBatchBytes+1))
+		require.ErrorContains(t, err, "too large")
 	})
 
 	t.Run("returns when the context ends", func(t *testing.T) {

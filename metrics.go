@@ -29,7 +29,8 @@ type AgentSessionMetrics interface {
 	// and cancellation end the wait for the result. On a stalled connection,
 	// sending the batch can last until the connection recovers or the Agent
 	// closes the session, for example after missed heartbeats or a call to
-	// Disconnect. Tunnel traffic does not wait for it. It returns
+	// Disconnect. Tunnel traffic does not wait for it. Call SendMetrics from
+	// its own goroutine, and never from an EventHandler. It returns
 	// ErrMetricsUnsupported if the connection does not accept metrics. Any
 	// other error means that the result is unknown.
 	SendMetrics(ctx context.Context, batch []byte) ([]byte, error)
@@ -41,11 +42,12 @@ type AgentSessionMetrics interface {
 var ErrMetricsUnsupported = legacy.ErrAgentMetricsUnsupported
 
 // MetricsSettings tells an agent how to publish metrics batches on the current
-// connection to the ngrok cloud service.
+// connection to the ngrok cloud service. All fields are above zero.
 type MetricsSettings struct {
 	// Interval is the time between batches.
 	Interval time.Duration
-	// MaxBatchBytes is the maximum encoded size of a batch.
+	// MaxBatchBytes is the maximum encoded size of a batch. It is never more
+	// than the largest batch that SendMetrics can send.
 	MaxBatchBytes int
 	// MaxSamples is the maximum number of samples in a batch.
 	MaxSamples int

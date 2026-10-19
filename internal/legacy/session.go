@@ -590,7 +590,7 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 			DeprecationWarning: resp.Extra.DeprecationWarning,
 			ConnectAddresses:   resp.Extra.ConnectAddresses,
 			AgentSessionID:     resp.Extra.AgentSessionID,
-			AgentMetrics:       resp.Extra.AgentMetrics,
+			AgentMetrics:       agentMetricsSettings(resp.Extra.AgentMetrics, logger),
 			raw:                raw,
 			Logger:             logger,
 		}
@@ -771,6 +771,28 @@ func (s *sessionImpl) Warnings() []error {
 
 func (s *sessionImpl) PatchTunnelState(tunnelID string, name, description, metadata *string, poolingEnabled *bool, trafficPolicy *string) error {
 	return s.inner().PatchTunnelState(tunnelID, name, description, metadata, poolingEnabled, trafficPolicy)
+}
+
+// agentMetricsSettings returns nil for settings that the agent cannot follow,
+// so that the session sends no metrics. It lowers MaxBatchBytes to the
+// largest batch that SendAgentMetrics can send.
+func agentMetricsSettings(settings *proto.AgentMetricsSettings, logger *slog.Logger) *proto.AgentMetricsSettings {
+	if settings == nil {
+		return nil
+	}
+	if settings.IntervalMs <= 0 || settings.MaxBatchBytes <= 0 || settings.MaxSamples <= 0 {
+		logger.Warn("ignoring invalid agent metrics settings",
+			"interval_ms", settings.IntervalMs,
+			"max_batch_bytes", settings.MaxBatchBytes,
+			"max_samples", settings.MaxSamples)
+		return nil
+	}
+	if settings.MaxBatchBytes > tunnel_client.MaxAgentMetricsBatchBytes {
+		lowered := *settings
+		lowered.MaxBatchBytes = tunnel_client.MaxAgentMetricsBatchBytes
+		return &lowered
+	}
+	return settings
 }
 
 func (s *sessionImpl) AgentMetricsSettings() *proto.AgentMetricsSettings {

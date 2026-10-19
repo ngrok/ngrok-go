@@ -174,6 +174,10 @@ const maxAgentMetricsResultBytes = 4096
 // fits in the window of a new stream never waits for a window update.
 const maxAgentMetricsWriteBytes = 0x40000
 
+// MaxAgentMetricsBatchBytes is the largest batch that SendAgentMetrics sends.
+// The stream type and the length prefix use the rest of the stream window.
+const MaxAgentMetricsBatchBytes = maxAgentMetricsWriteBytes - 4 - binary.MaxVarintLen32
+
 // SendAgentMetrics writes one length-delimited, encoded agent.AgentMetricsBatch
 // on a new AgentMetricsReq stream and returns the encoded
 // agent.AgentMetricsBatchResult. The caller encodes and decodes both, so that
@@ -195,11 +199,11 @@ func (s *rawSession) SendAgentMetrics(ctx context.Context, batch []byte) ([]byte
 		return nil, errors.New("agent metrics require a context with a deadline")
 	}
 
-	msg := binary.AppendUvarint(make([]byte, 0, binary.MaxVarintLen64+len(batch)), uint64(len(batch)))
-	msg = append(msg, batch...)
-	if len(msg) > maxAgentMetricsWriteBytes-4 { // 4 bytes for the stream type
+	if len(batch) > MaxAgentMetricsBatchBytes {
 		return nil, fmt.Errorf("agent metrics batch of %d bytes is too large", len(batch))
 	}
+	msg := binary.AppendUvarint(make([]byte, 0, binary.MaxVarintLen64+len(batch)), uint64(len(batch)))
+	msg = append(msg, batch...)
 
 	stream, err := s.mux.OpenTypedStream(muxado.StreamType(proto.AgentMetricsReq))
 	if err != nil {
