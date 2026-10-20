@@ -1,7 +1,10 @@
 package ngrok
 
 import (
+	"sync/atomic"
 	"time"
+
+	"golang.ngrok.com/ngrok/v2/internal/legacy"
 )
 
 // AgentSession represents an active connection from an Agent to the ngrok cloud
@@ -38,7 +41,8 @@ type AgentSessionDetails interface {
 	Banner() string
 }
 
-// agentSession implements the AgentSession and AgentSessionDetails interfaces.
+// agentSession implements the AgentSession, AgentSessionDetails, and
+// AgentSessionMetrics interfaces.
 type agentSession struct {
 	id          string
 	warnings    []error
@@ -48,6 +52,9 @@ type agentSession struct {
 	planName    string
 	region      string
 	banner      string
+	// legacy holds the legacy.Session after the first connect. The connect
+	// handler stores it while other goroutines can read it.
+	legacy atomic.Value
 }
 
 func (s *agentSession) ID() string {
@@ -80,4 +87,9 @@ func (s *agentSession) Region() string {
 
 func (s *agentSession) Banner() string {
 	return s.banner
+}
+
+func (s *agentSession) legacySession() legacy.Session {
+	sess, _ := s.legacy.Load().(legacy.Session)
+	return sess
 }

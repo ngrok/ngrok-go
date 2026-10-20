@@ -125,6 +125,7 @@ func (a *agent) Connect(ctx context.Context) error {
 
 	// Hook up connect event
 	legacyOpts = append(legacyOpts, legacy.WithConnectHandler(func(_ context.Context, sess legacy.Session) {
+		agentSession.legacy.Store(sess)
 		a.emitEvent(newAgentConnectSucceeded(a, agentSession))
 	}))
 
