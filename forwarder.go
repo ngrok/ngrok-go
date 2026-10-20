@@ -121,8 +121,16 @@ func (e *endpointForwarder) emitConnectionEvent(evt Event) {
 	}
 }
 
+// isHTTP reports whether connections are proxied as HTTP. Both the endpoint and
+// the upstream must speak HTTP: a tcp or tls endpoint carries raw bytes even
+// when its upstream URL has an http scheme, and parsing those bytes as HTTP
+// stalls the connection.
 func (e *endpointForwarder) isHTTP() bool {
-	switch strings.ToLower(e.upstreamURL.Load().Scheme) {
+	return isHTTPScheme(e.endpointURL.Scheme) && isHTTPScheme(e.upstreamURL.Load().Scheme)
+}
+
+func isHTTPScheme(scheme string) bool {
+	switch strings.ToLower(scheme) {
 	case "http", "https":
 		return true
 	default:

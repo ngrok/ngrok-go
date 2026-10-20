@@ -1,9 +1,13 @@
 package client
 
 import (
+	"bufio"
+	"context"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"math/rand"
 	"net"
@@ -25,6 +29,8 @@ type RawSession interface {
 	Accept() (netx.LoggedConn, error)
 
 	SrvInfo() (proto.SrvInfoResp, error)
+
+	SendAgentMetrics(ctx context.Context, batch []byte) ([]byte, error)
 
 	Latency() <-chan time.Duration
 	Heartbeat() (time.Duration, error)
@@ -158,6 +164,78 @@ func (s *rawSession) SrvInfo() (resp proto.SrvInfoResp, err error) {
 	req := proto.SrvInfo{}
 	err = s.rpc(proto.SrvInfoReq, &req, &resp)
 	return
+}
+
+// maxAgentMetricsResultBytes limits the size of a result that the server
+// sends. Real results are much smaller.
+const maxAgentMetricsResultBytes = 4096
+
+// maxAgentMetricsWriteBytes is the default muxado stream window. A write that
+// fits in the window of a new stream never waits for a window update.
+const maxAgentMetricsWriteBytes = 0x40000
+
+// MaxAgentMetricsBatchBytes is the largest batch that SendAgentMetrics sends.
+// The stream type and the length prefix use the rest of the stream window.
+const MaxAgentMetricsBatchBytes = maxAgentMetricsWriteBytes - 4 - binary.MaxVarintLen32
+
+// SendAgentMetrics writes one length-delimited, encoded agent.AgentMetricsBatch
+// on a new AgentMetricsReq stream and returns the encoded
+// agent.AgentMetricsBatchResult. The caller encodes and decodes both, so that
+// the protobuf schema stays out of this package. A retry can send identical
+// bytes.
+//
+// ctx must have a deadline. The deadline and cancellation end the wait for the
+// result. They do not end a write. When a muxado write deadline expires, the
+// session writer can still hold the stream's frame, and the next write on the
+// stream changes that frame and corrupts the connection. A write or a stream
+// close on a stalled connection therefore lasts until the connection recovers
+// or the session closes, for example when heartbeats fail.
+func (s *rawSession) SendAgentMetrics(ctx context.Context, batch []byte) ([]byte, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		return nil, errors.New("agent metrics require a context with a deadline")
+	}
+
+	if len(batch) > MaxAgentMetricsBatchBytes {
+		return nil, fmt.Errorf("agent metrics batch of %d bytes is too large", len(batch))
+	}
+	msg := binary.AppendUvarint(make([]byte, 0, binary.MaxVarintLen64+len(batch)), uint64(len(batch)))
+	msg = append(msg, batch...)
+
+	stream, err := s.mux.OpenTypedStream(muxado.StreamType(proto.AgentMetricsReq))
+	if err != nil {
+		return nil, err
+	}
+	_ = stream.SetReadDeadline(deadline)
+	// SetReadDeadline does not wait for an in-progress write, so it is safe to
+	// call from the cancel callback.
+	stop := context.AfterFunc(ctx, func() { _ = stream.SetReadDeadline(time.Now()) })
+	defer stop()
+
+	if _, err := stream.Write(msg); err != nil {
+		// With no write deadline, a failed write either did not queue its
+		// frame or ended the session. Close reuses the frame, which a dying
+		// session writer can still hold, so do not call it.
+		return nil, err
+	}
+	defer stream.Close()
+
+	r := bufio.NewReader(stream)
+	size, err := binary.ReadUvarint(r)
+	if err != nil {
+		return nil, err
+	}
+	if size > maxAgentMetricsResultBytes {
+		return nil, fmt.Errorf("agent metrics result of %d bytes is too large", size)
+	}
+	result := make([]byte, size)
+	if _, err := io.ReadFull(r, result); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 func (s *rawSession) Heartbeat() (time.Duration, error) {

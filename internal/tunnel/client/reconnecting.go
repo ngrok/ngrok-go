@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"sync"
@@ -72,6 +73,13 @@ func (s *swapRaw) SrvInfo() (resp proto.SrvInfoResp, err error) {
 		return raw.SrvInfo()
 	}
 	return proto.SrvInfoResp{}, ErrSessionNotReady
+}
+
+func (s *swapRaw) SendAgentMetrics(ctx context.Context, batch []byte) ([]byte, error) {
+	if raw := s.get(); raw != nil {
+		return raw.SendAgentMetrics(ctx, batch)
+	}
+	return nil, ErrSessionNotReady
 }
 
 func (s *swapRaw) Heartbeat() (time.Duration, error) {
