@@ -1,11 +1,15 @@
 package ngrok
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
+	"go/version"
+	"log/slog"
 	"net"
 	"net/url"
+	"runtime"
 	"slices"
 	"sync"
 	"time"
@@ -16,6 +20,18 @@ import (
 	"golang.ngrok.com/ngrok/v2/internal/legacy/config"
 	"golang.ngrok.com/ngrok/v2/rpc"
 )
+
+var warnEMudhraOnce sync.Once
+
+// Delete this check and its warning once go.mod requires go1.27.3 or later,
+// since no affected Go can build the module then.
+func goTrustsCompromisedEMudhraCAs(v string) bool {
+	if !version.IsValid(v) {
+		return false
+	}
+	return version.Compare(v, "go1.26.10") < 0 ||
+		version.Lang(v) == "go1.27" && version.Compare(v, "go1.27.3") < 0
+}
 
 // Agent is the main interface for interacting with the ngrok service.
 type Agent interface {
@@ -80,6 +96,14 @@ func (a *agent) Connect(ctx context.Context) error {
 	// If we're already connected, return an error
 	if a.sess != nil && a.agentSession != nil {
 		return errors.New("agent already connected")
+	}
+
+	if goTrustsCompromisedEMudhraCAs(runtime.Version()) {
+		warnEMudhraOnce.Do(func() {
+			cmp.Or(a.opts.logger, slog.Default()).Warn(
+				"this Go version trusts certificates from the compromised eMudhra CA keys (CVE-2026-111943); rebuild with go1.26.10 or a later go1.26 release, or with go1.27.3 or later",
+				"go_version", runtime.Version())
+		})
 	}
 
 	// Add legacy connect handlers for events
