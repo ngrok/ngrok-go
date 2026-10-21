@@ -23,6 +23,8 @@ import (
 
 var warnEMudhraOnce sync.Once
 
+// Delete this check and its warning once go.mod requires go1.27.3 or later,
+// since no affected Go can build the module then.
 func goTrustsCompromisedEMudhraCAs(v string) bool {
 	if !version.IsValid(v) {
 		return false
@@ -99,7 +101,7 @@ func (a *agent) Connect(ctx context.Context) error {
 	if goTrustsCompromisedEMudhraCAs(runtime.Version()) {
 		warnEMudhraOnce.Do(func() {
 			cmp.Or(a.opts.logger, slog.Default()).Warn(
-				"this Go version trusts certificates from the compromised eMudhra CA keys; rebuild with go1.26.10 or a later go1.26 release, or with go1.27.3 or later",
+				"this Go version trusts certificates from the compromised eMudhra CA keys (CVE-2026-111943); rebuild with go1.26.10 or a later go1.26 release, or with go1.27.3 or later",
 				"go_version", runtime.Version())
 		})
 	}
