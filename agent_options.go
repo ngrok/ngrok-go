@@ -53,6 +53,10 @@ func defaultAgentOpts() *agentOpts {
 // WithAgentConnectCAs defines the CAs used to validate the TLS certificate
 // returned by the ngrok service when establishing a session.
 //
+// By default the session trusts only ngrok's root CA. Passing a pool replaces
+// that, so passing [x509.SystemCertPool] makes the session trust every CA in
+// the host store.
+//
 // See https://ngrok.com/docs/agent/config/v3/#connect_cas
 func WithAgentConnectCAs(pool *x509.CertPool) AgentOption {
 	return func(opts *agentOpts) {
@@ -184,7 +188,8 @@ func WithProxyURL(urlSpec string) AgentOption {
 }
 
 // WithTLSConfig customizes the TLS configuration for connections to the ngrok
-// service.
+// service. The customizer runs after the CA pool is set, so changing RootCAs or
+// InsecureSkipVerify there changes which certificates the session accepts.
 func WithTLSConfig(tlsCustomizer func(*tls.Config)) AgentOption {
 	return func(opts *agentOpts) {
 		opts.tlsConfig = tlsCustomizer
