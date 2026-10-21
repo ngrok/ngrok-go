@@ -27,6 +27,26 @@ jobs:
       run: direnv exec . go build -C ./examples -v ./...
     - name: Test
       run: direnv exec . go test -v ./...
+  patched-go:
+    name: Go ${{ matrix.go }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go: ['1.26.10', '1.27.3']
+    env:
+      GOTOOLCHAIN: local
+      NGROK_TEST_FLAKEY: 1
+    steps:
+    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+    - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version: ${{ matrix.go }}
+    - name: Build
+      run: go build -v ./...
+    - name: Build Examples
+      run: go build -C ./examples -v ./...
+    - name: Test
+      run: go test -v ./...
   online-tests:
     name: Online tests
     runs-on: ubuntu-latest
