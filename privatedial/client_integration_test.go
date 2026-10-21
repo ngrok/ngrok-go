@@ -1,0 +1,992 @@
+package privatedial
+
+import (
+	"bufio"
+	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"errors"
+	"fmt"
+	"io"
+	"math/big"
+	"net"
+	"net/http"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"syscall"
+	"testing"
+	"time"
+
+	"github.com/quic-go/quic-go"
+	"github.com/quic-go/quic-go/http3"
+	"golang.org/x/net/http2"
+	"google.golang.org/protobuf/encoding/protodelim"
+
+	pbpd "golang.ngrok.com/ngrok/privatedial/internal/pb_private_dial"
+)
+
+// These tests stand up real HTTP/2 and HTTP/3 servers that speak the
+// private-dial /session and /dial handshakes, then drive the actual client
+// against them. They exercise the Happy-Eyeballs transport selection end to
+// end: which protocol wins the race, the staggered HTTP/2 fallback when QUIC
+// is unreachable, process-sticky reuse, ForceProtocol, and a full duplex
+// /dial echo over each transport.
+//
+// The race relies on process-global sticky state, so these tests reset it
+// between cases and must not run in parallel.
+
+// resetSticky clears the process-global protocol decision so each test
+// starts from ProtocolAuto. It also resets the memoized UDP-buffer probe and
+// forces it to succeed so the race runs regardless of the host kernel's buffer
+// tuning; tests that want to exercise the probe-driven HTTP/2 fallback override
+// probeBuffers after calling this.
+func resetSticky() {
+	stickyProtocol.Store(nil)
+	probeBuffers = func() error { return nil }
+	probeOnce = sync.Once{}
+	probeErr = nil
+}
+
+func TestRaceQUICWins(t *testing.T) {
+	resetSticky()
+	cert := genTLSCert(t)
+	var quicHits, h2Hits atomic.Int64
+	quicAddr := startH3Server(t, cert, privateDialHandler(&quicHits))
+	h2Addr := startH2Server(t, cert, privateDialHandler(&h2Hits))
+
+	sess := mustConnect(t, Config{
+		QUICServerAddr: quicAddr,
+		H2ServerAddr:   h2Addr,
+		AuthToken:      "test-token",
+		TLSConfig:      &tls.Config{InsecureSkipVerify: true},
+	})
+	defer sess.Close()
+
+	if got := stickyProtocol.Load(); got == nil || *got != ProtocolQUIC {
+		t.Fatalf("expected QUIC to win the race, sticky protocol = %v", got)
+	}
+	// QUIC connects on localhost well inside the 250ms head start, so the
+	// HTTP/2 attempt should never be launched.
+	if n := h2Hits.Load(); n != 0 {
+		t.Fatalf("expected no HTTP/2 connection when QUIC wins fast, got %d hits", n)
+	}
+	if quicHits.Load() == 0 {
+		t.Fatal("expected the QUIC server to receive the /session request")
+	}
+}
+
+func TestRaceFallsBackToH2(t *testing.T) {
+	resetSticky()
+	cert := genTLSCert(t)
+	var h2Hits atomic.Int64
+	// QUIC points at a UDP socket that silently drops everything, so the
+	// QUIC handshake never completes and the race must stagger in HTTP/2.
+	quicAddr := blackholeUDPAddr(t)
+	h2Addr := startH2Server(t, cert, privateDialHandler(&h2Hits))
+
+	start := time.Now()
+	sess := mustConnect(t, Config{
+		QUICServerAddr: quicAddr,
+		H2ServerAddr:   h2Addr,
+		AuthToken:      "test-token",
+		TLSConfig:      &tls.Config{InsecureSkipVerify: true},
+	})
+	defer sess.Close()
+
+	if got := stickyProtocol.Load(); got == nil || *got != ProtocolH2 {
+		t.Fatalf("expected HTTP/2 to win when QUIC is unreachable, sticky protocol = %v", got)
+	}
+	if h2Hits.Load() == 0 {
+		t.Fatal("expected the HTTP/2 server to receive the /session request")
+	}
+	// The HTTP/2 attempt is staggered behind the QUIC head start, so the
+	// session can't have come up before quicHeadStart elapsed.
+	if elapsed := time.Since(start); elapsed < quicHeadStart {
+		t.Fatalf("fallback completed in %v, expected at least the %v head start", elapsed, quicHeadStart)
+	}
+}
+
+func TestBufferProbeForcesH2(t *testing.T) {
+	resetSticky()
+	// Simulate a host where QUIC can't obtain the UDP buffer sizes it wants.
+	// The probe should short-circuit the race and force HTTP/2 without ever
+	// touching QUIC.
+	probeBuffers = func() error { return errors.New("failed to increase receive buffer size") }
+
+	cert := genTLSCert(t)
+	var quicHits, h2Hits atomic.Int64
+	quicAddr := startH3Server(t, cert, privateDialHandler(&quicHits))
+	h2Addr := startH2Server(t, cert, privateDialHandler(&h2Hits))
+
+	sess := mustConnect(t, Config{
+		QUICServerAddr: quicAddr,
+		H2ServerAddr:   h2Addr,
+		AuthToken:      "test-token",
+		TLSConfig:      &tls.Config{InsecureSkipVerify: true},
+	})
+	defer sess.Close()
+
+	if got := sess.Protocol(); got != ProtocolH2 {
+		t.Fatalf("expected the buffer probe to force HTTP/2, Protocol = %v", got)
+	}
+	// The probe is decoupled from stickyProtocol: it forces HTTP/2 for this
+	// dialer without writing the process-global race decision.
+	if got := stickyProtocol.Load(); got != nil {
+		t.Fatalf("buffer probe should not set sticky protocol, got %v", *got)
+	}
+	if n := quicHits.Load(); n != 0 {
+		t.Fatalf("expected QUIC to be skipped entirely, got %d hits", n)
+	}
+	if h2Hits.Load() == 0 {
+		t.Fatal("expected the HTTP/2 server to receive the /session request")
+	}
+}
+
+func TestBufferProbeMemoized(t *testing.T) {
+	resetSticky()
+	// The probe answer is a host property, so it must run at most once per
+	// process regardless of how many connects (or Dialers) consult it. This is
+	// memoized independently of stickyProtocol so it survives changes to where
+	// the protocol decision is cached.
+	var calls atomic.Int64
+	probeBuffers = func() error {
+		calls.Add(1)
+		return errors.New("probe failed")
+	}
+	for range 3 {
+		if err := quicBuffersUsable(); err == nil {
+			t.Fatal("expected the memoized probe to keep returning its error")
+		}
+	}
+	if got := calls.Load(); got != 1 {
+		t.Fatalf("probe should run exactly once, ran %d times", got)
+	}
+}
+
+func TestStickyProtocolReused(t *testing.T) {
+	resetSticky()
+	cert := genTLSCert(t)
+	var quicHits, h2Hits atomic.Int64
+	quicAddr := startH3Server(t, cert, privateDialHandler(&quicHits))
+	h2Addr := startH2Server(t, cert, privateDialHandler(&h2Hits))
+
+	opts := Config{
+		QUICServerAddr: quicAddr,
+		H2ServerAddr:   h2Addr,
+		AuthToken:      "test-token",
+		TLSConfig:      &tls.Config{InsecureSkipVerify: true},
+	}
+
+	// First session races and settles on QUIC.
+	sess1 := mustConnect(t, opts)
+	defer sess1.Close()
+	if got := stickyProtocol.Load(); got == nil || *got != ProtocolQUIC {
+		t.Fatalf("first session should settle on QUIC, sticky = %v", got)
+	}
+
+	// A second session must reuse the sticky choice without racing, so
+	// HTTP/2 is still never touched.
+	sess2 := mustConnect(t, opts)
+	defer sess2.Close()
+	if n := h2Hits.Load(); n != 0 {
+		t.Fatalf("sticky reuse should not touch HTTP/2, got %d hits", n)
+	}
+	if quicHits.Load() < 2 {
+		t.Fatalf("expected both sessions to use QUIC, got %d QUIC hits", quicHits.Load())
+	}
+}
+
+func TestForceProtocol(t *testing.T) {
+	cert := genTLSCert(t)
+
+	t.Run("h2", func(t *testing.T) {
+		resetSticky()
+		var quicHits, h2Hits atomic.Int64
+		quicAddr := startH3Server(t, cert, privateDialHandler(&quicHits))
+		h2Addr := startH2Server(t, cert, privateDialHandler(&h2Hits))
+
+		sess := mustConnect(t, Config{
+			QUICServerAddr: quicAddr,
+			H2ServerAddr:   h2Addr,
+			AuthToken:      "test-token",
+			ForceProtocol:  ProtocolH2,
+			TLSConfig:      &tls.Config{InsecureSkipVerify: true},
+		})
+		defer sess.Close()
+
+		if h2Hits.Load() == 0 {
+			t.Fatal("ForceProtocol=H2 should use the HTTP/2 server")
+		}
+		if quicHits.Load() != 0 {
+			t.Fatalf("ForceProtocol=H2 must not touch QUIC, got %d hits", quicHits.Load())
+		}
+		// The H2 transport records the server IP it dialed.
+		if sess.RemoteAddr() == "" {
+			t.Fatal("ForceProtocol=H2 should record a non-empty RemoteAddr")
+		}
+		// Forcing a protocol bypasses the race and must not write sticky state.
+		if got := stickyProtocol.Load(); got != nil {
+			t.Fatalf("ForceProtocol should not set sticky state, got %v", *got)
+		}
+	})
+
+	t.Run("quic", func(t *testing.T) {
+		resetSticky()
+		var quicHits, h2Hits atomic.Int64
+		quicAddr := startH3Server(t, cert, privateDialHandler(&quicHits))
+		h2Addr := startH2Server(t, cert, privateDialHandler(&h2Hits))
+
+		sess := mustConnect(t, Config{
+			QUICServerAddr: quicAddr,
+			H2ServerAddr:   h2Addr,
+			AuthToken:      "test-token",
+			ForceProtocol:  ProtocolQUIC,
+			TLSConfig:      &tls.Config{InsecureSkipVerify: true},
+		})
+		defer sess.Close()
+
+		if quicHits.Load() == 0 {
+			t.Fatal("ForceProtocol=QUIC should use the QUIC server")
+		}
+		if h2Hits.Load() != 0 {
+			t.Fatalf("ForceProtocol=QUIC must not touch HTTP/2, got %d hits", h2Hits.Load())
+		}
+		// The H3 transport records the server IP it dialed.
+		if sess.RemoteAddr() == "" {
+			t.Fatal("ForceProtocol=QUIC should record a non-empty RemoteAddr")
+		}
+	})
+}
+
+// TestDialEcho proves a full-duplex /dial stream works over each transport:
+// bytes written to the returned net.Conn are echoed back by the server. This
+// validates that the HTTP/3 path streams the request body concurrently with
+// the response, which the protocol depends on.
+func TestDialEcho(t *testing.T) {
+	cert := genTLSCert(t)
+
+	for _, tc := range []struct {
+		name  string
+		proto Protocol
+	}{
+		{"quic", ProtocolQUIC},
+		{"h2", ProtocolH2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			resetSticky()
+			var hits atomic.Int64
+			quicAddr := startH3Server(t, cert, privateDialHandler(&hits))
+			h2Addr := startH2Server(t, cert, privateDialHandler(&hits))
+
+			sess := mustConnect(t, Config{
+				QUICServerAddr: quicAddr,
+				H2ServerAddr:   h2Addr,
+				AuthToken:      "test-token",
+				ForceProtocol:  tc.proto,
+				TLSConfig:      &tls.Config{InsecureSkipVerify: true},
+			})
+			defer sess.Close()
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			conn, err := sess.DialContext(ctx, "tcp", "foo.private:80")
+			if err != nil {
+				t.Fatalf("DialContext: %v", err)
+			}
+			defer conn.Close()
+
+			// The server reports the resolved endpoint ID in the DialResp frame.
+			if pc, ok := conn.(Conn); !ok {
+				t.Fatalf("conn %T does not implement privatedial.Conn", conn)
+			} else if pc.EndpointID() != "ep_test" {
+				t.Fatalf("EndpointID() = %q, want %q", pc.EndpointID(), "ep_test")
+			}
+
+			payload := []byte("hello private dial over " + tc.name)
+			if _, err := conn.Write(payload); err != nil {
+				t.Fatalf("Write: %v", err)
+			}
+			// Signal end-of-request so the server's echo copy returns.
+			if err := conn.(*dialConn).CloseWrite(); err != nil {
+				t.Fatalf("CloseWrite: %v", err)
+			}
+
+			got, err := io.ReadAll(conn)
+			if err != nil {
+				t.Fatalf("ReadAll: %v", err)
+			}
+			if string(got) != string(payload) {
+				t.Fatalf("echo mismatch: got %q want %q", got, payload)
+			}
+		})
+	}
+}
+
+// TestGetHost exercises /get-host over each transport: a known host, an unknown
+// host (not-found code), a non-not-found in-band error, and a server rejection.
+func TestGetHost(t *testing.T) {
+	cert := genTLSCert(t)
+
+	getHostHandler := func() http.Handler {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/session", func(w http.ResponseWriter, r *http.Request) {
+			var req pbpd.SessionReq
+			if err := protodelimUnmarshaler.UnmarshalFrom(bufio.NewReader(r.Body), &req); err != nil {
+				http.Error(w, "bad SessionReq", http.StatusBadRequest)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			if _, err := protodelim.MarshalTo(w, &pbpd.SessionAck{ServerId: "gethost-srv"}); err != nil {
+				return
+			}
+			flush(w)
+			<-r.Context().Done()
+		})
+		mux.HandleFunc("/get-host", func(w http.ResponseWriter, r *http.Request) {
+			var req pbpd.GetHostReq
+			if err := protodelimUnmarshaler.UnmarshalFrom(bufio.NewReader(r.Body), &req); err != nil {
+				http.Error(w, "bad GetHostReq", http.StatusBadRequest)
+				return
+			}
+			if req.GetHost() == "denied.private" {
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
+			resp := &pbpd.GetHostResp{}
+			switch req.GetHost() {
+			case "missing.private":
+				resp.Error = &pbpd.Error{Code: errCodeEndpointNotFound, Message: "no such host"}
+			case "servfail.private":
+				// A non-not-found in-band error.
+				resp.Error = &pbpd.Error{Code: "ERR_NGROK_999", Message: "lookup failed"}
+			}
+			w.WriteHeader(http.StatusOK)
+			if _, err := protodelim.MarshalTo(w, resp); err != nil {
+				return
+			}
+			flush(w)
+		})
+		return mux
+	}
+
+	for _, tc := range []struct {
+		name  string
+		proto Protocol
+	}{
+		{"quic", ProtocolQUIC},
+		{"h2", ProtocolH2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			resetSticky()
+			sess := mustConnect(t, configForProtocol(t, tc.proto, cert, getHostHandler()))
+			defer sess.Close()
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			if exists, err := sess.GetHost(ctx, "foo.private"); err != nil || !exists {
+				t.Fatalf("GetHost(foo.private) = (%v, %v), want (true, nil)", exists, err)
+			}
+			if exists, err := sess.GetHost(ctx, "missing.private"); err != nil || exists {
+				t.Fatalf("GetHost(missing.private) = (%v, %v), want (false, nil)", exists, err)
+			}
+			// A non-not-found in-band error surfaces as a privatedial.Error.
+			exists, err := sess.GetHost(ctx, "servfail.private")
+			if err == nil || exists {
+				t.Fatalf("GetHost(servfail.private) = (%v, %v), want (false, non-nil)", exists, err)
+			}
+			var nerr Error
+			if !errors.As(err, &nerr) {
+				t.Fatalf("GetHost(servfail.private) error %v is not a privatedial.Error", err)
+			}
+			if nerr.Code() != "ERR_NGROK_999" {
+				t.Fatalf("GetHost(servfail.private) code = %q, want %q", nerr.Code(), "ERR_NGROK_999")
+			}
+			if exists, err := sess.GetHost(ctx, "denied.private"); err == nil || exists {
+				t.Fatalf("GetHost(denied.private) = (%v, %v), want (false, non-nil)", exists, err)
+			}
+		})
+	}
+}
+
+// TestDialTrailerError proves an end-to-end pre-bridge dial failure reported
+// via HTTP trailers is rehydrated into a privatedial.Error and surfaced from
+// DialContext itself: the server commits a 200 with no DialResp frame and an
+// empty body, so reading the (absent) success frame fails and the client
+// consults the trailers before returning the conn.
+func TestDialTrailerError(t *testing.T) {
+	cert := genTLSCert(t)
+
+	dialErrorHandler := func() http.Handler {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/session", func(w http.ResponseWriter, r *http.Request) {
+			var req pbpd.SessionReq
+			if err := protodelimUnmarshaler.UnmarshalFrom(bufio.NewReader(r.Body), &req); err != nil {
+				http.Error(w, "bad SessionReq", http.StatusBadRequest)
+				return
+			}
+			if _, err := protodelim.MarshalTo(w, &pbpd.SessionAck{ServerId: "trailer-srv"}); err != nil {
+				return
+			}
+			flush(w)
+			<-r.Context().Done()
+		})
+		mux.HandleFunc("/dial", func(w http.ResponseWriter, r *http.Request) {
+			var dreq pbpd.DialReq
+			if err := protodelimUnmarshaler.UnmarshalFrom(bufio.NewReader(r.Body), &dreq); err != nil {
+				http.Error(w, "bad DialReq", http.StatusBadRequest)
+				return
+			}
+			// Commit to a 200, then report the dial failure via trailers with
+			// no DialResp and no body, mirroring an immediate server-side
+			// failure (e.g. endpoint not found).
+			w.Header().Set(http.TrailerPrefix+dialErrorCodeTrailer, errCodeSessionDraining)
+			w.Header().Set(http.TrailerPrefix+dialErrorMessageTrailer, "session draining")
+			w.WriteHeader(http.StatusOK)
+			flush(w)
+		})
+		return mux
+	}
+
+	for _, tc := range []struct {
+		name  string
+		proto Protocol
+	}{
+		{"h2", ProtocolH2},
+		{"quic", ProtocolQUIC},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			resetSticky()
+			sess := mustConnect(t, configForProtocol(t, tc.proto, cert, dialErrorHandler()))
+			defer sess.Close()
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_, err := sess.DialContext(ctx, "tcp", "foo.private:80")
+			if err == nil {
+				t.Fatal("DialContext succeeded, want trailer error")
+			}
+			assertDialTrailerError(t, err)
+		})
+	}
+}
+
+// TestDialMidStreamTrailerError proves a failure that occurs after the stream
+// is established (a successful DialResp, then bytes, then an error trailer)
+// surfaces on the first failing Read rather than from DialContext.
+func TestDialMidStreamTrailerError(t *testing.T) {
+	cert := genTLSCert(t)
+
+	midStreamErrorHandler := func() http.Handler {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/session", func(w http.ResponseWriter, r *http.Request) {
+			var req pbpd.SessionReq
+			if err := protodelimUnmarshaler.UnmarshalFrom(bufio.NewReader(r.Body), &req); err != nil {
+				http.Error(w, "bad SessionReq", http.StatusBadRequest)
+				return
+			}
+			if _, err := protodelim.MarshalTo(w, &pbpd.SessionAck{ServerId: "midstream-srv"}); err != nil {
+				return
+			}
+			flush(w)
+			<-r.Context().Done()
+		})
+		mux.HandleFunc("/dial", func(w http.ResponseWriter, r *http.Request) {
+			var dreq pbpd.DialReq
+			if err := protodelimUnmarshaler.UnmarshalFrom(bufio.NewReader(r.Body), &dreq); err != nil {
+				http.Error(w, "bad DialReq", http.StatusBadRequest)
+				return
+			}
+			// Succeed (DialResp + some bytes), then fail via trailers.
+			w.Header().Set(http.TrailerPrefix+dialErrorCodeTrailer, errCodeSessionDraining)
+			w.Header().Set(http.TrailerPrefix+dialErrorMessageTrailer, "session draining")
+			w.WriteHeader(http.StatusOK)
+			if _, err := protodelim.MarshalTo(w, &pbpd.DialResp{EndpointId: "ep_test"}); err != nil {
+				return
+			}
+			_, _ = w.Write([]byte("partial"))
+			flush(w)
+		})
+		return mux
+	}
+
+	for _, tc := range []struct {
+		name  string
+		proto Protocol
+	}{
+		{"h2", ProtocolH2},
+		{"quic", ProtocolQUIC},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			resetSticky()
+			sess := mustConnect(t, configForProtocol(t, tc.proto, cert, midStreamErrorHandler()))
+			defer sess.Close()
+
+			// The dial itself succeeds — the error only appears once the stream ends.
+			conn := mustDial(t, sess, "foo.private:80")
+			defer conn.Close()
+
+			got, err := io.ReadAll(conn)
+			if string(got) != "partial" {
+				t.Fatalf("read %q, want the pre-error bytes %q", got, "partial")
+			}
+			if err == nil {
+				t.Fatal("Read succeeded, want trailer error")
+			}
+			if errors.Is(err, io.EOF) {
+				t.Fatalf("Read returned io.EOF, want trailer error")
+			}
+			assertDialTrailerError(t, err)
+		})
+	}
+}
+
+// assertDialTrailerError checks that err is the rehydrated session-draining
+// trailer error, carrying its ngrok code, message, and net sentinel.
+func assertDialTrailerError(t *testing.T, err error) {
+	t.Helper()
+	var nerr Error
+	if !errors.As(err, &nerr) {
+		t.Fatalf("error %T not assignable to privatedial.Error", err)
+	}
+	if nerr.Code() != errCodeSessionDraining {
+		t.Fatalf("Code() = %q, want %q", nerr.Code(), errCodeSessionDraining)
+	}
+	if !strings.Contains(nerr.Error(), "session draining") {
+		t.Fatalf("Error() = %q, want to contain message", nerr.Error())
+	}
+	// The code's net sentinel must bubble end-to-end.
+	if !errors.Is(err, syscall.ECONNREFUSED) {
+		t.Fatalf("want ECONNREFUSED to bubble, got %v", err)
+	}
+}
+
+// TestSessionTrailerError proves that a session rejected via trailers (a 200
+// with an error trailer and no SessionAck) is rehydrated and returned straight
+// out of Connect, since the handshake reads the SessionAck synchronously.
+func TestSessionTrailerError(t *testing.T) {
+	cert := genTLSCert(t)
+
+	sessionErrorHandler := func() http.Handler {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/session", func(w http.ResponseWriter, r *http.Request) {
+			var req pbpd.SessionReq
+			if err := protodelimUnmarshaler.UnmarshalFrom(bufio.NewReader(r.Body), &req); err != nil {
+				http.Error(w, "bad SessionReq", http.StatusBadRequest)
+				return
+			}
+			// Commit to a 200, then reject via trailers without ever
+			// sending a SessionAck.
+			w.Header().Set(http.TrailerPrefix+dialErrorCodeTrailer, "ERR_NGROK_4040")
+			w.Header().Set(http.TrailerPrefix+dialErrorMessageTrailer, "session rejected")
+			w.WriteHeader(http.StatusOK)
+			flush(w)
+		})
+		return mux
+	}
+
+	for _, tc := range []struct {
+		name  string
+		proto Protocol
+	}{
+		{"h2", ProtocolH2},
+		{"quic", ProtocolQUIC},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			resetSticky()
+			opts := configForProtocol(t, tc.proto, cert, sessionErrorHandler())
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			dialer := New(opts)
+			defer dialer.Close()
+			err := dialer.Connect(ctx)
+			if err == nil {
+				t.Fatal("Connect succeeded, want trailer error")
+			}
+			var nerr Error
+			if !errors.As(err, &nerr) {
+				t.Fatalf("error %T not assignable to privatedial.Error: %v", err, err)
+			}
+			if nerr.Code() != "ERR_NGROK_4040" {
+				t.Fatalf("Code() = %q, want ERR_NGROK_4040", nerr.Code())
+			}
+			if !strings.Contains(nerr.Error(), "session rejected") {
+				t.Fatalf("Error() = %q, want to contain message", nerr.Error())
+			}
+		})
+	}
+}
+
+func TestDrainReconnect(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		proto Protocol
+	}{
+		{"h2", ProtocolH2},
+		{"quic", ProtocolQUIC},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			resetSticky()
+			cert := genTLSCert(t)
+			var sessionN atomic.Int32
+			firstDrainCh := make(chan struct{})
+
+			mux := http.NewServeMux()
+			mux.HandleFunc("/session", func(w http.ResponseWriter, r *http.Request) {
+				n := sessionN.Add(1)
+				var req pbpd.SessionReq
+				if err := protodelimUnmarshaler.UnmarshalFrom(bufio.NewReader(r.Body), &req); err != nil {
+					http.Error(w, "bad SessionReq", http.StatusBadRequest)
+					return
+				}
+				if _, err := protodelim.MarshalTo(w, &pbpd.SessionAck{ServerId: fmt.Sprintf("srv-%d", n)}); err != nil {
+					return
+				}
+				flush(w)
+				if n == 1 {
+					select {
+					case <-firstDrainCh:
+					case <-r.Context().Done():
+						return
+					}
+					_, _ = protodelim.MarshalTo(w, &pbpd.ControlFrame{
+						Frame: &pbpd.ControlFrame_PleaseDrain{
+							PleaseDrain: &pbpd.PleaseDrain{GracePeriodSeconds: 1},
+						},
+					})
+					flush(w)
+				}
+				<-r.Context().Done()
+			})
+			mux.HandleFunc("/dial", echoDialHandler)
+
+			sess := mustConnect(t, configForProtocol(t, tc.proto, cert, mux))
+			defer sess.Close()
+
+			if got := sess.Protocol(); got != tc.proto {
+				t.Fatalf("Protocol = %v, want %v", got, tc.proto)
+			}
+			if got := sess.ServerID(); got != "srv-1" {
+				t.Fatalf("initial ServerID = %q, want srv-1", got)
+			}
+			conn1 := mustDial(t, sess, "first.private:80")
+			assertEcho(t, conn1, "before-drain")
+			_ = conn1.Close()
+
+			close(firstDrainCh)
+			waitFor(t, 3*time.Second, func() bool { return sess.ServerID() == "srv-2" })
+
+			conn2 := mustDial(t, sess, "second.private:443")
+			if got := conn2.RemoteAddr().Network(); got != "tcp" {
+				t.Fatalf("RemoteAddr network = %q, want tcp", got)
+			}
+			if got := conn2.RemoteAddr().String(); got != "second.private:443" {
+				t.Fatalf("RemoteAddr string = %q, want second.private:443", got)
+			}
+			assertEcho(t, conn2, "after-drain")
+			_ = conn2.Close()
+		})
+	}
+}
+
+func TestAbruptControlStreamReconnect(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		proto Protocol
+	}{
+		{"h2", ProtocolH2},
+		{"quic", ProtocolQUIC},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			resetSticky()
+			cert := genTLSCert(t)
+			var sessionN atomic.Int32
+			dropFirst := make(chan struct{})
+
+			mux := http.NewServeMux()
+			mux.HandleFunc("/session", func(w http.ResponseWriter, r *http.Request) {
+				n := sessionN.Add(1)
+				var req pbpd.SessionReq
+				if err := protodelimUnmarshaler.UnmarshalFrom(bufio.NewReader(r.Body), &req); err != nil {
+					http.Error(w, "bad SessionReq", http.StatusBadRequest)
+					return
+				}
+				if _, err := protodelim.MarshalTo(w, &pbpd.SessionAck{ServerId: fmt.Sprintf("srv-%d", n)}); err != nil {
+					return
+				}
+				flush(w)
+				if n == 1 {
+					select {
+					case <-dropFirst:
+					case <-r.Context().Done():
+					}
+					return
+				}
+				<-r.Context().Done()
+			})
+			mux.HandleFunc("/dial", echoDialHandler)
+
+			sess := mustConnect(t, configForProtocol(t, tc.proto, cert, mux))
+			defer sess.Close()
+
+			if got := sess.Protocol(); got != tc.proto {
+				t.Fatalf("Protocol = %v, want %v", got, tc.proto)
+			}
+			if got := sess.ServerID(); got != "srv-1" {
+				t.Fatalf("initial ServerID = %q, want srv-1", got)
+			}
+			close(dropFirst)
+			waitFor(t, 3*time.Second, func() bool { return sess.ServerID() == "srv-2" })
+
+			conn := mustDial(t, sess, "after-drop.private:80")
+			assertEcho(t, conn, "after-drop")
+			_ = conn.Close()
+		})
+	}
+}
+
+func configForProtocol(t *testing.T, proto Protocol, cert tls.Certificate, h http.Handler) Config {
+	t.Helper()
+	opts := Config{
+		AuthToken:     "test-token",
+		ForceProtocol: proto,
+		TLSConfig:     &tls.Config{InsecureSkipVerify: true},
+	}
+	switch proto {
+	case ProtocolH2:
+		opts.H2ServerAddr = startH2Server(t, cert, h)
+	case ProtocolQUIC:
+		opts.QUICServerAddr = startH3Server(t, cert, h)
+	default:
+		t.Fatalf("unsupported protocol %v", proto)
+	}
+	return opts
+}
+
+// mustConnect returns a connected Dialer for the given config, failing the
+// test on error.
+func mustConnect(t *testing.T, cfg Config) *Dialer {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	dialer := New(cfg)
+	if err := dialer.Connect(ctx); err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+	return dialer
+}
+
+func mustDial(t *testing.T, sess *Dialer, addr string) net.Conn {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	conn, err := sess.DialContext(ctx, "tcp", addr)
+	if err != nil {
+		t.Fatalf("DialContext: %v", err)
+	}
+	return conn
+}
+
+func assertEcho(t *testing.T, conn net.Conn, msg string) {
+	t.Helper()
+	if _, err := io.WriteString(conn, msg); err != nil {
+		t.Fatalf("WriteString: %v", err)
+	}
+	buf := make([]byte, len(msg))
+	if _, err := io.ReadFull(conn, buf); err != nil {
+		t.Fatalf("ReadFull: %v", err)
+	}
+	if string(buf) != msg {
+		t.Fatalf("echo mismatch: got %q want %q", buf, msg)
+	}
+}
+
+func waitFor(t *testing.T, timeout time.Duration, fn func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if fn() {
+			return
+		}
+		time.Sleep(2 * time.Millisecond)
+	}
+	t.Fatalf("waitFor timed out after %s", timeout)
+}
+
+// privateDialHandler returns a handler that speaks the private-dial protocol:
+// /session reads a SessionReq and replies with a SessionAck, holding the
+// stream open; /dial reads a DialReq and then echoes the raw stream. counter
+// is incremented once per request so tests can assert which transport was
+// used.
+func privateDialHandler(counter *atomic.Int64) http.Handler {
+	unmarshal := &protodelim.UnmarshalOptions{MaxSize: 16 * 1024}
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/session", func(w http.ResponseWriter, r *http.Request) {
+		counter.Add(1)
+		var req pbpd.SessionReq
+		if err := unmarshal.UnmarshalFrom(bufio.NewReader(r.Body), &req); err != nil {
+			http.Error(w, "bad SessionReq", http.StatusBadRequest)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		if _, err := protodelim.MarshalTo(w, &pbpd.SessionAck{ServerId: "test-server"}); err != nil {
+			return
+		}
+		flush(w)
+		// Keep the control stream open for the life of the session.
+		<-r.Context().Done()
+	})
+
+	mux.HandleFunc("/dial", func(w http.ResponseWriter, r *http.Request) {
+		counter.Add(1)
+		br := bufio.NewReader(r.Body)
+		var dreq pbpd.DialReq
+		if err := unmarshal.UnmarshalFrom(br, &dreq); err != nil {
+			http.Error(w, "bad DialReq", http.StatusBadRequest)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		// The success frame precedes the raw stream.
+		if _, err := protodelim.MarshalTo(w, &pbpd.DialResp{EndpointId: "ep_test"}); err != nil {
+			return
+		}
+		flush(w)
+		// The stream is now raw TCP: echo everything the client sends.
+		// br may hold bytes already read past the DialReq, so copy from it.
+		_, _ = io.Copy(flushWriter{w}, br)
+	})
+
+	return mux
+}
+
+func echoDialHandler(w http.ResponseWriter, r *http.Request) {
+	br := bufio.NewReader(r.Body)
+	var dreq pbpd.DialReq
+	if err := protodelimUnmarshaler.UnmarshalFrom(br, &dreq); err != nil {
+		http.Error(w, "bad DialReq", http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	// The success frame precedes the raw stream.
+	if _, err := protodelim.MarshalTo(w, &pbpd.DialResp{EndpointId: "ep_test"}); err != nil {
+		return
+	}
+	flush(w)
+	_, _ = io.Copy(flushWriter{w}, br)
+}
+
+func flush(w http.ResponseWriter) {
+	if f, ok := w.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+// flushWriter flushes after every write so echoed bytes reach the client
+// without waiting for the handler to return.
+type flushWriter struct{ w http.ResponseWriter }
+
+func (fw flushWriter) Write(p []byte) (int, error) {
+	n, err := fw.w.Write(p)
+	flush(fw.w)
+	return n, err
+}
+
+// startH2Server starts an HTTP/2-over-TLS server on a loopback port and
+// returns its address.
+func startH2Server(t *testing.T, cert tls.Certificate, h http.Handler) string {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen tcp: %v", err)
+	}
+	srv := &http.Server{
+		Handler: h,
+		TLSConfig: &tls.Config{
+			Certificates: []tls.Certificate{cert},
+			NextProtos:   []string{"h2"},
+			MinVersion:   tls.VersionTLS13,
+		},
+	}
+	if err := http2.ConfigureServer(srv, &http2.Server{}); err != nil {
+		t.Fatalf("ConfigureServer: %v", err)
+	}
+	go srv.Serve(tls.NewListener(ln, srv.TLSConfig))
+	t.Cleanup(func() { _ = srv.Close() })
+	return ln.Addr().String()
+}
+
+// startH3Server starts an HTTP/3 (QUIC) server on a loopback UDP port and
+// returns its address.
+func startH3Server(t *testing.T, cert tls.Certificate, h http.Handler) string {
+	t.Helper()
+	pc, err := net.ListenPacket("udp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen udp: %v", err)
+	}
+	srv := &http3.Server{
+		Handler: h,
+		TLSConfig: &tls.Config{
+			Certificates: []tls.Certificate{cert},
+			MinVersion:   tls.VersionTLS13,
+		},
+		QUICConfig: &quic.Config{},
+	}
+	go srv.Serve(pc)
+	t.Cleanup(func() {
+		_ = srv.Close()
+		_ = pc.Close()
+	})
+	return pc.LocalAddr().String()
+}
+
+// blackholeUDPAddr returns the address of a UDP socket that silently reads and
+// discards everything, so a QUIC handshake against it never completes (and
+// produces no ICMP unreachable that would fail the dial early).
+func blackholeUDPAddr(t *testing.T) string {
+	t.Helper()
+	pc, err := net.ListenPacket("udp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen udp: %v", err)
+	}
+	go func() {
+		buf := make([]byte, 2048)
+		for {
+			if _, _, err := pc.ReadFrom(buf); err != nil {
+				return
+			}
+		}
+	}()
+	t.Cleanup(func() { _ = pc.Close() })
+	return pc.LocalAddr().String()
+}
+
+// genTLSCert generates a short-lived self-signed certificate for loopback use.
+func genTLSCert(t *testing.T) tls.Certificate {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	tmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "127.0.0.1"},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(time.Hour),
+		KeyUsage:     x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		IPAddresses:  []net.IP{net.ParseIP("127.0.0.1")},
+		DNSNames:     []string{"localhost"},
+	}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	if err != nil {
+		t.Fatalf("create certificate: %v", err)
+	}
+	return tls.Certificate{Certificate: [][]byte{der}, PrivateKey: key}
+}

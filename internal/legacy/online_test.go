@@ -152,7 +152,7 @@ func TestTCP(t *testing.T) {
 	url, err := url.Parse(tun.URL())
 	require.NoError(t, err)
 	url.Scheme = "http"
-	resp, err := http.Get(url.String())
+	resp, err := getTunnelURL(ctx, url.String())
 	require.NoError(t, err, "GET tunnel url")
 	defer resp.Body.Close()
 
@@ -163,6 +163,48 @@ func TestTCP(t *testing.T) {
 
 	require.NoError(t, tun.CloseWithContext(ctx))
 	expectChanError(t, exited, 5*time.Second)
+}
+
+func getTunnelURL(ctx context.Context, url string) (*http.Response, error) {
+	const (
+		retryFor     = 5 * time.Second
+		initialDelay = 25 * time.Millisecond
+		maxDelay     = 250 * time.Millisecond
+	)
+
+	ctx, cancel := context.WithTimeout(ctx, retryFor)
+	defer cancel()
+
+	delay := initialDelay
+	var lastErr error
+	for {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		resp, err := http.DefaultClient.Do(req)
+		if err == nil {
+			return resp, nil
+		}
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+		lastErr = err
+
+		timer := time.NewTimer(delay)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return nil, lastErr
+		case <-timer.C:
+		}
+
+		delay *= 2
+		if delay > maxDelay {
+			delay = maxDelay
+		}
+	}
 }
 
 func TestConnectionCallbacks(t *testing.T) {
