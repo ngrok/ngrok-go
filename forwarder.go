@@ -189,7 +189,9 @@ func (e *endpointForwarder) connectToBackend(ctx context.Context) (net.Conn, err
 		}
 	}
 
+	start := time.Now()
 	conn, err := dialer.DialContext(ctx, "tcp", address)
+	e.emitConnectionEvent(newUpstreamDialComplete(e, time.Since(start), err))
 	if err != nil {
 		return nil, err
 	}
@@ -214,10 +216,50 @@ func (e *endpointForwarder) connectToBackend(ctx context.Context) (net.Conn, err
 			config.NextProtos = append(config.NextProtos, "h2", "http/1.1")
 		}
 
-		return tls.Client(conn, config), nil
+		return &handshakeReportingConn{
+			Conn: tls.Client(conn, config),
+			report: func(d time.Duration, err error) {
+				e.emitConnectionEvent(newUpstreamTLSHandshakeComplete(e, d, err))
+			},
+		}, nil
 	}
 
 	return conn, nil
+}
+
+// handshakeReportingConn runs the TLS handshake on the first Read or Write, as
+// tls.Client does, and passes the duration and the result to report. Keep the
+// handshake lazy. Inside join, a client that leaves before it sends data makes
+// join close the connection, and the close ends a handshake that the upstream
+// stalls.
+type handshakeReportingConn struct {
+	*tls.Conn
+	report func(time.Duration, error)
+	once   sync.Once
+	err    error
+}
+
+func (c *handshakeReportingConn) handshake() error {
+	c.once.Do(func() {
+		start := time.Now()
+		c.err = c.Handshake()
+		c.report(time.Since(start), c.err)
+	})
+	return c.err
+}
+
+func (c *handshakeReportingConn) Read(p []byte) (int, error) {
+	if err := c.handshake(); err != nil {
+		return 0, err
+	}
+	return c.Conn.Read(p)
+}
+
+func (c *handshakeReportingConn) Write(p []byte) (int, error) {
+	if err := c.handshake(); err != nil {
+		return 0, err
+	}
+	return c.Conn.Write(p)
 }
 
 // join copies data bidirectionally between the two connections

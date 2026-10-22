@@ -17,6 +17,8 @@ func TestEventTypeString(t *testing.T) {
 		{EventTypeAgentConnectSucceeded, "AgentConnectSucceeded"},
 		{EventTypeAgentDisconnected, "AgentDisconnected"},
 		{EventTypeAgentHeartbeatReceived, "AgentHeartbeatReceived"},
+		{EventTypeUpstreamDialComplete, "UpstreamDialComplete"},
+		{EventTypeUpstreamTLSHandshakeComplete, "UpstreamTLSHandshakeComplete"},
 	}
 
 	for _, test := range tests {
