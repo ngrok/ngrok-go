@@ -12,6 +12,8 @@ const (
 	EventTypeConnectionOpened
 	EventTypeConnectionClosed
 	EventTypeHTTPRequestComplete
+	EventTypeUpstreamDialComplete
+	EventTypeUpstreamTLSHandshakeComplete
 )
 
 func (t EventType) String() string {
@@ -22,6 +24,8 @@ func (t EventType) String() string {
 		"ConnectionOpened",
 		"ConnectionClosed",
 		"HTTPRequestComplete",
+		"UpstreamDialComplete",
+		"UpstreamTLSHandshakeComplete",
 	}[t]
 }
 
@@ -167,5 +171,72 @@ func newHTTPRequestComplete(endpoint Endpoint, method, path string, statusCode i
 		Path:       path,
 		StatusCode: statusCode,
 		Duration:   duration,
+	}
+}
+
+// EventUpstreamDialComplete is emitted each time a forwarder's dialer returns while
+// it connects to the upstream. Duration is the time DialContext took,
+// including any name resolution. It excludes the TLS handshake. Err is the
+// dialer's error, or nil.
+//
+// A forwarder proxies HTTP when both the endpoint URL and the upstream URL use
+// http or https. It then dials only when no idle upstream connection is free,
+// so it can emit fewer of these events than EventHTTPRequestComplete. Any
+// other forwarder dials once for each connection it accepts.
+//
+// Err wraps context.Canceled if the endpoint closes during the dial, or if the
+// client disconnects from a forwarder that proxies HTTP. Ignore that error
+// when you count upstream failures.
+type EventUpstreamDialComplete struct {
+	baseEvent
+	Endpoint Endpoint
+	Duration time.Duration
+	Err      error
+}
+
+func newUpstreamDialComplete(endpoint Endpoint, duration time.Duration, err error) *EventUpstreamDialComplete {
+	return &EventUpstreamDialComplete{
+		baseEvent: baseEvent{
+			Type:       EventTypeUpstreamDialComplete,
+			OccurredAt: time.Now(),
+		},
+		Endpoint: endpoint,
+		Duration: duration,
+		Err:      err,
+	}
+}
+
+// EventUpstreamTLSHandshakeComplete is emitted each time a TLS handshake with an https
+// or tls upstream finishes. It follows a successful EventUpstreamDialComplete for
+// the same connection. Duration is the handshake time only. Err is the
+// handshake error, such as a *tls.CertificateVerificationError, or nil. A
+// forwarder that proxies HTTP reuses idle upstream connections without a new
+// handshake, so it can emit fewer of these events than
+// EventHTTPRequestComplete.
+//
+// Under TLS 1.3, the upstream checks a client certificate after the forwarder
+// finishes its side of the handshake. A rejected client certificate then fails
+// the connection after an event with a nil Err.
+//
+// Err wraps context.Canceled if the client disconnects from a forwarder that
+// proxies HTTP. For any other forwarder, Err wraps net.ErrClosed if the client
+// disconnects before it sends data. Ignore both errors when you count upstream
+// failures.
+type EventUpstreamTLSHandshakeComplete struct {
+	baseEvent
+	Endpoint Endpoint
+	Duration time.Duration
+	Err      error
+}
+
+func newUpstreamTLSHandshakeComplete(endpoint Endpoint, duration time.Duration, err error) *EventUpstreamTLSHandshakeComplete {
+	return &EventUpstreamTLSHandshakeComplete{
+		baseEvent: baseEvent{
+			Type:       EventTypeUpstreamTLSHandshakeComplete,
+			OccurredAt: time.Now(),
+		},
+		Endpoint: endpoint,
+		Duration: duration,
+		Err:      err,
 	}
 }

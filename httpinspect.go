@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/http/httptrace"
 	"net/http/httputil"
 	"time"
 
@@ -39,6 +40,7 @@ func (e *endpointForwarder) httpServe(proxyConn net.Conn) {
 	rp := &httputil.ReverseProxy{
 		Rewrite: func(pr *httputil.ProxyRequest) {
 			pr.SetURL(target)
+			pr.Out = pr.Out.WithContext(e.traceUpstreamTLS(pr.Out.Context()))
 			// Preserve the original Host header from the inbound request
 			pr.Out.Host = pr.In.Host
 			// ReverseProxy removes the forwarding headers when Rewrite is set.
@@ -107,11 +109,36 @@ func (e *endpointForwarder) buildHTTPTransport() *http.Transport {
 		IdleConnTimeout: 90 * time.Second,
 	}
 
-	if e.upstreamDialer != nil {
-		transport.DialContext = e.upstreamDialer.DialContext
+	// A zero net.Dialer dials the same way as a Transport with no DialContext.
+	dialer := e.upstreamDialer
+	if dialer == nil {
+		dialer = &net.Dialer{}
+	}
+	transport.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
+		start := time.Now()
+		conn, err := dialer.DialContext(ctx, network, address)
+		e.emitConnectionEvent(newUpstreamDialComplete(e, time.Since(start), err))
+		return conn, err
 	}
 
 	return transport
+}
+
+// traceUpstreamTLS returns ctx with a trace that emits an
+// EventUpstreamTLSHandshakeComplete for each handshake that the Transport runs. The
+// Transport keeps the handshake because it picks the ALPN protocols for each
+// connection. With a DialTLSContext, every connection offers the same
+// protocols, and an HTTP/1.1 upgrade fails when the upstream protocol is
+// http2. The trace stays in the dial context after the request is canceled,
+// so an abandoned handshake still reports.
+func (e *endpointForwarder) traceUpstreamTLS(ctx context.Context) context.Context {
+	var start time.Time
+	return httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{
+		TLSHandshakeStart: func() { start = time.Now() },
+		TLSHandshakeDone: func(_ tls.ConnectionState, err error) {
+			e.emitConnectionEvent(newUpstreamTLSHandshakeComplete(e, time.Since(start), err))
+		},
+	})
 }
 
 // statusCaptureWriter wraps an http.ResponseWriter to capture the status code
