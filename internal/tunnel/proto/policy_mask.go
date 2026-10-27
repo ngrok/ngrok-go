@@ -50,7 +50,7 @@ func maskPolicy(policy string) string {
 			return "HIDDEN"
 		}
 	}
-	if _, ok := v.(map[string]any); !ok {
+	if _, ok := v.(map[string]any); !ok || hasNonStringKeys(v) {
 		return "HIDDEN"
 	}
 	maskSecretValues(v)
@@ -59,6 +59,28 @@ func maskPolicy(policy string) string {
 		return "HIDDEN"
 	}
 	return string(masked)
+}
+
+// hasNonStringKeys reports a YAML mapping with a non-string key. The walker
+// skips such a map, and newer encoding/json prints it, so the policy is withheld.
+func hasNonStringKeys(v any) bool {
+	switch v := v.(type) {
+	case map[any]any:
+		return true
+	case map[string]any:
+		for _, val := range v {
+			if hasNonStringKeys(val) {
+				return true
+			}
+		}
+	case []any:
+		for _, item := range v {
+			if hasNonStringKeys(item) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func maskCredential(cred string) string {

@@ -201,7 +201,7 @@ func logValueCases() []logValueCase {
 				return &BindResp{Opts: decodedOpts("on_http_request:\n  - actions:\n      - config:\n          1: visible\n          secret: " + hookCred + "\n")}
 			},
 			secrets: []string{hookCred},
-			visible: []string{"TrafficPolicy"},
+			visible: []string{"TrafficPolicy", "HIDDEN"},
 		},
 		{
 			name:    "BindResp/scalar policy",
