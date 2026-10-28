@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -480,11 +481,16 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 		updateHandler:  cfg.UpdateHandler,
 	}
 
+	// legs connect concurrently, so the shared addresses and cookie need a lock
+	var sharedMu sync.Mutex
+
 	rawDialer := func(legNumber uint32) (tunnel_client.RawSession, error) {
+		sharedMu.Lock()
 		serverAddr := cfg.ServerAddr
 		if legNumber > 0 && len(cfg.AdditionalServerAddrs) >= int(legNumber) {
 			serverAddr = cfg.AdditionalServerAddrs[legNumber-1]
 		}
+		sharedMu.Unlock()
 		tlsConfig := &tls.Config{
 			RootCAs:    cfg.CAPool,
 			ServerName: strings.Split(serverAddr, ":")[0],
@@ -552,8 +558,11 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 	}
 
 	reconnect := func(sess tunnel_client.Session, raw tunnel_client.RawSession, legNumber uint32) (int, error) {
-		auth.LegNumber = legNumber
-		resp, err := sess.Auth(auth)
+		sharedMu.Lock()
+		legAuth := auth
+		sharedMu.Unlock()
+		legAuth.LegNumber = legNumber
+		resp, err := sess.Auth(legAuth)
 		if err != nil {
 			remote := false
 			if resp.Error != "" {
@@ -620,6 +629,7 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 			}()
 		}
 
+		sharedMu.Lock()
 		auth.Cookie = resp.Extra.Cookie
 
 		// store any connect server addresses for use in subsequent legs
@@ -637,11 +647,14 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 				}
 			}
 		}
+		sharedMu.Unlock()
 
 		// if we are using multi-leg, we need to know how many legs to connect
 		desiredLegs := 1
 		if cfg.EnableMultiLeg {
+			sharedMu.Lock()
 			desiredLegs = 1 + len(cfg.AdditionalServerAddrs)
+			sharedMu.Unlock()
 		}
 		return desiredLegs, nil
 	}
