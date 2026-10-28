@@ -5,7 +5,7 @@ import (
 	"slices"
 	"strings"
 
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 // secretMask and secretPolicyFields copy the ngrok agent's rule for printing a
