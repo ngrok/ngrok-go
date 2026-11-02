@@ -108,27 +108,33 @@ func maskSecretValues(v any) bool {
 
 func maskSecretField(m map[string]any, key string, val any) bool {
 	switch val := val.(type) {
-	// An unquoted YAML secret decodes as a number.
-	case string, int, int64, uint64, float64:
-		if val == "" || !slices.Contains(secretPolicyFields, key) {
-			return false
-		}
-		m[key] = secretMask
-		return true
+	case map[string]any:
 	case []any:
 		if key != "credentials" {
 			break
 		}
 		masked := false
 		for i, cred := range val {
-			if s, ok := cred.(string); ok {
-				val[i] = maskCredential(s)
+			switch cred := cred.(type) {
+			case string:
+				val[i] = maskCredential(cred)
 				masked = true
-			} else {
+			case map[string]any, []any:
 				masked = maskSecretValues(cred) || masked
+			case nil:
+			default:
+				val[i] = secretMask
+				masked = true
 			}
 		}
 		return masked
+	default:
+		// Unquoted YAML secrets can decode as numbers, booleans, or timestamps.
+		if val == nil || val == "" || !slices.Contains(secretPolicyFields, key) {
+			return false
+		}
+		m[key] = secretMask
+		return true
 	}
 	return maskSecretValues(val)
 }

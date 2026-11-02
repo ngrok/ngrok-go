@@ -170,6 +170,30 @@ func logValueCases() []logValueCase {
 			visible: []string{"visible-client-id", secretMask},
 		},
 		{
+			name: "BindResp/bool secret",
+			newMsg: func() any {
+				return &BindResp{Opts: decodedOpts("on_http_request:\n  - actions:\n      - type: verify-webhook\n        config:\n          provider: github\n          secret: true\n")}
+			},
+			secrets: []string{"true"},
+			visible: []string{"github", secretMask},
+		},
+		{
+			name: "BindResp/timestamp secret",
+			newMsg: func() any {
+				return &BindResp{Opts: decodedOpts("on_http_request:\n  - actions:\n      - type: openid-connect\n        config:\n          client_secret: 2001-12-14\n")}
+			},
+			secrets: []string{"2001-12-14"},
+			visible: []string{"openid-connect", secretMask},
+		},
+		{
+			name: "BindResp/numeric credential",
+			newMsg: func() any {
+				return &BindResp{Opts: decodedOpts("on_http_request:\n  - actions:\n      - type: basic-auth\n        config:\n          credentials:\n            - 7346591828\n")}
+			},
+			secrets: []string{"7346591828"},
+			visible: []string{"basic-auth", secretMask},
+		},
+		{
 			name:    "BindResp/nested secret",
 			newMsg:  func() any { return &BindResp{Opts: decodedOpts(deepJSON)} },
 			secrets: []string{deepCred},
@@ -323,6 +347,60 @@ func TestLogValueLeavesEmptySecretsEmpty(t *testing.T) {
 			slog.New(slog.NewJSONHandler(&buf, nil)).Info("encode request", "req", msg)
 			require.NotContains(t, buf.String(), "HIDDEN")
 			require.NotContains(t, buf.String(), secretMask)
+		})
+	}
+}
+
+func TestMaskPolicyScalars(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		policy string
+		want   string
+	}{
+		{
+			name:   "bool",
+			policy: "secret: true",
+			want:   `{"secret":"********"}`,
+		},
+		{
+			name:   "timestamp",
+			policy: "client_secret: 2001-12-14",
+			want:   `{"client_secret":"********"}`,
+		},
+		{
+			name:   "datetime",
+			policy: "client_secret: 2001-12-14T21:59:43Z",
+			want:   `{"client_secret":"********"}`,
+		},
+		{
+			name:   "numeric credential item",
+			policy: "credentials:\n  - 7346591828",
+			want:   `{"credentials":["********"]}`,
+		},
+		{
+			name:   "bool credential item",
+			policy: "credentials:\n  - true",
+			want:   `{"credentials":["********"]}`,
+		},
+		{
+			name:   "null secret",
+			policy: "secret: null",
+			want:   `{"secret":null}`,
+		},
+		{
+			name:   "empty string secret",
+			policy: "secret: \"\"",
+			want:   `{"secret":""}`,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			require.Equal(t, tc.want, maskPolicy(tc.policy))
 		})
 	}
 }
