@@ -311,6 +311,7 @@ func (a *agent) createListener(ctx context.Context, endpointOpts *endpointOpts) 
 			endpointURL:     *tunnelURL,
 			doneChannel:     make(chan struct{}),
 			doneOnce:        &sync.Once{},
+			mu:              &sync.RWMutex{},
 			createdAt:       now,
 			updatedAt:       now,
 			tunnelSessionID: tunnelSessionID,
