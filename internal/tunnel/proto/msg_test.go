@@ -385,6 +385,31 @@ func TestMaskPolicyScalars(t *testing.T) {
 			want:   `{"credentials":["********"]}`,
 		},
 		{
+			name:   "title case credentials",
+			policy: "Credentials:\n  - alice:hunter2",
+			want:   `{"Credentials":["alice:********"]}`,
+		},
+		{
+			name:   "mixed case client secret",
+			policy: "Client_Secret: s3cr3t",
+			want:   `{"Client_Secret":"********"}`,
+		},
+		{
+			name:   "upper case secret",
+			policy: "SECRET: whsec_abc",
+			want:   `{"SECRET":"********"}`,
+		},
+		{
+			name:   "dashed client secret",
+			policy: "client-secret: s3cr3t",
+			want:   `{"client-secret":"********"}`,
+		},
+		{
+			name:   "dashed server private key",
+			policy: `{"Server-Private-Key":"s3cr3t"}`,
+			want:   `{"Server-Private-Key":"********"}`,
+		},
+		{
 			name:   "null secret",
 			policy: "secret: null",
 			want:   `{"secret":null}`,

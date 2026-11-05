@@ -106,11 +106,17 @@ func maskSecretValues(v any) bool {
 	return masked
 }
 
+// policyKey folds a field name's case and "-" to "_", so every spelling a
+// lenient parser accepts is masked.
+func policyKey(key string) string {
+	return strings.ReplaceAll(strings.ToLower(key), "-", "_")
+}
+
 func maskSecretField(m map[string]any, key string, val any) bool {
 	switch val := val.(type) {
 	case map[string]any:
 	case []any:
-		if key != "credentials" {
+		if policyKey(key) != "credentials" {
 			break
 		}
 		masked := false
@@ -130,7 +136,7 @@ func maskSecretField(m map[string]any, key string, val any) bool {
 		return masked
 	default:
 		// Unquoted YAML secrets can decode as numbers, booleans, or timestamps.
-		if val == nil || val == "" || !slices.Contains(secretPolicyFields, key) {
+		if val == nil || val == "" || !slices.Contains(secretPolicyFields, policyKey(key)) {
 			return false
 		}
 		m[key] = secretMask
