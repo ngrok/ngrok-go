@@ -165,6 +165,21 @@ func WithAgentMetadata(meta string) AgentOption {
 	}
 }
 
+// WithAgentID sets the durable agent ID (agt_...) that the agent sends when its
+// session authenticates. An empty ID sends none.
+func WithAgentID(id string) AgentOption {
+	return WithAgentIDFunc(func() string { return id })
+}
+
+// WithAgentIDFunc sets a function that returns the durable agent ID. The agent
+// calls it before every connect and reconnect, so an ID stored or cleared while
+// the agent runs reaches the next session. An empty ID sends none.
+func WithAgentIDFunc(fn func() string) AgentOption {
+	return func(opts *agentOpts) {
+		opts.sessionOpts = append(opts.sessionOpts, legacy.WithAgentID(fn))
+	}
+}
+
 // WithMultiLeg enables connecting to the ngrok service on secondary legs. This
 // option is EXPERIMENTAL and may be removed without a breaking version change.
 func WithMultiLeg(enable bool) AgentOption {
