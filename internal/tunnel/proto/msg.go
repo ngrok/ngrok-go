@@ -158,6 +158,10 @@ type AuthExtra struct {
 	StopUnsupportedError    *string
 	RestartUnsupportedError *string
 
+	// DPoPUnsupportedError is reserved for the DPoP step of agent registration
+	// and follows the capability rules above. Unused at GA: never set.
+	DPoPUnsupportedError *string
+
 	ProxyType       string
 	MutualTLS       bool
 	ServiceRun      bool
@@ -171,6 +175,14 @@ type AuthExtra struct {
 	// Defaults to zero, will be 1 or more for the additional connected
 	// leg(s) when multi-leg is engaged.
 	LegNumber uint32
+
+	// AgentID is the durable agent ID (agt_...) the client stored at
+	// registration. Empty for a non-durable client.
+	AgentID string
+
+	// DPoPProof is reserved for a DPoP proof of the agent's key. Unused at
+	// GA: never set.
+	DPoPProof string
 }
 
 type ClientType string

@@ -173,6 +173,10 @@ type connectConfig struct {
 	// Viewable from the ngrok dashboard or API.
 	Metadata string
 
+	// Durable agent ID sent in the auth message, read before every connect
+	// and reconnect. Nil sends none.
+	AgentID func() string
+
 	// Child client types and versions used to identify specific applications
 	// using this library to the ngrok service.
 	ClientInfo []clientInfo
@@ -212,6 +216,22 @@ func WithMetadata(meta string) ConnectOption {
 	return func(cfg *connectConfig) {
 		cfg.Metadata = meta
 	}
+}
+
+// WithAgentID configures a function that returns the durable agent ID
+// (agt_...). The session calls it before every connect and reconnect. An empty
+// ID sends none.
+func WithAgentID(id func() string) ConnectOption {
+	return func(cfg *connectConfig) {
+		cfg.AgentID = id
+	}
+}
+
+func (cfg *connectConfig) agentID() string {
+	if cfg.AgentID == nil {
+		return ""
+	}
+	return cfg.AgentID()
 }
 
 // WithClientInfo configures client type and version information for applications
@@ -533,27 +553,10 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 		clientInfo{Type: string(proto.LibraryOfficialGo), Version: strings.TrimSpace(libraryAgentVersion)},
 	)
 
-	userAgent := generateUserAgent(cfg.ClientInfo)
-
-	auth := proto.AuthExtra{
-		Version:            cfg.ClientInfo[0].Version,
-		ClientType:         proto.ClientType(cfg.ClientInfo[0].Type),
-		UserAgent:          userAgent,
-		Authtoken:          proto.ObfuscatedString(cfg.Authtoken),
-		Metadata:           cfg.Metadata,
-		OS:                 runtime.GOOS,
-		Arch:               runtime.GOARCH,
-		HeartbeatInterval:  int64(heartbeatConfig.Interval),
-		HeartbeatTolerance: int64(heartbeatConfig.Tolerance),
-
-		RestartUnsupportedError: cfg.remoteRestartErr,
-		StopUnsupportedError:    cfg.remoteStopErr,
-		UpdateUnsupportedError:  cfg.remoteUpdateErr,
-	}
+	auth := &sessionAuth{base: newAuthExtra(&cfg, heartbeatConfig), cfg: &cfg}
 
 	reconnect := func(sess tunnel_client.Session, raw tunnel_client.RawSession, legNumber uint32) (int, error) {
-		auth.LegNumber = legNumber
-		resp, err := sess.Auth(auth)
+		resp, err := sess.Auth(auth.forLeg(legNumber))
 		if err != nil {
 			remote := false
 			if resp.Error != "" {
@@ -620,7 +623,7 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 			}()
 		}
 
-		auth.Cookie = resp.Extra.Cookie
+		auth.cookie.Store(&resp.Extra.Cookie)
 
 		// store any connect server addresses for use in subsequent legs
 		if cfg.EnableMultiLeg && legNumber == 0 && len(resp.Extra.ConnectAddresses) > 1 {
@@ -947,5 +950,42 @@ func (rc remoteCallbackHandler) OnStopTunnel(stopTunnel *proto.StopTunnel, respo
 	err := rc.sess.closeTunnel(stopTunnel.ClientID, ngrokErr)
 	if err != nil {
 		rc.Warn("error closing tunnel", "error", err)
+	}
+}
+
+// sessionAuth builds the auth message for each connect attempt. Legs reconnect
+// concurrently, so each attempt gets its own copy and base is never written.
+type sessionAuth struct {
+	base   proto.AuthExtra
+	cfg    *connectConfig
+	cookie atomic.Pointer[string]
+}
+
+func (s *sessionAuth) forLeg(legNumber uint32) proto.AuthExtra {
+	a := s.base
+	a.LegNumber = legNumber
+	a.AgentID = s.cfg.agentID()
+	if c := s.cookie.Load(); c != nil {
+		a.Cookie = *c
+	}
+	return a
+}
+
+// newAuthExtra builds the parts of the auth message shared by every connect.
+func newAuthExtra(cfg *connectConfig, heartbeatConfig *muxado.HeartbeatConfig) proto.AuthExtra {
+	return proto.AuthExtra{
+		Version:            cfg.ClientInfo[0].Version,
+		ClientType:         proto.ClientType(cfg.ClientInfo[0].Type),
+		UserAgent:          generateUserAgent(cfg.ClientInfo),
+		Authtoken:          proto.ObfuscatedString(cfg.Authtoken),
+		Metadata:           cfg.Metadata,
+		OS:                 runtime.GOOS,
+		Arch:               runtime.GOARCH,
+		HeartbeatInterval:  int64(heartbeatConfig.Interval),
+		HeartbeatTolerance: int64(heartbeatConfig.Tolerance),
+
+		RestartUnsupportedError: cfg.remoteRestartErr,
+		StopUnsupportedError:    cfg.remoteStopErr,
+		UpdateUnsupportedError:  cfg.remoteUpdateErr,
 	}
 }
