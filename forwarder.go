@@ -3,9 +3,13 @@ package ngrok
 import (
 	"context"
 	"crypto/tls"
+	"encoding/binary"
+	"fmt"
 	"io"
 	"net"
+	"net/netip"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -98,12 +102,57 @@ func (e *endpointForwarder) handleConnection(ctx context.Context, conn net.Conn)
 	e.emitConnectionEvent(newConnectionOpened(e, remoteAddr))
 
 	proxyConn := &countingConn{Conn: conn}
+	var header []byte
+	var err error
+	switch e.proxyProtocol {
+	case ProxyProtoV1:
+		for len(header) < 107 {
+			var b [1]byte
+			_, err = io.ReadFull(proxyConn, b[:])
+			if err != nil {
+				break
+			}
+			header = append(header, b[0])
+			if len(header) >= 2 && string(header[len(header)-2:]) == "\r\n" {
+				break
+			}
+		}
+		if err == nil && !validProxyV1Header(header) {
+			err = fmt.Errorf("invalid PROXY v1 header")
+		}
+	case ProxyProtoV2:
+		header = make([]byte, 16)
+		_, err = io.ReadFull(proxyConn, header)
+		if err == nil && (string(header[:12]) != "\r\n\r\n\x00\r\nQUIT\n" || header[12]>>4 != 2 || header[12]&0x0f > 1) {
+			err = fmt.Errorf("invalid PROXY v2 header framing")
+		}
+		// LOCAL ignores family and protocol, but still consumes the declared payload.
+		if err == nil && header[12]&0x0f == 1 {
+			family, protocol := header[13]>>4, header[13]&0x0f
+			length := int(binary.BigEndian.Uint16(header[14:16]))
+			if family > 3 || protocol > 2 {
+				err = fmt.Errorf("invalid PROXY v2 family or protocol")
+			} else if family != 0 && protocol != 0 && length < [...]int{0, 12, 36, 216}[family] {
+				err = fmt.Errorf("short PROXY v2 address block")
+			}
+		}
+		if err == nil {
+			payload := make([]byte, int(binary.BigEndian.Uint16(header[14:16])))
+			_, err = io.ReadFull(proxyConn, payload)
+			header = append(header, payload...)
+		}
+	}
+	if err != nil {
+		_ = conn.Close()
+		e.emitConnectionEvent(newConnectionClosed(e, remoteAddr, time.Since(start), proxyConn.bytesRead.Load(), 0))
+		return
+	}
 
 	if e.isHTTP() {
-		e.httpServe(proxyConn)
+		e.httpServe(proxyConn, header)
 		e.emitConnectionEvent(newConnectionClosed(e, remoteAddr, time.Since(start), proxyConn.bytesRead.Load(), proxyConn.bytesWritten.Load()))
 	} else {
-		backend, err := e.connectToBackend(ctx)
+		backend, err := e.connectToBackend(ctx, header)
 		if err != nil {
 			conn.Close() //nolint:errcheck
 			e.emitConnectionEvent(newConnectionClosed(e, remoteAddr, time.Since(start), 0, 0))
@@ -113,6 +162,44 @@ func (e *endpointForwarder) handleConnection(ctx context.Context, conn net.Conn)
 		e.join(proxyConn, backendConn)
 		e.emitConnectionEvent(newConnectionClosed(e, remoteAddr, time.Since(start), proxyConn.bytesRead.Load(), backendConn.bytesRead.Load()))
 	}
+}
+
+func validProxyV1Header(header []byte) bool {
+	line := string(header)
+	if !strings.HasSuffix(line, "\r\n") {
+		return false
+	}
+	fields := strings.Split(strings.TrimSuffix(line, "\r\n"), " ")
+	if len(fields) < 2 || fields[0] != "PROXY" {
+		return false
+	}
+	// UNKNOWN's remaining fields are explicitly opaque in the specification.
+	if fields[1] == "UNKNOWN" {
+		return true
+	}
+	if len(fields) != 6 || (fields[1] != "TCP4" && fields[1] != "TCP6") {
+		return false
+	}
+	for _, field := range fields[2:4] {
+		addr, err := netip.ParseAddr(field)
+		if err != nil || addr.Zone() != "" || (fields[1] == "TCP4" && !addr.Is4()) || (fields[1] == "TCP6" && !addr.Is6()) {
+			return false
+		}
+	}
+	for _, field := range fields[4:6] {
+		if field == "" || (len(field) > 1 && field[0] == '0') {
+			return false
+		}
+		for _, digit := range field {
+			if digit < '0' || digit > '9' {
+				return false
+			}
+		}
+		if _, err := strconv.ParseUint(field, 10, 16); err != nil {
+			return false
+		}
+	}
+	return true
 }
 
 func (e *endpointForwarder) emitConnectionEvent(evt Event) {
@@ -157,7 +244,7 @@ func (c *countingConn) Write(p []byte) (int, error) {
 }
 
 // connectToBackend establishes a connection to the upstream URL
-func (e *endpointForwarder) connectToBackend(ctx context.Context) (net.Conn, error) {
+func (e *endpointForwarder) connectToBackend(ctx context.Context, header []byte) (net.Conn, error) {
 	u := e.upstreamURL.Load()
 
 	// Parse host and port from URL
@@ -195,6 +282,9 @@ func (e *endpointForwarder) connectToBackend(ctx context.Context) (net.Conn, err
 	if err != nil {
 		return nil, err
 	}
+	if err := writeProxyHeader(conn, header); err != nil {
+		return nil, err
+	}
 
 	// For HTTPS/TLS upstreams, establish TLS
 	if usesTLS(u.Scheme) {
@@ -225,6 +315,21 @@ func (e *endpointForwarder) connectToBackend(ctx context.Context) (net.Conn, err
 	}
 
 	return conn, nil
+}
+
+// writeProxyHeader sends edge metadata on the raw socket, before any TLS bytes.
+func writeProxyHeader(conn net.Conn, header []byte) error {
+	if len(header) == 0 {
+		return nil
+	}
+	n, err := conn.Write(header)
+	if err == nil && n != len(header) {
+		err = io.ErrShortWrite
+	}
+	if err != nil {
+		_ = conn.Close()
+	}
+	return err
 }
 
 // handshakeReportingConn runs the TLS handshake on the first Read or Write, as
