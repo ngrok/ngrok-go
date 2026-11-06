@@ -27,9 +27,9 @@ var forwardingHeaders = []string{"Forwarded", "X-Forwarded-For", "X-Forwarded-Ho
 // It creates an http.Server with a handler that wraps ReverseProxy and a
 // statusCaptureWriter for event emission, then uses httpx.ServeConnServer
 // to serve the single proxy connection without needing a real net.Listener.
-func (e *endpointForwarder) httpServe(proxyConn net.Conn) {
+func (e *endpointForwarder) httpServe(proxyConn net.Conn, header ...[]byte) {
 	target := e.upstreamURL.Load()
-	transport := e.buildHTTPTransport()
+	transport := e.buildHTTPTransport(header...)
 	// This transport is built per inbound connection, so it has to be torn down
 	// per inbound connection too. Nothing else ever closes it: net/http sets no
 	// finalizer on Transport, and an idle upstream connection keeps its read
@@ -86,7 +86,7 @@ func (e *endpointForwarder) httpServe(proxyConn net.Conn) {
 
 // buildHTTPTransport creates an http.Transport configured with the
 // endpoint's upstream settings
-func (e *endpointForwarder) buildHTTPTransport() *http.Transport {
+func (e *endpointForwarder) buildHTTPTransport(header ...[]byte) *http.Transport {
 	u := e.upstreamURL.Load()
 	tlsConfig := &tls.Config{
 		ServerName: u.Hostname(),
@@ -118,6 +118,9 @@ func (e *endpointForwarder) buildHTTPTransport() *http.Transport {
 		start := time.Now()
 		conn, err := dialer.DialContext(ctx, network, address)
 		e.emitConnectionEvent(newUpstreamDialComplete(e, time.Since(start), err))
+		if err == nil && len(header) != 0 {
+			err = writeProxyHeader(conn, header[0])
+		}
 		return conn, err
 	}
 
