@@ -72,6 +72,9 @@ type Endpoint interface {
 // baseEndpoint implements the common functionality for both EndpointListener and
 // EndpointForwarder.
 type baseEndpoint struct {
+	// mu guards the fields that update changes. It is a pointer because
+	// Forward copies baseEndpoint by value.
+	mu              *sync.RWMutex
 	agent           Agent
 	name            string
 	poolingEnabled  bool
@@ -95,6 +98,8 @@ func (e *baseEndpoint) Agent() Agent {
 }
 
 func (e *baseEndpoint) PoolingEnabled() bool {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
 	return e.poolingEnabled
 }
 
@@ -103,6 +108,8 @@ func (e *baseEndpoint) Bindings() []string {
 }
 
 func (e *baseEndpoint) Description() string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
 	return e.description
 }
 
@@ -119,14 +126,20 @@ func (e *baseEndpoint) ID() string {
 }
 
 func (e *baseEndpoint) Metadata() string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
 	return e.metadata
 }
 
 func (e *baseEndpoint) Name() string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
 	return e.name
 }
 
 func (e *baseEndpoint) update(name, description, metadata *string, poolingEnabled *bool, trafficPolicy *string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	if name != nil {
 		e.name = *name
 	}
@@ -142,6 +155,7 @@ func (e *baseEndpoint) update(name, description, metadata *string, poolingEnable
 	if trafficPolicy != nil {
 		e.trafficPolicy = *trafficPolicy
 	}
+	e.updatedAt = time.Now()
 }
 
 func (e *baseEndpoint) Protocol() string {
@@ -153,6 +167,8 @@ func (e *baseEndpoint) AgentTLSTermination() *tls.Config {
 }
 
 func (e *baseEndpoint) TrafficPolicy() string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
 	return e.trafficPolicy
 }
 
@@ -165,6 +181,8 @@ func (e *baseEndpoint) CreatedAt() time.Time {
 }
 
 func (e *baseEndpoint) UpdatedAt() time.Time {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
 	return e.updatedAt
 }
 

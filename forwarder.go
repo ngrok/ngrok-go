@@ -307,6 +307,9 @@ func (e *endpointForwarder) UpstreamURL() url.URL {
 
 func (e *endpointForwarder) UpdateUpstream(u url.URL) {
 	e.upstreamURL.Store(&u)
+	e.mu.Lock()
+	e.updatedAt = time.Now()
+	e.mu.Unlock()
 }
 
 func (e *endpointForwarder) Update(ctx context.Context, name, description, metadata *string, poolingEnabled *bool, trafficPolicy *string) error {
