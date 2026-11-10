@@ -65,7 +65,7 @@ func newTestForwarder(t *testing.T, upstream string) *endpointForwarder {
 	require.NoError(t, err)
 
 	e := &endpointForwarder{}
-	e.upstreamURL.Store(u)
+	e.upstream.Store(&upstreamTarget{url: u})
 
 	return e
 }
@@ -79,7 +79,7 @@ func serveEdgeConn(t *testing.T, e *endpointForwarder) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		e.httpServe(edgeServer)
+		e.httpServe(edgeServer, e.upstream.Load())
 	}()
 
 	_, err := io.WriteString(edgeClient, "GET / HTTP/1.1\r\nHost: example.test\r\n\r\n")
@@ -157,7 +157,7 @@ func TestHTTPServeWebSocketUpgrade(t *testing.T) {
 		if err != nil {
 			return
 		}
-		e.httpServe(conn)
+		e.httpServe(conn, e.upstream.Load())
 	}()
 
 	origin := "http://" + ln.Addr().String()
@@ -201,7 +201,7 @@ func TestHTTPServePreservesForwardedHeaders(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		e.httpServe(edgeServer)
+		e.httpServe(edgeServer, e.upstream.Load())
 	}()
 
 	_, err := io.WriteString(edgeClient, "GET / HTTP/1.1\r\n"+
@@ -264,7 +264,7 @@ func TestHTTPServeClosesIncompleteRequest(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		e.httpServe(edgeServer)
+		e.httpServe(edgeServer, e.upstream.Load())
 	}()
 	go func() { _, _ = io.Copy(io.Discard, edgeClient) }()
 
@@ -282,5 +282,5 @@ func TestHTTPServeClosesIncompleteRequest(t *testing.T) {
 // outlive any reasonable connection lifetime.
 func TestBuildHTTPTransportSetsIdleConnTimeout(t *testing.T) {
 	e := newTestForwarder(t, "http://127.0.0.1:1")
-	assert.NotZero(t, e.buildHTTPTransport().IdleConnTimeout)
+	assert.NotZero(t, e.buildHTTPTransport(e.upstream.Load()).IdleConnTimeout)
 }

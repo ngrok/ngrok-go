@@ -13,18 +13,15 @@ type EndpointOption func(*endpointOpts)
 
 // endpointOpts stores configuration for endpoints.
 type endpointOpts struct {
-	name                    string
-	poolingEnabled          bool
-	bindings                []string
-	description             string
-	metadata                string
-	agentTLSConfig          *tls.Config
-	trafficPolicy           string
-	url                     string
-	upstreamProtocol        string
-	upstreamURL             string
-	upstreamTLSClientConfig *tls.Config
-	proxyProtoVersion       config.ProxyProtoVersion
+	name              string
+	poolingEnabled    bool
+	bindings          []string
+	description       string
+	metadata          string
+	agentTLSConfig    *tls.Config
+	trafficPolicy     string
+	url               string
+	proxyProtoVersion config.ProxyProtoVersion
 }
 
 // defaultEndpointOpts returns the default options for an endpoint.

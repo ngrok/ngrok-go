@@ -81,7 +81,9 @@ func eventsOf[T Event](r *eventRecorder) []T {
 func trusting(e *endpointForwarder, upstream *httptest.Server) {
 	roots := x509.NewCertPool()
 	roots.AddCert(upstream.Certificate())
-	e.upstreamTLSClientConfig = &tls.Config{RootCAs: roots}
+	target := *e.upstream.Load()
+	target.tlsClientConfig = &tls.Config{RootCAs: roots}
+	e.upstream.Store(&target)
 }
 
 // refusedAddr returns a loopback address with nothing listening on it.
@@ -366,7 +368,9 @@ func TestForwarderSlowDialIsNotHandshakeTime(t *testing.T) {
 
 			e, rec := newRecordedForwarder(t, tc.upstream(upstream))
 			trusting(e, upstream)
-			e.upstreamDialer = slowDialer{delay: delay}
+			target := *e.upstream.Load()
+			target.dialer = slowDialer{delay: delay}
+			e.upstream.Store(&target)
 			tc.endpoint(e)
 
 			edgeClient := startEdgeConn(t, e)
