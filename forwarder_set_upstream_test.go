@@ -154,6 +154,7 @@ func TestSetUpstreamRejectsChangesFixedAtBind(t *testing.T) {
 	before := e.UpstreamURL()
 
 	for name, u := range map[string]*Upstream{
+		"nil":           nil,
 		"protocol":      WithUpstream(b, WithUpstreamProxyProto(ProxyProtoV1)),
 		"PROXY version": WithUpstream(b, WithUpstreamProtocol("http2"), WithUpstreamProxyProto(ProxyProtoV2)),
 		"bad address":   WithUpstream("://no-scheme", WithUpstreamProtocol("http2"), WithUpstreamProxyProto(ProxyProtoV1)),

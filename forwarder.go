@@ -3,6 +3,7 @@ package ngrok
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -60,8 +61,8 @@ type UpstreamSetter interface {
 	//
 	// The upstream protocol and the PROXY protocol version are fixed when
 	// Forward opens the endpoint. SetUpstream returns an error and changes
-	// nothing if u asks for different values, or if u's address is not a
-	// valid URL.
+	// nothing if u is nil, if u asks for different values, or if u's address
+	// is not a valid URL.
 	SetUpstream(u *Upstream) error
 }
 
@@ -343,6 +344,9 @@ func (e *endpointForwarder) UpdateUpstream(u url.URL) {
 }
 
 func (e *endpointForwarder) SetUpstream(u *Upstream) error {
+	if u == nil {
+		return errors.New("upstream is nil")
+	}
 	if u.protocol != e.upstreamProtocol {
 		return fmt.Errorf("cannot change the upstream protocol of a running endpoint from %q to %q", e.upstreamProtocol, u.protocol)
 	}
