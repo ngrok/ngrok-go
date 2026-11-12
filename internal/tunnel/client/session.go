@@ -299,6 +299,19 @@ func (s *session) getTunnel(id string) (t *tunnel, ok bool) {
 	return
 }
 
+// idFor reports the id this leg bound t under. A tunnel can carry a different
+// id on each leg, so unbinding it needs the leg's own.
+func (s *session) idFor(t *tunnel) (string, bool) {
+	s.RLock()
+	defer s.RUnlock()
+	for id, candidate := range s.tunnels {
+		if candidate == t {
+			return id, true
+		}
+	}
+	return "", false
+}
+
 func (s *session) addTunnel(id string, t *tunnel) {
 	s.Lock()
 	defer s.Unlock()

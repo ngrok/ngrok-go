@@ -19,6 +19,9 @@ var ErrSessionNotReady = errors.New("an ngrok tunnel session has not yet been es
 // Wraps a RawSession so that it can be safely swapped out
 type swapRaw struct {
 	raw atomic.Pointer[RawSession]
+	// live trails raw: the connection exists from set() but cannot carry
+	// binds until Auth and the rebinds have gone through on it.
+	live atomic.Bool
 }
 
 func (s *swapRaw) get() RawSession {
@@ -31,6 +34,27 @@ func (s *swapRaw) get() RawSession {
 
 func (s *swapRaw) set(raw RawSession) {
 	s.raw.Store(&raw)
+}
+
+// clear marks this leg as not connected. Without it ready would mean "has
+// connected at least once", and a leg that dropped and is still backing off
+// would be handed out as if it were live.
+func (s *swapRaw) clear() {
+	s.live.Store(false)
+	s.raw.Store(nil)
+}
+
+// serving marks the leg usable for new binds. Auth itself needs the raw
+// session set, so a leg mid-handshake would otherwise be picked by
+// firstReadySession and the bind would go out before the server authed it.
+func (s *swapRaw) serving() {
+	s.live.Store(true)
+}
+
+// ready reports whether this leg currently has a live connection. Legs dial
+// independently, so callers must not assume any particular leg is up.
+func (s *swapRaw) ready() bool {
+	return s.live.Load()
 }
 
 func (s *swapRaw) Auth(id string, extra proto.AuthExtra) (resp proto.AuthResp, err error) {
@@ -109,12 +133,21 @@ func (s *swapRaw) Accept() (netx.LoggedConn, error) {
 }
 
 type reconnectingSession struct {
-	closed            int32
-	dialer            RawSessionDialer
-	stateChanges      chan<- error
-	clientID          string
-	cb                ReconnectCallback
-	sessions          []*session
+	closed       int32
+	dialer       RawSessionDialer
+	stateChanges chan<- error
+	clientID     string
+	cb           ReconnectCallback
+	// sessionsMu guards sessions. Legs are appended by whichever leg goroutine
+	// first learns the leg count, and read by callers binding tunnels.
+	sessionsMu sync.RWMutex
+	sessions   []*session
+	// tunnelsMu guards tunnels, the endpoints the caller has open. Every leg
+	// binds this whole set, so a leg that was down while one was created
+	// picks it up when it reconnects. Keyed by pointer because a label
+	// tunnel's id is assigned per bind and differs between legs.
+	tunnelsMu         sync.RWMutex
+	tunnels           map[*tunnel]struct{}
 	failPermanentOnce sync.Once
 	*slog.Logger
 }
@@ -159,13 +192,18 @@ func NewReconnectingSession(logger *slog.Logger, dialer RawSessionDialer, stateC
 
 func (s *reconnectingSession) createTunnelClientSession(logger *slog.Logger) {
 	swapper := new(swapRaw)
+	s.sessionsMu.Lock()
 	tcs := &session{
-		swapper:   swapper,
-		raw:       swapper,
-		Logger:    newLogger(logger),
+		swapper: swapper,
+		raw:     swapper,
+		Logger:  newLogger(logger),
+		// a leg can now be bound onto before its first restartBinds, which
+		// used to be what created this map
+		tunnels:   make(map[string]*tunnel),
 		legNumber: uint32(len(s.sessions)),
 	}
 	s.sessions = append(s.sessions, tcs)
+	s.sessionsMu.Unlock()
 
 	go func() {
 		err := s.connect(nil, tcs)
@@ -176,7 +214,29 @@ func (s *reconnectingSession) createTunnelClientSession(logger *slog.Logger) {
 	}()
 }
 
+// legs returns a snapshot so callers never hold sessionsMu across a network
+// call to a leg.
+func (s *reconnectingSession) legs() []*session {
+	s.sessionsMu.RLock()
+	defer s.sessionsMu.RUnlock()
+	return append([]*session(nil), s.sessions...)
+}
+
+// firstReadySession returns the lowest-numbered leg that is currently
+// connected. An unreachable region must not deny service to the legs that did
+// connect, so no specific leg is required.
+func (s *reconnectingSession) firstReadySession() *session {
+	for _, sess := range s.legs() {
+		if sess.swapper.ready() {
+			return sess
+		}
+	}
+	return nil
+}
+
 func (s *reconnectingSession) firstSession() *session {
+	s.sessionsMu.RLock()
+	defer s.sessionsMu.RUnlock()
 	if len(s.sessions) == 0 {
 		return nil
 	}
@@ -210,22 +270,87 @@ func (s *reconnectingSession) ListenLabel(labels map[string]string, metadata str
 }
 
 func (s *reconnectingSession) listenTunnel(listen func(*session) (Tunnel, error)) (Tunnel, error) {
-	if sess := s.firstSession(); sess != nil {
-		tun, err := listen(sess)
-		if err != nil {
-			return nil, err
-		}
-		// connect this tunnel to the other legs
-		for _, session := range s.sessions[1:] {
-			if e := s.reconnectTunnelToSession(session.raw, tun.(*tunnel), make(map[string]*tunnel), tun.ID()); e != nil {
-				return nil, e
-			}
-			// use locking method
-			session.addTunnel(tun.ID(), tun.(*tunnel))
-		}
-		return tun, nil
+	primary := s.firstReadySession()
+	if primary == nil {
+		return nil, ErrSessionNotReady
 	}
-	return nil, ErrSessionNotReady
+
+	t, err := listen(primary)
+	if err != nil {
+		return nil, err
+	}
+	tun := t.(*tunnel)
+
+	// the per-leg closure newTunnel installed would unbind the primary leg
+	// only, leaving the endpoint serving on every other leg
+	tun.unlisten = func() error { return s.unlistenTunnel(tun) }
+
+	s.tunnelsMu.Lock()
+	if s.tunnels == nil {
+		s.tunnels = make(map[*tunnel]struct{})
+	}
+	s.tunnels[tun] = struct{}{}
+	s.tunnelsMu.Unlock()
+
+	for _, leg := range s.legs() {
+		if leg == primary {
+			continue
+		}
+		s.bindTunnelToLeg(leg, tun)
+	}
+	return tun, nil
+}
+
+// openTunnels snapshots the endpoints every leg is expected to be serving.
+func (s *reconnectingSession) openTunnels() []*tunnel {
+	s.tunnelsMu.RLock()
+	defer s.tunnelsMu.RUnlock()
+	open := make([]*tunnel, 0, len(s.tunnels))
+	for t := range s.tunnels {
+		open = append(open, t)
+	}
+	return open
+}
+
+// bindTunnelToLeg mirrors an already-bound tunnel onto another leg. Failure is
+// logged and dropped: the endpoint is already serving elsewhere, and tearing
+// it down because a second region is unreachable would turn a degraded
+// session into an outage. The leg rebinds it on its next reconnect.
+func (s *reconnectingSession) bindTunnelToLeg(leg *session, tun *tunnel) {
+	if !leg.swapper.ready() {
+		return
+	}
+	bound := make(map[string]*tunnel, 1)
+	if err := s.reconnectTunnelToSession(leg.raw, tun, bound, tun.ID()); err != nil {
+		s.Error("failed to bind tunnel on leg, continuing without it",
+			"leg", leg.legNumber, "id", tun.ID(), "err", err)
+		return
+	}
+	for id, t := range bound {
+		leg.addTunnel(id, t)
+	}
+}
+
+// unlistenTunnel unbinds a tunnel everywhere it is bound. Each leg assigns its
+// own id, so the id to unbind is the one in that leg's map.
+func (s *reconnectingSession) unlistenTunnel(tun *tunnel) error {
+	s.tunnelsMu.Lock()
+	delete(s.tunnels, tun)
+	s.tunnelsMu.Unlock()
+
+	var err error
+	for _, leg := range s.legs() {
+		id, ok := leg.idFor(tun)
+		if !ok {
+			continue
+		}
+		if lerr := leg.unlisten(id); lerr != nil {
+			s.Error("failed to unlisten tunnel on leg",
+				"leg", leg.legNumber, "id", id, "err", lerr)
+			err = lerr
+		}
+	}
+	return err
 }
 
 func (s *reconnectingSession) PatchTunnelState(tunnelID string, name, description, metadata *string, poolingEnabled *bool, trafficPolicy *string) error {
@@ -261,7 +386,7 @@ func (s *reconnectingSession) ListenTLS(opts *proto.TLSEndpoint, extra proto.Bin
 func (s *reconnectingSession) Close() error {
 	atomic.StoreInt32(&s.closed, 1)
 	var err error
-	for _, session := range s.sessions {
+	for _, session := range s.legs() {
 		serr := session.Close()
 		if serr != nil {
 			err = serr
@@ -270,15 +395,25 @@ func (s *reconnectingSession) Close() error {
 	return err
 }
 
+// CloseTunnel closes a tunnel the server has rejected. The id is the one the
+// rejecting leg bound it under, and every other leg may hold it under its
+// own, so the lookup stops at the leg that knows it.
 func (s *reconnectingSession) CloseTunnel(clientID string, e error) error {
-	var err error
-	for _, session := range s.sessions {
-		serr := session.CloseTunnel(clientID, e)
-		if serr != nil {
-			err = serr
+	for _, leg := range s.legs() {
+		t, ok := leg.getTunnel(clientID)
+		if !ok {
+			continue
 		}
+		// the remote already dropped it, so it must not come back on the
+		// next leg to reconnect
+		s.tunnelsMu.Lock()
+		delete(s.tunnels, t)
+		s.tunnelsMu.Unlock()
+
+		t.CloseWithError(e)
+		return nil
 	}
-	return err
+	return proto.StringError("no listener found for client id " + clientID)
 }
 
 func (s *reconnectingSession) receive(session *session) {
@@ -309,12 +444,41 @@ func (s *reconnectingSession) receive(session *session) {
 	}
 }
 
+// restartBinds rebinds the whole open set on one leg. A leg that was down
+// while an endpoint was created catches up here rather than staying behind
+// it until some later full reconnect.
+func (s *reconnectingSession) restartBinds(leg *session) error {
+	open := s.openTunnels()
+
+	leg.Lock()
+	defer leg.Unlock()
+	raw := leg.raw
+
+	// reconnected tunnels, which may have different IDs
+	newTunnels := make(map[string]*tunnel, len(open))
+	for _, t := range open {
+		oldID := t.ID()
+		for id, candidate := range leg.tunnels {
+			if candidate == t {
+				oldID = id
+				break
+			}
+		}
+		if err := s.reconnectTunnelToSession(raw, t, newTunnels, oldID); err != nil {
+			return err
+		}
+	}
+	leg.tunnels = newTunnels
+	return nil
+}
+
 func (s *reconnectingSession) Auth(extra proto.AuthExtra) (resp proto.AuthResp, err error) {
-	if len(s.sessions) < int(extra.LegNumber) {
+	legs := s.legs()
+	if len(legs) < int(extra.LegNumber) {
 		err = errors.New("leg number out of range")
 		return
 	}
-	resp, err = s.sessions[extra.LegNumber].raw.Auth(s.clientID, extra)
+	resp, err = legs[extra.LegNumber].raw.Auth(s.clientID, extra)
 	if err != nil {
 		return
 	}
@@ -338,6 +502,10 @@ func (s *reconnectingSession) connect(acceptErr error, connSession *session) err
 		s.Error("failed to reconnect session", "err", err)
 		s.stateChanges <- err
 
+		// the leg is down for as long as we are backing off, so it must not be
+		// picked to bind on
+		connSession.swapper.clear()
+
 		// if the retry loop failed after the session was opened, then make sure to close it
 		if raw != nil {
 			raw.Close()
@@ -357,23 +525,10 @@ func (s *reconnectingSession) connect(acceptErr error, connSession *session) err
 		return err
 	}
 
-	restartBinds := func(session *session) (err error) {
-		session.Lock()
-		defer session.Unlock()
-		raw := session.raw
-
-		// reconnected tunnels, which may have different IDs
-		newTunnels := make(map[string]*tunnel, len(session.tunnels))
-		for oldID, t := range session.tunnels {
-			if err := s.reconnectTunnelToSession(raw, t, newTunnels, oldID); err != nil {
-				return err
-			}
-		}
-		session.tunnels = newTunnels
-		return nil
-	}
-
 	if acceptErr != nil {
+		// the connection behind this leg is gone, so stop advertising it as
+		// usable until the dial below succeeds
+		connSession.swapper.clear()
 		if atomic.LoadInt32(&s.closed) == 0 {
 			connSession.Error("session closed, starting reconnect loop", "err", acceptErr)
 			s.stateChanges <- acceptErr
@@ -406,31 +561,31 @@ func (s *reconnectingSession) connect(acceptErr error, connSession *session) err
 			continue
 		}
 
-		// check if more sessions need to be established
-		sendStateChange := true
-		if desiredLegs > len(s.sessions) {
-			// set up the next connection. additional sessions will
-			// continue to chain on from there until all legs are
-			// established
+		// spawn every remaining leg at once. Chaining them meant an
+		// unreachable region stalled the legs queued behind it.
+		s.sessionsMu.RLock()
+		missing := desiredLegs - len(s.sessions)
+		s.sessionsMu.RUnlock()
+		for i := 0; i < missing; i++ {
 			s.createTunnelClientSession(s.Logger)
-			// not done with initial setup yet
-			sendStateChange = false
 		}
 
 		// re-establish binds
-		err = restartBinds(connSession)
+		err = s.restartBinds(connSession)
 		if err != nil {
 			failTemp(err, raw)
 			continue
 		}
 
-		if sendStateChange {
-			// reset wait
-			boff.Reset()
+		// reset wait
+		boff.Reset()
 
-			s.Info("client session established")
-			s.stateChanges <- nil
-		}
+		// any leg reaching this point can serve traffic, so report the
+		// session as established rather than waiting for every leg. A region
+		// the client cannot reach must not hold up the ones it can.
+		connSession.swapper.serving()
+		s.Info("client session established", "leg", connSession.legNumber)
+		s.stateChanges <- nil
 		return nil
 	}
 }
