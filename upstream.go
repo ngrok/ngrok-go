@@ -2,6 +2,8 @@ package ngrok
 
 import (
 	"crypto/tls"
+	"fmt"
+	"net/url"
 )
 
 // Upstream represents configuration for forwarding to an upstream service.
@@ -11,6 +13,22 @@ type Upstream struct {
 	proxyProto      ProxyProtoVersion
 	tlsClientConfig *tls.Config
 	dialer          Dialer
+}
+
+// Addr returns the address that WithUpstream was given.
+func (u *Upstream) Addr() string { return u.addr }
+
+// Dialer returns the dialer that WithUpstreamDialer set, or nil if the SDK
+// dials the upstream.
+func (u *Upstream) Dialer() Dialer { return u.dialer }
+
+// target parses u's address into where a forwarder sends connections.
+func (u *Upstream) target() (*upstreamTarget, error) {
+	addr, err := url.Parse(u.addr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid upstream URL: %w", err)
+	}
+	return &upstreamTarget{url: addr, dialer: u.dialer, tlsClientConfig: u.tlsClientConfig}, nil
 }
 
 // UpstreamOption configures an Upstream instance.

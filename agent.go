@@ -286,14 +286,6 @@ func (a *agent) createListener(ctx context.Context, endpointOpts *endpointOpts) 
 		return nil, fmt.Errorf("failed to parse tunnel URL: %w", err)
 	}
 
-	// Validate upstream URL format if provided
-	if endpointOpts.upstreamURL != "" {
-		_, err = url.Parse(endpointOpts.upstreamURL)
-		if err != nil {
-			return nil, fmt.Errorf("invalid upstream URL: %w", err)
-		}
-	}
-
 	now := time.Now()
 
 	// Create endpoint listener
@@ -446,10 +438,11 @@ func (a *agent) Forward(ctx context.Context, upstream *Upstream, opts ...Endpoin
 	// Apply all base options first
 	endpointOpts := defaultEndpointOpts()
 
-	// Set upstream values directly from the Upstream object
-	endpointOpts.upstreamURL = upstream.addr
-	endpointOpts.upstreamProtocol = upstream.protocol
-	endpointOpts.upstreamTLSClientConfig = upstream.tlsClientConfig
+	// Parse before binding, so that a bad address does not leave a tunnel open
+	target, err := upstream.target()
+	if err != nil {
+		return nil, err
+	}
 
 	// Convert the proxy protocol to config.ProxyProtoVersion
 	if upstream.proxyProto != "" {
@@ -481,19 +474,14 @@ func (a *agent) Forward(ctx context.Context, upstream *Upstream, opts ...Endpoin
 		return nil, err
 	}
 
-	// Parse upstream URL - we know it exists and is valid from createListener
-	upstreamURL, _ := url.Parse(endpointOpts.upstreamURL)
-
 	// Create the forwarder
 	endpoint := &endpointForwarder{
-		baseEndpoint:            listener.baseEndpoint, // reuse the baseEndpoint from listener
-		listener:                listener,
-		upstreamProtocol:        endpointOpts.upstreamProtocol,
-		upstreamTLSClientConfig: endpointOpts.upstreamTLSClientConfig,
-		proxyProtocol:           upstream.proxyProto,
-		upstreamDialer:          upstream.dialer,
+		baseEndpoint:     listener.baseEndpoint, // reuse the baseEndpoint from listener
+		listener:         listener,
+		upstreamProtocol: upstream.protocol,
+		proxyProtocol:    upstream.proxyProto,
 	}
-	endpoint.upstreamURL.Store(upstreamURL)
+	endpoint.upstream.Store(target)
 
 	// Start the forwarding process
 	endpoint.start(ctx)

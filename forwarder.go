@@ -3,6 +3,8 @@ package ngrok
 import (
 	"context"
 	"crypto/tls"
+	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/url"
@@ -48,15 +50,39 @@ type UpdateableEndpointForwarder interface {
 	Update(ctx context.Context, name, description, metadata *string, poolingEnabled *bool, trafficPolicy *string) error
 }
 
+// UpstreamSetter is implemented by EndpointForwarder types that can replace
+// their upstream while running. Use a type assertion to access it:
+//
+//	s, ok := forwarder.(ngrok.UpstreamSetter)
+type UpstreamSetter interface {
+	// SetUpstream replaces the upstream URL, dialer, and TLS client config
+	// that new connections use. Connections already in progress keep the
+	// upstream they started with.
+	//
+	// The upstream protocol and the PROXY protocol version are fixed when
+	// Forward opens the endpoint. SetUpstream returns an error and changes
+	// nothing if u is nil, if u asks for different values, or if u's address
+	// is not a valid URL.
+	SetUpstream(u *Upstream) error
+}
+
 // endpointForwarder implements the EndpointForwarder interface.
 type endpointForwarder struct {
 	baseEndpoint
-	listener                *endpointListener
-	upstreamURL             atomic.Pointer[url.URL]
-	upstreamTLSClientConfig *tls.Config
-	upstreamProtocol        string
-	proxyProtocol           ProxyProtoVersion
-	upstreamDialer          Dialer
+	listener *endpointListener
+	// upstream is replaced whole, never changed in place. Each connection
+	// loads it once, so a connection never mixes two upstreams. Writers hold
+	// mu.
+	upstream         atomic.Pointer[upstreamTarget]
+	upstreamProtocol string
+	proxyProtocol    ProxyProtoVersion
+}
+
+// upstreamTarget is where a forwarder sends a connection.
+type upstreamTarget struct {
+	url             *url.URL
+	dialer          Dialer // nil: the SDK dials
+	tlsClientConfig *tls.Config
 }
 
 // Start begins forwarding connections from the listener to the upstream URL
@@ -98,12 +124,13 @@ func (e *endpointForwarder) handleConnection(ctx context.Context, conn net.Conn)
 	e.emitConnectionEvent(newConnectionOpened(e, remoteAddr))
 
 	proxyConn := &countingConn{Conn: conn}
+	target := e.upstream.Load()
 
-	if e.isHTTP() {
-		e.httpServe(proxyConn)
+	if e.isHTTP(target) {
+		e.httpServe(proxyConn, target)
 		e.emitConnectionEvent(newConnectionClosed(e, remoteAddr, time.Since(start), proxyConn.bytesRead.Load(), proxyConn.bytesWritten.Load()))
 	} else {
-		backend, err := e.connectToBackend(ctx)
+		backend, err := e.connectToBackend(ctx, target)
 		if err != nil {
 			conn.Close() //nolint:errcheck
 			e.emitConnectionEvent(newConnectionClosed(e, remoteAddr, time.Since(start), 0, 0))
@@ -125,8 +152,8 @@ func (e *endpointForwarder) emitConnectionEvent(evt Event) {
 // the upstream must speak HTTP: a tcp or tls endpoint carries raw bytes even
 // when its upstream URL has an http scheme, and parsing those bytes as HTTP
 // stalls the connection.
-func (e *endpointForwarder) isHTTP() bool {
-	return isHTTPScheme(e.endpointURL.Scheme) && isHTTPScheme(e.upstreamURL.Load().Scheme)
+func (e *endpointForwarder) isHTTP(target *upstreamTarget) bool {
+	return isHTTPScheme(e.endpointURL.Scheme) && isHTTPScheme(target.url.Scheme)
 }
 
 func isHTTPScheme(scheme string) bool {
@@ -156,9 +183,9 @@ func (c *countingConn) Write(p []byte) (int, error) {
 	return n, err
 }
 
-// connectToBackend establishes a connection to the upstream URL
-func (e *endpointForwarder) connectToBackend(ctx context.Context) (net.Conn, error) {
-	u := e.upstreamURL.Load()
+// connectToBackend establishes a connection to the target
+func (e *endpointForwarder) connectToBackend(ctx context.Context, target *upstreamTarget) (net.Conn, error) {
+	u := target.url
 
 	// Parse host and port from URL
 	host := u.Hostname()
@@ -182,7 +209,7 @@ func (e *endpointForwarder) connectToBackend(ctx context.Context) (net.Conn, err
 	address := net.JoinHostPort(host, port)
 
 	// Use custom dialer if provided, otherwise use default dialer
-	dialer := e.upstreamDialer
+	dialer := target.dialer
 	if dialer == nil {
 		dialer = &net.Dialer{
 			Timeout: 3 * time.Second,
@@ -203,9 +230,9 @@ func (e *endpointForwarder) connectToBackend(ctx context.Context) (net.Conn, err
 		}
 
 		// Use custom TLS client config if provided
-		if e.upstreamTLSClientConfig != nil {
+		if target.tlsClientConfig != nil {
 			// Use the provided config as a base, but ensure ServerName is set
-			config = e.upstreamTLSClientConfig.Clone()
+			config = target.tlsClientConfig.Clone()
 			if config.ServerName == "" {
 				config.ServerName = u.Hostname()
 			}
@@ -302,14 +329,40 @@ func (e *endpointForwarder) UpstreamProtocol() string {
 
 // UpstreamURL returns the URL that the endpoint forwards its traffic to.
 func (e *endpointForwarder) UpstreamURL() url.URL {
-	return *e.upstreamURL.Load()
+	return *e.upstream.Load().url
 }
 
+// UpdateUpstream changes the upstream URL and keeps the dialer and the TLS
+// client config.
 func (e *endpointForwarder) UpdateUpstream(u url.URL) {
-	e.upstreamURL.Store(&u)
 	e.mu.Lock()
+	defer e.mu.Unlock()
+	next := *e.upstream.Load()
+	next.url = &u
+	e.upstream.Store(&next)
 	e.updatedAt = time.Now()
-	e.mu.Unlock()
+}
+
+func (e *endpointForwarder) SetUpstream(u *Upstream) error {
+	if u == nil {
+		return errors.New("upstream is nil")
+	}
+	if u.protocol != e.upstreamProtocol {
+		return fmt.Errorf("cannot change the upstream protocol of a running endpoint from %q to %q", e.upstreamProtocol, u.protocol)
+	}
+	if u.proxyProto != e.proxyProtocol {
+		return fmt.Errorf("cannot change the PROXY protocol version of a running endpoint from %q to %q", e.proxyProtocol, u.proxyProto)
+	}
+	target, err := u.target()
+	if err != nil {
+		return err
+	}
+
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.upstream.Store(target)
+	e.updatedAt = time.Now()
+	return nil
 }
 
 func (e *endpointForwarder) Update(ctx context.Context, name, description, metadata *string, poolingEnabled *bool, trafficPolicy *string) error {
@@ -324,7 +377,7 @@ func (e *endpointForwarder) Update(ctx context.Context, name, description, metad
 
 // UpstreamTLSClientConfig returns the TLS client configuration used for upstream connections.
 func (e *endpointForwarder) UpstreamTLSClientConfig() *tls.Config {
-	return e.upstreamTLSClientConfig
+	return e.upstream.Load().tlsClientConfig
 }
 
 // ProxyProtocol returns the PROXY protocol version used for the endpoint.

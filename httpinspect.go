@@ -27,9 +27,8 @@ var forwardingHeaders = []string{"Forwarded", "X-Forwarded-For", "X-Forwarded-Ho
 // It creates an http.Server with a handler that wraps ReverseProxy and a
 // statusCaptureWriter for event emission, then uses httpx.ServeConnServer
 // to serve the single proxy connection without needing a real net.Listener.
-func (e *endpointForwarder) httpServe(proxyConn net.Conn) {
-	target := e.upstreamURL.Load()
-	transport := e.buildHTTPTransport()
+func (e *endpointForwarder) httpServe(proxyConn net.Conn, target *upstreamTarget) {
+	transport := e.buildHTTPTransport(target)
 	// This transport is built per inbound connection, so it has to be torn down
 	// per inbound connection too. Nothing else ever closes it: net/http sets no
 	// finalizer on Transport, and an idle upstream connection keeps its read
@@ -39,7 +38,7 @@ func (e *endpointForwarder) httpServe(proxyConn net.Conn) {
 
 	rp := &httputil.ReverseProxy{
 		Rewrite: func(pr *httputil.ProxyRequest) {
-			pr.SetURL(target)
+			pr.SetURL(target.url)
 			pr.Out = pr.Out.WithContext(e.traceUpstreamTLS(pr.Out.Context()))
 			// Preserve the original Host header from the inbound request
 			pr.Out.Host = pr.In.Host
@@ -84,15 +83,14 @@ func (e *endpointForwarder) httpServe(proxyConn net.Conn) {
 	server.Close()                                      //nolint:errcheck
 }
 
-// buildHTTPTransport creates an http.Transport configured with the
-// endpoint's upstream settings
-func (e *endpointForwarder) buildHTTPTransport() *http.Transport {
-	u := e.upstreamURL.Load()
+// buildHTTPTransport creates an http.Transport that reaches target
+func (e *endpointForwarder) buildHTTPTransport(target *upstreamTarget) *http.Transport {
+	u := target.url
 	tlsConfig := &tls.Config{
 		ServerName: u.Hostname(),
 	}
-	if e.upstreamTLSClientConfig != nil {
-		tlsConfig = e.upstreamTLSClientConfig.Clone()
+	if target.tlsClientConfig != nil {
+		tlsConfig = target.tlsClientConfig.Clone()
 		if tlsConfig.ServerName == "" {
 			tlsConfig.ServerName = u.Hostname()
 		}
@@ -110,7 +108,7 @@ func (e *endpointForwarder) buildHTTPTransport() *http.Transport {
 	}
 
 	// A zero net.Dialer dials the same way as a Transport with no DialContext.
-	dialer := e.upstreamDialer
+	dialer := target.dialer
 	if dialer == nil {
 		dialer = &net.Dialer{}
 	}
