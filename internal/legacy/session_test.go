@@ -4,9 +4,11 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"golang.ngrok.com/muxado/v2"
 
 	tunnel_client "golang.ngrok.com/ngrok/v2/internal/tunnel/client"
 	"golang.ngrok.com/ngrok/v2/internal/tunnel/proto"
@@ -78,4 +80,48 @@ func TestAgentMetricsSettings(t *testing.T) {
 	got := agentMetricsSettings(large, logger)
 	require.Equal(t, with(func(s *proto.AgentMetricsSettings) { s.MaxBatchBytes = tunnel_client.MaxAgentMetricsBatchBytes }), got)
 	require.EqualValues(t, 1<<20, large.MaxBatchBytes, "the received settings must not change")
+}
+
+func TestAuthExtraAgentID(t *testing.T) {
+	id := "agt_first"
+	cfg := connectConfig{ClientInfo: []clientInfo{{Type: "agent", Version: "4.0.0"}}}
+	WithAgentID(func() string { return id })(&cfg)
+	auth := &sessionAuth{base: newAuthExtra(&cfg, muxado.NewHeartbeatConfig()), cfg: &cfg}
+
+	require.Equal(t, "agt_first", auth.forLeg(0).AgentID)
+	require.Empty(t, auth.forLeg(0).DPoPProof)
+	require.Nil(t, auth.forLeg(0).DPoPUnsupportedError)
+	id = ""
+	require.Empty(t, auth.forLeg(0).AgentID)
+	id = "agt_second"
+	require.Equal(t, "agt_second", auth.forLeg(0).AgentID)
+
+	none := connectConfig{ClientInfo: []clientInfo{{Type: "agent", Version: "4.0.0"}}}
+	require.Empty(t, (&sessionAuth{base: newAuthExtra(&none, muxado.NewHeartbeatConfig()), cfg: &none}).forLeg(0).AgentID)
+}
+
+// Legs reconnect concurrently; run with -race.
+func TestAuthExtraConcurrentLegs(t *testing.T) {
+	cfg := connectConfig{ClientInfo: []clientInfo{{Type: "agent", Version: "4.0.0"}}}
+	WithAgentID(func() string { return "agt_123" })(&cfg)
+	auth := &sessionAuth{base: newAuthExtra(&cfg, muxado.NewHeartbeatConfig()), cfg: &cfg}
+
+	var wg sync.WaitGroup
+	for leg := uint32(0); leg < 4; leg++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for range 100 {
+				a := auth.forLeg(leg)
+				require.Equal(t, leg, a.LegNumber)
+				require.Equal(t, "agt_123", a.AgentID)
+				cookie := "cookie"
+				auth.cookie.Store(&cookie)
+			}
+		}()
+	}
+	wg.Wait()
+	require.Zero(t, auth.base.LegNumber)
+	require.Empty(t, auth.base.Cookie)
+	require.Equal(t, "cookie", auth.forLeg(1).Cookie)
 }
