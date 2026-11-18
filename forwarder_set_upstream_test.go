@@ -38,9 +38,15 @@ func forward(t *testing.T, upstream *Upstream) *endpointForwarder {
 func bodyServer(t *testing.T, body string) string {
 	t.Helper()
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, body)
 	}))
+	// Some tests forward with the http2 upstream protocol, which speaks h2c
+	// to an http:// upstream, so accept both.
+	srv.Config.Protocols = new(http.Protocols)
+	srv.Config.Protocols.SetHTTP1(true)
+	srv.Config.Protocols.SetUnencryptedHTTP2(true)
+	srv.Start()
 	t.Cleanup(srv.Close)
 	return srv.URL
 }
