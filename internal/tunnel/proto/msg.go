@@ -285,6 +285,7 @@ type Bind struct {
 func (b Bind) LogValue() slog.Value {
 	type bind Bind
 	b.Extra.Token = redact(b.Extra.Token)
+	b.Opts = maskOpts(b.Opts)
 	return slog.AnyValue(bind(b))
 }
 
@@ -313,6 +314,7 @@ type BindResp struct {
 func (r BindResp) LogValue() slog.Value {
 	type bindResp BindResp
 	r.Extra.Token = redact(r.Extra.Token)
+	r.Opts = maskOpts(r.Opts)
 	return slog.AnyValue(bindResp(r))
 }
 
@@ -525,6 +527,16 @@ type PatchTunnelState struct {
 	Metadata       *string `json:"Metadata,omitempty"`
 	PoolingEnabled *bool   `json:"PoolingEnabled,omitempty"`
 	TrafficPolicy  *string `json:"TrafficPolicy,omitempty"`
+}
+
+// LogValue implements slog.LogValuer. See Auth.LogValue.
+func (p PatchTunnelState) LogValue() slog.Value {
+	type patchTunnelState PatchTunnelState
+	if p.TrafficPolicy != nil {
+		masked := maskPolicy(*p.TrafficPolicy)
+		p.TrafficPolicy = &masked
+	}
+	return slog.AnyValue(patchTunnelState(p))
 }
 
 // PatchTunnelStateResp is the server's reply to a PatchTunnelState request.
