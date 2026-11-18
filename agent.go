@@ -462,6 +462,7 @@ func (a *agent) Forward(ctx context.Context, upstream *Upstream, opts ...Endpoin
 	for _, opt := range opts {
 		opt(endpointOpts)
 	}
+	endpointOpts.upstreamProtocol = upstream.protocol
 
 	// Ensure we're connected
 	if err := a.ensureConnected(ctx); err != nil {
