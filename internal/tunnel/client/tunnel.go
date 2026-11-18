@@ -38,7 +38,7 @@ type tunnel struct {
 	labels        map[string]string
 	forwardsTo    string
 	forwardsProto string
-	tunnelID      string
+	tunnelID      atomic.Value // server tunnel ID from the leg 0 bind; changes on reconnect
 
 	accept     chan *ProxyConn // new connections come on this channel
 	unlisten   func() error    // call this function to close the tunnel
@@ -50,7 +50,7 @@ type tunnel struct {
 func newTunnel(resp proto.BindResp, extra proto.BindExtra, s *session, forwardsTo string, forwardsProto string) *tunnel {
 	id := atomic.Value{}
 	id.Store(resp.ClientID)
-	return &tunnel{
+	t := &tunnel{
 		id:            id,
 		configProto:   resp.Proto,
 		url:           resp.URL,
@@ -62,8 +62,9 @@ func newTunnel(resp proto.BindResp, extra proto.BindExtra, s *session, forwardsT
 		forwardsTo:    forwardsTo,
 		forwardsProto: forwardsProto,
 		closeError:    errors.New("Listener closed"),
-		tunnelID:      resp.Extra.TunnelID,
 	}
+	t.tunnelID.Store(resp.Extra.TunnelID)
+	return t
 }
 
 func newTunnelLabel(resp proto.StartTunnelWithLabelResp, metadata string, labels map[string]string, s *session, forwardsTo string, forwardsProto string) *tunnel {
@@ -144,7 +145,8 @@ func (t *tunnel) Name() string {
 }
 
 func (t *tunnel) TunnelID() string {
-	return t.tunnelID
+	id, _ := t.tunnelID.Load().(string)
+	return id
 }
 
 // RemoteBindConfig returns more detailed information about the public endpoint of the
