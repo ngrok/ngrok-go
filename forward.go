@@ -50,6 +50,13 @@ func (fwd *forwarder) Wait() error {
 	return fwd.mainGroup.Wait()
 }
 
+func (fwd *forwarder) TunnelID() string {
+	if ider, ok := fwd.Tunnel.(TunnelIDer); ok {
+		return ider.TunnelID()
+	}
+	return ""
+}
+
 // compile-time check that we're implementing the proper interface
 var _ Forwarder = (*forwarder)(nil)
 

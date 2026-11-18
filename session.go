@@ -682,6 +682,8 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 			SessionDuration:    resp.Extra.SessionDuration,
 			DeprecationWarning: resp.Extra.DeprecationWarning,
 			ConnectAddresses:   resp.Extra.ConnectAddresses,
+			AgentMetrics:       agentMetricsSettings(resp.Extra.AgentMetrics, logger),
+			raw:                raw,
 			Logger:             logger,
 		}
 
@@ -819,6 +821,12 @@ type sessionInner struct {
 	SessionDuration    int64
 	DeprecationWarning *proto.AgentVersionDeprecated
 	ConnectAddresses   []proto.ConnectAddress
+	AgentMetrics       *proto.AgentMetricsSettings
+
+	// raw is the connection that AgentMetrics came from. Metrics go only to
+	// that connection, because a reconnect can reach a server with other
+	// settings, or with no metrics support.
+	raw tunnel_client.RawSession
 
 	Logger log15.Logger
 }
