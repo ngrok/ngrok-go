@@ -156,4 +156,88 @@ func TestUpstreamProtocolHTTP2(t *testing.T) {
 
 		t.Logf("Response: %s", string(body))
 	})
+
+	// Test 3: With HTTP/2 protocol to an unencrypted h2c-only HTTP upstream
+	t.Run("With HTTP/2 protocol to h2c-only HTTP upstream", func(t *testing.T) {
+		t.Parallel()
+
+		agent, ctx := SetupAgent(t)
+
+		srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "text/plain")
+			w.Header().Set("X-Protocol-Version", r.Proto)
+			w.Header().Set("Trailer", "X-Test-Trailer")
+			w.WriteHeader(http.StatusOK)
+			_, _ = fmt.Fprintf(w, "Server used %s", r.Proto)
+			w.Header().Set("X-Test-Trailer", "ok")
+		}))
+		srv.Config.Protocols = new(http.Protocols)
+		srv.Config.Protocols.SetUnencryptedHTTP2(true)
+		srv.Start()
+		defer srv.Close()
+
+		forwarder, err := agent.Forward(ctx,
+			ngrok.WithUpstream(srv.URL, ngrok.WithUpstreamProtocol("http2")),
+		)
+		require.NoError(t, err, "Failed to create forwarder")
+		defer forwarder.Close()
+
+		ngrokURL := forwarder.URL().String()
+		t.Logf("Forwarder URL: %s", ngrokURL)
+		WaitForForwarderReady(t, ngrokURL)
+
+		transport := &http.Transport{ForceAttemptHTTP2: true}
+		defer transport.CloseIdleConnections()
+		client := &http.Client{Transport: transport}
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, ngrokURL, nil)
+		require.NoError(t, err)
+
+		resp, err := client.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err, "Failed to read response body")
+
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		assert.Equal(t, 2, resp.ProtoMajor, "Expected HTTP/2 response from ngrok edge")
+		assert.Equal(t, "HTTP/2.0", resp.Header.Get("X-Protocol-Version"))
+		assert.Equal(t, "ok", resp.Trailer.Get("X-Test-Trailer"))
+		t.Logf("Response (%s): %s", resp.Proto, string(body))
+	})
+
+	// Test 4: With HTTP/1 protocol explicitly specified
+	t.Run("With HTTP/1 protocol explicitly specified", func(t *testing.T) {
+		t.Parallel()
+
+		agent, ctx := SetupAgent(t)
+
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "text/plain")
+			w.Header().Set("X-Protocol-Version", r.Proto)
+			w.WriteHeader(http.StatusOK)
+			_, _ = fmt.Fprintf(w, "Server used %s", r.Proto)
+		}))
+		defer srv.Close()
+
+		forwarder, err := agent.Forward(ctx,
+			ngrok.WithUpstream(srv.URL, ngrok.WithUpstreamProtocol("http1")),
+		)
+		require.NoError(t, err, "Failed to create forwarder with http1 protocol")
+		defer forwarder.Close()
+
+		ngrokURL := forwarder.URL().String()
+		t.Logf("Forwarder URL: %s", ngrokURL)
+		WaitForForwarderReady(t, ngrokURL)
+
+		resp, err := MakeHTTPRequest(ctx, t, ngrokURL, "Testing HTTP/1")
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err, "Failed to read response body")
+		assert.Equal(t, "HTTP/1.1", resp.Header.Get("X-Protocol-Version"))
+		t.Logf("Response: %s", string(body))
+	})
 }
