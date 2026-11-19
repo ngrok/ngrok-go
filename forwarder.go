@@ -239,7 +239,7 @@ func (e *endpointForwarder) connectToBackend(ctx context.Context, target *upstre
 		}
 
 		// Add HTTP/2 support via ALPN if requested
-		if e.upstreamProtocol == "http2" {
+		if e.usesHTTP2() {
 			config.NextProtos = append(config.NextProtos, "h2", "http/1.1")
 		}
 
@@ -327,6 +327,10 @@ func (e *endpointForwarder) UpstreamProtocol() string {
 	return e.upstreamProtocol
 }
 
+func (e *endpointForwarder) usesHTTP2() bool {
+	return e.upstreamProtocol == upstreamProtocolHTTP2
+}
+
 // UpstreamURL returns the URL that the endpoint forwards its traffic to.
 func (e *endpointForwarder) UpstreamURL() url.URL {
 	return *e.upstream.Load().url
@@ -347,7 +351,11 @@ func (e *endpointForwarder) SetUpstream(u *Upstream) error {
 	if u == nil {
 		return errors.New("upstream is nil")
 	}
-	if u.protocol != e.upstreamProtocol {
+	proto, err := normalizeUpstreamProtocol(u.protocol)
+	if err != nil {
+		return err
+	}
+	if proto != e.upstreamProtocol {
 		return fmt.Errorf("cannot change the upstream protocol of a running endpoint from %q to %q", e.upstreamProtocol, u.protocol)
 	}
 	if u.proxyProto != e.proxyProtocol {

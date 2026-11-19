@@ -4,7 +4,26 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net/url"
+	"strings"
 )
+
+const (
+	upstreamProtocolHTTP1 = "http1"
+	upstreamProtocolHTTP2 = "http2"
+)
+
+// normalizeUpstreamProtocol normalizes and validates an upstream protocol value
+// so the hint sent to the edge, the tunnel-side server, the upstream transport,
+// and SetUpstream all agree.
+func normalizeUpstreamProtocol(proto string) (string, error) {
+	normalized := strings.ToLower(proto)
+	switch normalized {
+	case "", upstreamProtocolHTTP1, upstreamProtocolHTTP2:
+		return normalized, nil
+	default:
+		return "", fmt.Errorf("unsupported upstream protocol: %s", proto)
+	}
+}
 
 // Upstream represents configuration for forwarding to an upstream service.
 type Upstream struct {
@@ -48,8 +67,13 @@ func WithUpstream(addr string, opts ...UpstreamOption) *Upstream {
 }
 
 // WithUpstreamProtocol sets the protocol to use when forwarding to the upstream.
-// This is typically used to specify "http2" when communicating with an
-// upstream HTTP/2 server.
+// Valid values are "", "http1", and "http2" (case-insensitive); unrecognized
+// values cause Forward and SetUpstream to return an error.
+//
+// Setting "http2" instructs the ngrok edge to send every request over HTTP/2
+// for both http:// and https:// upstreams. WebSocket upgrades are rejected at
+// the edge (ERR_NGROK_3004) on http2 endpoints; leave the protocol unset for
+// upstreams that serve WebSockets.
 func WithUpstreamProtocol(proto string) UpstreamOption {
 	return func(o *Upstream) {
 		o.protocol = proto

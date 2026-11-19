@@ -58,10 +58,8 @@ func TestForwarderHTTP2UpstreamAcceptsHTTP2FromEdge(t *testing.T) {
 	edgeClient := startEdgeConn(t, newH2CForwarder(t))
 
 	edge := &http.Transport{
-		Protocols: new(http.Protocols),
-		DialContext: func(context.Context, string, string) (net.Conn, error) {
-			return edgeClient, nil
-		},
+		Protocols:   new(http.Protocols),
+		DialContext: singleConnDialer(edgeClient),
 	}
 	edge.Protocols.SetUnencryptedHTTP2(true)
 	t.Cleanup(edge.CloseIdleConnections)
