@@ -1,9 +1,9 @@
 name: lint
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "release/**" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "release/**" ]
 permissions:
   contents: read
   # Optional: allow read access to pull request. Use with `only-new-issues` option.

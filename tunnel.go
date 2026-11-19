@@ -60,6 +60,28 @@ type TunnelInfo interface {
 	URL() string
 }
 
+// TunnelIDer is implemented by the [Tunnel] and [Forwarder] values that this
+// package returns. It is not part of [TunnelInfo], so that existing
+// implementations of [Tunnel] still compile. Use a type assertion to access it:
+//
+//	tunnelID := ""
+//	if ider, ok := tun.(ngrok.TunnelIDer); ok {
+//		tunnelID = ider.TunnelID()
+//	}
+type TunnelIDer interface {
+	// TunnelID returns the tunnel resource ID (tn_...) that the ngrok cloud
+	// service assigned to the first bind of this tunnel. It returns "" for
+	// labeled tunnels and when the service did not send an ID.
+	TunnelID() string
+}
+
+// compile-time check that the tunnels and forwarders that this package returns
+// implement the optional interface
+var (
+	_ TunnelIDer = (*tunnelImpl)(nil)
+	_ TunnelIDer = (*forwarder)(nil)
+)
+
 // Listen creates a new [Tunnel] after connecting a new [Session]. This is a
 // shortcut for calling [Connect] then [Session].Listen.
 //
@@ -210,6 +232,10 @@ func (t *tunnelImpl) ID() string {
 
 func (t *tunnelImpl) Labels() map[string]string {
 	return t.Tunnel.RemoteBindConfig().Labels
+}
+
+func (t *tunnelImpl) TunnelID() string {
+	return t.Tunnel.TunnelID()
 }
 
 func (t *tunnelImpl) Session() Session {

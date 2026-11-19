@@ -31,6 +31,11 @@ const (
 
 	// sent from client to the server
 	SrvInfoReq ReqType = 8
+
+	// sent from client to the server. Unlike other streams, the payloads are
+	// varint length-delimited protobufs: agent.AgentMetricsBatch, then
+	// agent.AgentMetricsBatchResult.
+	AgentMetricsReq ReqType = 11
 )
 
 var Version = []string{"3", "2"} // integers in priority order
@@ -206,6 +211,16 @@ type AuthRespExtra struct {
 	Banner             string
 	DeprecationWarning *AgentVersionDeprecated
 	ConnectAddresses   []ConnectAddress
+	// AgentMetrics is nil when the server does not accept AgentMetricsReq
+	// streams on this session. Agents must not open them in that case.
+	AgentMetrics *AgentMetricsSettings
+}
+
+// AgentMetricsSettings tells the agent how to publish metrics batches.
+type AgentMetricsSettings struct {
+	IntervalMs    int64 // time between batches
+	MaxBatchBytes int64 // maximum encoded size of a batch, without the length prefix
+	MaxSamples    int64 // maximum samples in a batch
 }
 
 // A client sends this message to the server over a new stream
@@ -242,7 +257,8 @@ type BindResp struct {
 }
 
 type BindRespExtra struct {
-	Token string
+	Token    string
+	TunnelID string
 }
 
 // A client sends this message to the server over a new stream

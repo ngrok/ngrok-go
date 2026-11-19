@@ -2,6 +2,7 @@ package ngrok
 
 import (
 	"bufio"
+	"bytes"
 	"compress/gzip"
 	"context"
 	"encoding/binary"
@@ -11,9 +12,11 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -74,6 +77,102 @@ func onlineTest(t *testing.T) {
 	// session errors for free accounts. "Something something eventual
 	// consistency" most likely.
 	require.NotEmpty(t, os.Getenv("NGROK_AUTHTOKEN"), "Online tests require an authtoken.")
+	retryOfflineOnce.Do(func() {
+		http.DefaultTransport = offlineRetry{
+			next:    http.DefaultTransport,
+			timeout: 10 * time.Second,
+			wait:    250 * time.Millisecond,
+		}
+	})
+}
+
+var retryOfflineOnce sync.Once
+
+// offlineRetry is an http.RoundTripper that retries a request while the
+// answer is the "endpoint offline" page (ERR_NGROK_3200). A request sent
+// right after an endpoint starts can get that page, which made online tests
+// fail now and then. It retries only requests with no body, until timeout,
+// and returns any other answer as is.
+type offlineRetry struct {
+	next    http.RoundTripper
+	timeout time.Duration
+	wait    time.Duration
+}
+
+func (o offlineRetry) RoundTrip(req *http.Request) (*http.Response, error) {
+	deadline := time.Now().Add(o.timeout)
+	for {
+		resp, err := o.next.RoundTrip(req)
+		if err != nil || resp.StatusCode != http.StatusNotFound || (req.Body != nil && req.Body != http.NoBody) {
+			return resp, err
+		}
+		body, err := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+		if err != nil {
+			return nil, err
+		}
+		if !bytes.Contains(body, []byte("ERR_NGROK_3200")) || time.Now().After(deadline) {
+			resp.Body = io.NopCloser(bytes.NewReader(body))
+			return resp, nil
+		}
+		select {
+		case <-req.Context().Done():
+			return nil, req.Context().Err()
+		case <-time.After(o.wait):
+		}
+	}
+}
+
+func TestOfflineRetry(t *testing.T) {
+	offlinePage := "The endpoint example.ngrok.app is offline.\r\n\r\nERR_NGROK_3200\r\n"
+	var calls int
+	srv := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		calls++
+		switch {
+		case r.URL.Path == "/other404":
+			http.Error(rw, "not here", http.StatusNotFound)
+		case r.URL.Path == "/always" || calls <= 2:
+			http.Error(rw, offlinePage, http.StatusNotFound)
+		default:
+			_, _ = fmt.Fprintln(rw, "Hello, world!")
+		}
+	}))
+	defer srv.Close()
+
+	client := &http.Client{Transport: offlineRetry{
+		next:    http.DefaultTransport,
+		timeout: time.Second,
+		wait:    time.Millisecond,
+	}}
+	get := func(path string) (int, string) {
+		t.Helper()
+		resp, err := client.Get(srv.URL + path)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		return resp.StatusCode, string(body)
+	}
+
+	t.Run("retries until the endpoint answers", func(t *testing.T) {
+		calls = 0
+		code, body := get("/")
+		require.Equal(t, http.StatusOK, code)
+		require.Equal(t, "Hello, world!\n", body)
+		require.Equal(t, 3, calls)
+	})
+	t.Run("returns another 404 at once", func(t *testing.T) {
+		calls = 0
+		code, body := get("/other404")
+		require.Equal(t, http.StatusNotFound, code)
+		require.Equal(t, "not here\n", body)
+		require.Equal(t, 1, calls)
+	})
+	t.Run("gives up after the timeout", func(t *testing.T) {
+		code, body := get("/always")
+		require.Equal(t, http.StatusNotFound, code)
+		require.Contains(t, body, "ERR_NGROK_3200")
+	})
 }
 
 func setupSession(ctx context.Context, t *testing.T, opts ...ConnectOption) Session {

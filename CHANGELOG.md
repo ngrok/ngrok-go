@@ -1,3 +1,12 @@
+## 1.13.0
+
+Enhancements:
+
+- Adds the optional `AgentMetricsSession` interface, which the `Session` from `Connect` implements. `AgentMetricsSettings` returns the agent metrics settings that the ngrok service sends for the current connection, and `SendAgentMetrics` sends one encoded metrics batch on a new stream of that connection. Backported from ngrok-go v2 (#275).
+- Adds the optional `TunnelIDer` interface, which the `Tunnel` and `Forwarder` values of this package implement. `TunnelID` returns the tunnel resource ID (`tn_...`) from the bind response, or `""` when the service does not send it. Backported from ngrok-go v2 (#238).
+
+Both are separate interfaces, so code that implements `Session`, `Tunnel` or `Forwarder` still compiles.
+
 ## 1.12.1
 
 Fixes:
