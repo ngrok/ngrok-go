@@ -78,12 +78,14 @@ type Session interface {
 }
 
 type session struct {
-	swapper *swapRaw
-	raw     RawSession
+	raw RawSession
 	sync.RWMutex
 	*slog.Logger
-	tunnels   map[string]*tunnel
-	legNumber uint32
+	tunnels map[string]*tunnel
+	// unbind releases a tunnel wherever it is bound. A tunnel can be bound on
+	// more sessions than the one that created it, and under a different id on
+	// each, so it cannot unbind itself by id.
+	unbind func(*tunnel) error
 }
 
 // NewSession starts a new go-tunnel client session running over the given
@@ -94,6 +96,13 @@ func NewSession(logger *slog.Logger, mux muxado.Session, heartbeatConfig *muxado
 		raw:     newRawSession(mux, logger, heartbeatConfig, handler),
 		Logger:  logger,
 		tunnels: make(map[string]*tunnel),
+	}
+	s.unbind = func(t *tunnel) error {
+		id, ok := s.idFor(t)
+		if !ok {
+			id = t.ID()
+		}
+		return s.unlisten(id)
 	}
 
 	go s.receive()
@@ -297,6 +306,19 @@ func (s *session) getTunnel(id string) (t *tunnel, ok bool) {
 	defer s.RUnlock()
 	t, ok = s.tunnels[id]
 	return
+}
+
+// idFor reports the id this leg bound t under. A tunnel can carry a different
+// id on each leg, so unbinding it needs the leg's own.
+func (s *session) idFor(t *tunnel) (string, bool) {
+	s.RLock()
+	defer s.RUnlock()
+	for id, candidate := range s.tunnels {
+		if candidate == t {
+			return id, true
+		}
+	}
+	return "", false
 }
 
 func (s *session) addTunnel(id string, t *tunnel) {

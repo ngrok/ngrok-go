@@ -50,7 +50,7 @@ type tunnel struct {
 func newTunnel(resp proto.BindResp, extra proto.BindExtra, s *session, forwardsTo string, forwardsProto string) *tunnel {
 	id := atomic.Value{}
 	id.Store(resp.ClientID)
-	return &tunnel{
+	t := &tunnel{
 		id:            id,
 		configProto:   resp.Proto,
 		url:           resp.URL,
@@ -58,29 +58,31 @@ func newTunnel(resp proto.BindResp, extra proto.BindExtra, s *session, forwardsT
 		token:         resp.Extra.Token,
 		bindExtra:     extra, // this makes the reconnecting session a little easier
 		accept:        make(chan *ProxyConn),
-		unlisten:      func() error { return s.unlisten(resp.ClientID) },
 		forwardsTo:    forwardsTo,
 		forwardsProto: forwardsProto,
 		closeError:    errors.New("Listener closed"),
 		tunnelID:      resp.Extra.TunnelID,
 	}
+	t.unlisten = func() error { return s.unbind(t) }
+	return t
 }
 
 func newTunnelLabel(resp proto.StartTunnelWithLabelResp, metadata string, labels map[string]string, s *session, forwardsTo string, forwardsProto string) *tunnel {
 	id := atomic.Value{}
 	id.Store(resp.ID)
-	return &tunnel{
+	t := &tunnel{
 		id: id,
 		bindExtra: proto.BindExtra{
 			Metadata: metadata,
 		}, // this makes the reconnecting session a little easier
 		labels:        labels,
 		accept:        make(chan *ProxyConn),
-		unlisten:      func() error { return s.unlisten(resp.ID) },
 		forwardsTo:    forwardsTo,
 		forwardsProto: forwardsProto,
 		closeError:    errors.New("Listener closed"),
 	}
+	t.unlisten = func() error { return s.unbind(t) }
+	return t
 }
 
 func (t *tunnel) handleConn(r *ProxyConn) {

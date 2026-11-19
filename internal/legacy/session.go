@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -500,11 +501,16 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 		updateHandler:  cfg.UpdateHandler,
 	}
 
+	// legs connect concurrently, so the server addresses they share need a lock
+	var sharedMu sync.Mutex
+
 	rawDialer := func(legNumber uint32) (tunnel_client.RawSession, error) {
+		sharedMu.Lock()
 		serverAddr := cfg.ServerAddr
 		if legNumber > 0 && len(cfg.AdditionalServerAddrs) >= int(legNumber) {
 			serverAddr = cfg.AdditionalServerAddrs[legNumber-1]
 		}
+		sharedMu.Unlock()
 		tlsConfig := &tls.Config{
 			RootCAs:    cfg.CAPool,
 			ServerName: strings.Split(serverAddr, ":")[0],
@@ -625,6 +631,8 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 
 		auth.cookie.Store(&resp.Extra.Cookie)
 
+		sharedMu.Lock()
+
 		// store any connect server addresses for use in subsequent legs
 		if cfg.EnableMultiLeg && legNumber == 0 && len(resp.Extra.ConnectAddresses) > 1 {
 			overrideAdditionalServers := len(cfg.AdditionalServerAddrs) == 0
@@ -640,11 +648,14 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 				}
 			}
 		}
+		sharedMu.Unlock()
 
 		// if we are using multi-leg, we need to know how many legs to connect
 		desiredLegs := 1
 		if cfg.EnableMultiLeg {
+			sharedMu.Lock()
 			desiredLegs = 1 + len(cfg.AdditionalServerAddrs)
+			sharedMu.Unlock()
 		}
 		return desiredLegs, nil
 	}
