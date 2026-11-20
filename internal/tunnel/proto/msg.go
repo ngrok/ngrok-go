@@ -260,6 +260,12 @@ type AuthRespExtra struct {
 	// AgentMetrics is nil when the server does not accept AgentMetricsReq
 	// streams on this session. Agents must not open them in that case.
 	AgentMetrics *AgentMetricsSettings
+	// PrincipalID and AccountID identify the owner of the session's
+	// credential, in the forms the agents API renders for an agent record.
+	// PrincipalID is empty when the credential has no owner. Both are empty
+	// from a server that predates them.
+	PrincipalID string
+	AccountID   string
 }
 
 // AgentMetricsSettings tells the agent how to publish metrics batches.

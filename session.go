@@ -41,8 +41,32 @@ type AgentSessionDetails interface {
 	Banner() string
 }
 
-// agentSession implements the AgentSession, AgentSessionDetails, and
-// AgentSessionMetrics interfaces.
+// AgentSessionIdentity is implemented by AgentSession values that report the
+// owner of the credential that authenticated the current connection to the
+// ngrok cloud service. Use a type assertion to access it:
+//
+//	identity, ok := session.(ngrok.AgentSessionIdentity)
+//
+// The values are readable once Connect returns and when
+// EventAgentConnectSucceeded is emitted, including from its EventHandler.
+// They can change when the Agent reconnects, so read them again after each
+// EventAgentConnectSucceeded.
+type AgentSessionIdentity interface {
+	AgentSession
+
+	// PrincipalID returns the ID of the principal (a user or a bot user) that
+	// owns the credential, in the form the ngrok API uses. It is empty if the
+	// server did not send it or the credential has no owner.
+	PrincipalID() string
+
+	// AccountID returns the ID of the account that owns the credential, an
+	// ac_ ID as the ngrok API uses. It is set when the credential has no
+	// owner principal, and empty if the server did not send it.
+	AccountID() string
+}
+
+// agentSession implements the AgentSession, AgentSessionDetails,
+// AgentSessionIdentity and AgentSessionMetrics interfaces.
 type agentSession struct {
 	id          string
 	warnings    []error
@@ -87,6 +111,20 @@ func (s *agentSession) Region() string {
 
 func (s *agentSession) Banner() string {
 	return s.banner
+}
+
+func (s *agentSession) PrincipalID() string {
+	if sess := s.legacySession(); sess != nil {
+		return sess.PrincipalID()
+	}
+	return ""
+}
+
+func (s *agentSession) AccountID() string {
+	if sess := s.legacySession(); sess != nil {
+		return sess.AccountID()
+	}
+	return ""
 }
 
 func (s *agentSession) legacySession() legacy.Session {
