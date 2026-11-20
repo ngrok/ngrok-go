@@ -458,11 +458,16 @@ func (a *agent) Forward(ctx context.Context, upstream *Upstream, opts ...Endpoin
 		endpointOpts.proxyProtoVersion = proxyVersion
 	}
 
+	upstreamProto, err := normalizeUpstreamProtocol(upstream.protocol)
+	if err != nil {
+		return nil, err
+	}
+
 	// Apply additional options
 	for _, opt := range opts {
 		opt(endpointOpts)
 	}
-	endpointOpts.upstreamProtocol = upstream.protocol
+	endpointOpts.upstreamProtocol = upstreamProto
 
 	// Ensure we're connected
 	if err := a.ensureConnected(ctx); err != nil {
@@ -479,7 +484,7 @@ func (a *agent) Forward(ctx context.Context, upstream *Upstream, opts ...Endpoin
 	endpoint := &endpointForwarder{
 		baseEndpoint:     listener.baseEndpoint, // reuse the baseEndpoint from listener
 		listener:         listener,
-		upstreamProtocol: upstream.protocol,
+		upstreamProtocol: upstreamProto,
 		proxyProtocol:    upstream.proxyProto,
 	}
 	endpoint.upstream.Store(target)
