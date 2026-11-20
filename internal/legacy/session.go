@@ -52,6 +52,12 @@ type Session interface {
 	// connection, or nil if the server does not accept metrics on it.
 	AgentMetricsSettings() *proto.AgentMetricsSettings
 
+	// PrincipalID and AccountID return the owner of the credential that
+	// authenticated the current connection, as the server sent them, or
+	// empty if it sent none.
+	PrincipalID() string
+	AccountID() string
+
 	// SendAgentMetrics sends one encoded agent.AgentMetricsBatch on the
 	// current connection and returns the encoded agent.AgentMetricsBatchResult.
 	// It returns ErrAgentMetricsUnsupported if the server did not advertise
@@ -594,6 +600,8 @@ func Connect(ctx context.Context, opts ...ConnectOption) (Session, error) {
 			ConnectAddresses:   resp.Extra.ConnectAddresses,
 			AgentSessionID:     resp.Extra.AgentSessionID,
 			AgentMetrics:       agentMetricsSettings(resp.Extra.AgentMetrics, logger),
+			PrincipalID:        resp.Extra.PrincipalID,
+			AccountID:          resp.Extra.AccountID,
 			raw:                raw,
 			Logger:             logger,
 		}
@@ -735,6 +743,8 @@ type sessionInner struct {
 	ConnectAddresses   []proto.ConnectAddress
 	AgentSessionID     string
 	AgentMetrics       *proto.AgentMetricsSettings
+	PrincipalID        string
+	AccountID          string
 
 	// raw is the connection that AgentMetrics came from. Metrics go only to
 	// that connection, because a reconnect can reach a server with other
@@ -867,6 +877,15 @@ func (s *sessionImpl) AccountName() string {
 func (s *sessionImpl) PlanName() string {
 	return s.inner().PlanName
 }
+
+func (s *sessionImpl) PrincipalID() string {
+	return s.inner().PrincipalID
+}
+
+func (s *sessionImpl) AccountID() string {
+	return s.inner().AccountID
+}
+
 func (s *sessionImpl) Banner() string {
 	return s.inner().Banner
 }
