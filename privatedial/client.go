@@ -982,6 +982,16 @@ func (d *Dialer) Err() error {
 // Dialing on a Dialer that has been closed, or torn down by a fatal
 // session error, fails with a *net.OpError wrapping ErrSessionClosed.
 func (d *Dialer) DialContext(ctx context.Context, network string, addr string) (net.Conn, error) {
+	return d.DialContextWithOptions(ctx, network, addr)
+}
+
+// DialContextWithOptions is DialContext with per-dial options, such as
+// WithPodIdentity. With no options it behaves exactly as DialContext.
+func (d *Dialer) DialContextWithOptions(ctx context.Context, network, addr string, opts ...DialOption) (net.Conn, error) {
+	var o dialOpts
+	for _, opt := range opts {
+		opt(&o)
+	}
 	if network != "tcp" {
 		// we only support tcp endpoints
 		return nil, net.UnknownNetworkError(network)
@@ -1004,10 +1014,10 @@ func (d *Dialer) DialContext(ctx context.Context, network string, addr string) (
 		addr: addr,
 		host: host,
 		port: int(port),
-	})
+	}, o)
 }
 
-func (d *Dialer) dial(ctx context.Context, addr dialAddr) (net.Conn, error) {
+func (d *Dialer) dial(ctx context.Context, addr dialAddr, opts dialOpts) (net.Conn, error) {
 	// budgetCtx bounds the entire dial: both the wait for a usable conn and the
 	// per-conn RoundTrip. The cause lets us map our own budget expiry to a
 	// refused connect without treating caller cancellation the same way.
@@ -1041,7 +1051,7 @@ func (d *Dialer) dial(ctx context.Context, addr dialAddr) (net.Conn, error) {
 		if err != nil {
 			return nil, dialErrFor(err)
 		}
-		conn, dialErr := cur.dial(budgetCtx, addr)
+		conn, dialErr := cur.dial(budgetCtx, addr, opts)
 		if dialErr == nil {
 			return conn, nil
 		}
@@ -1411,7 +1421,7 @@ type sessionConn struct {
 	closeOnce sync.Once
 }
 
-func (h *sessionConn) dial(ctx context.Context, addr dialAddr) (net.Conn, error) {
+func (h *sessionConn) dial(ctx context.Context, addr dialAddr, opts dialOpts) (net.Conn, error) {
 	h.log.Debug("dialing endpoint", "addr", addr.addr)
 	reqReader, reqWriter := io.Pipe()
 	reqCtx, reqCancel := context.WithCancel(context.Background())
@@ -1425,8 +1435,9 @@ func (h *sessionConn) dial(ctx context.Context, addr dialAddr) (net.Conn, error)
 	req.Header.Set("Content-Type", "application/octet-stream")
 
 	dreq := &pbpd.DialReq{
-		Host: addr.host,
-		Port: int64(addr.port),
+		Host:        addr.host,
+		Port:        int64(addr.port),
+		PodIdentity: opts.podIdentity,
 	}
 
 	if !h.acceptsStreams() {

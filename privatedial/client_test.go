@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"google.golang.org/protobuf/encoding/protodelim"
+	"google.golang.org/protobuf/proto"
 
 	pbpd "golang.ngrok.com/ngrok/privatedial/internal/pb_private_dial"
 )
@@ -441,7 +442,7 @@ func TestSessionConnDialRefusesAfterClose(t *testing.T) {
 	h := newFakeConn("conn-1")
 	_ = h.close()
 
-	_, err := h.dial(context.Background(), dialAddr{addr: "x.private:80", host: "x.private", port: 80})
+	_, err := h.dial(context.Background(), dialAddr{addr: "x.private:80", host: "x.private", port: 80}, dialOpts{})
 	if err == nil {
 		t.Fatal("dial succeeded after close")
 	}
@@ -1023,6 +1024,87 @@ func TestConnectRequiresServerAddr(t *testing.T) {
 			err := d.Connect(ctx)
 			if err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("Connect = %v, want error mentioning %s", err, tc.want)
+			}
+		})
+	}
+}
+
+// dialReqCapturingTransport records the DialReq of each /dial and rejects the
+// dial with a non-200 status, so the dial ends without a retry.
+type dialReqCapturingTransport struct {
+	got chan *pbpd.DialReq
+}
+
+func (c dialReqCapturingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	dreq := &pbpd.DialReq{}
+	if err := protodelim.UnmarshalFrom(bufio.NewReader(req.Body), dreq); err != nil {
+		return nil, err
+	}
+	c.got <- dreq
+	return &http.Response{
+		StatusCode: http.StatusForbidden,
+		Body:       io.NopCloser(strings.NewReader("rejected by test")),
+	}, nil
+}
+
+func (dialReqCapturingTransport) CloseIdleConnections() {}
+
+func TestDialSendsPodIdentity(t *testing.T) {
+	cases := []struct {
+		name string
+		opts []DialOption
+		want *pbpd.PodIdentity
+	}{
+		{
+			name: "plain DialContext sends no identity",
+			want: nil,
+		},
+		{
+			name: "identity is sent as given",
+			opts: []DialOption{WithPodIdentity(PodIdentity{
+				UID:         "0b6c3c9e-1d1a-4f0a-9d55-3c1f2d0c7e11",
+				Name:        "web-7d9f",
+				Namespace:   "shop",
+				Annotations: map[string]string{"team": "payments", "tier": "gold"},
+			})},
+			want: &pbpd.PodIdentity{
+				Uid:         "0b6c3c9e-1d1a-4f0a-9d55-3c1f2d0c7e11",
+				Name:        "web-7d9f",
+				Namespace:   "shop",
+				Annotations: map[string]string{"team": "payments", "tier": "gold"},
+			},
+		},
+		{
+			name: "empty identity keeps presence on the wire",
+			opts: []DialOption{WithPodIdentity(PodIdentity{})},
+			want: &pbpd.PodIdentity{},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tr := dialReqCapturingTransport{got: make(chan *pbpd.DialReq, 1)}
+			h := newFakeConn("conn-1")
+			h.transport = tr
+			h.authToken = "tok"
+			s := newBareDialerForTest(h, 5*time.Second)
+			defer s.Close() //nolint:errcheck
+
+			var err error
+			if tc.opts == nil {
+				_, err = s.DialContext(context.Background(), "tcp", "x.private:80")
+			} else {
+				_, err = s.DialContextWithOptions(context.Background(), "tcp", "x.private:80", tc.opts...)
+			}
+			if err == nil {
+				t.Fatal("dial succeeded, want the test transport's rejection")
+			}
+
+			got := (<-tr.got).GetPodIdentity()
+			if (got == nil) != (tc.want == nil) {
+				t.Fatalf("PodIdentity = %v, want %v", got, tc.want)
+			}
+			if !proto.Equal(got, tc.want) {
+				t.Fatalf("PodIdentity = %v, want %v", got, tc.want)
 			}
 		})
 	}

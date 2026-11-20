@@ -468,7 +468,12 @@ type DialReq struct {
 	// received any server response, so a /dial opened in parallel with
 	// /session can establish auth on its own. Once the client knows
 	// /session has acked, this field is left unset.
-	SessionReq    *SessionReq `protobuf:"bytes,4,opt,name=session_req,json=sessionReq,proto3" json:"session_req,omitempty"`
+	SessionReq *SessionReq `protobuf:"bytes,4,opt,name=session_req,json=sessionReq,proto3" json:"session_req,omitempty"`
+	// pod_identity names the Kubernetes pod that opened the connection
+	// that the client forwards. The server exposes it to Traffic Policy
+	// as conn.k8s.pod.*. Unset means the client sent no identity. An
+	// empty message means the client looked and found no pod.
+	PodIdentity   *PodIdentity `protobuf:"bytes,5,opt,name=pod_identity,json=podIdentity,proto3" json:"pod_identity,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -527,6 +532,13 @@ func (x *DialReq) GetMetadata() map[string]string {
 func (x *DialReq) GetSessionReq() *SessionReq {
 	if x != nil {
 		return x.SessionReq
+	}
+	return nil
+}
+
+func (x *DialReq) GetPodIdentity() *PodIdentity {
+	if x != nil {
+		return x.PodIdentity
 	}
 	return nil
 }
@@ -900,6 +912,75 @@ func (x *GetHostPortResp) GetMetadata() map[string]string {
 	return nil
 }
 
+// PodIdentity identifies a Kubernetes pod. The server does not verify it.
+type PodIdentity struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Uid           string                 `protobuf:"bytes,1,opt,name=uid,proto3" json:"uid,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Namespace     string                 `protobuf:"bytes,3,opt,name=namespace,proto3" json:"namespace,omitempty"`
+	Annotations   map[string]string      `protobuf:"bytes,4,rep,name=annotations,proto3" json:"annotations,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PodIdentity) Reset() {
+	*x = PodIdentity{}
+	mi := &file_lib_private_dial_private_dial_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PodIdentity) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PodIdentity) ProtoMessage() {}
+
+func (x *PodIdentity) ProtoReflect() protoreflect.Message {
+	mi := &file_lib_private_dial_private_dial_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PodIdentity.ProtoReflect.Descriptor instead.
+func (*PodIdentity) Descriptor() ([]byte, []int) {
+	return file_lib_private_dial_private_dial_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *PodIdentity) GetUid() string {
+	if x != nil {
+		return x.Uid
+	}
+	return ""
+}
+
+func (x *PodIdentity) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *PodIdentity) GetNamespace() string {
+	if x != nil {
+		return x.Namespace
+	}
+	return ""
+}
+
+func (x *PodIdentity) GetAnnotations() map[string]string {
+	if x != nil {
+		return x.Annotations
+	}
+	return nil
+}
+
 var File_lib_private_dial_private_dial_proto protoreflect.FileDescriptor
 
 const file_lib_private_dial_private_dial_proto_rawDesc = "" +
@@ -931,13 +1012,14 @@ const file_lib_private_dial_private_dial_proto_rawDesc = "" +
 	"\fplease_drain\x18\x02 \x01(\v2\x19.private_dial.PleaseDrainH\x00R\vpleaseDrain\x12A\n" +
 	"\rsession_error\x18\x03 \x01(\v2\x1a.private_dial.SessionErrorH\x00R\fsessionError\x12(\n" +
 	"\x04pong\x18\x04 \x01(\v2\x12.private_dial.PongH\x00R\x04pongB\a\n" +
-	"\x05frame\"\xea\x01\n" +
+	"\x05frame\"\xa8\x02\n" +
 	"\aDialReq\x12\x12\n" +
 	"\x04host\x18\x01 \x01(\tR\x04host\x12\x12\n" +
 	"\x04port\x18\x02 \x01(\x03R\x04port\x12?\n" +
 	"\bmetadata\x18\x03 \x03(\v2#.private_dial.DialReq.MetadataEntryR\bmetadata\x129\n" +
 	"\vsession_req\x18\x04 \x01(\v2\x18.private_dial.SessionReqR\n" +
-	"sessionReq\x1a;\n" +
+	"sessionReq\x12<\n" +
+	"\fpod_identity\x18\x05 \x01(\v2\x19.private_dial.PodIdentityR\vpodIdentity\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xaa\x01\n" +
@@ -970,6 +1052,14 @@ const file_lib_private_dial_private_dial_proto_rawDesc = "" +
 	"\bmetadata\x18\x03 \x03(\v2+.private_dial.GetHostPortResp.MetadataEntryR\bmetadata\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xdf\x01\n" +
+	"\vPodIdentity\x12\x10\n" +
+	"\x03uid\x18\x01 \x01(\tR\x03uid\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1c\n" +
+	"\tnamespace\x18\x03 \x01(\tR\tnamespace\x12L\n" +
+	"\vannotations\x18\x04 \x03(\v2*.private_dial.PodIdentity.AnnotationsEntryR\vannotations\x1a>\n" +
+	"\x10AnnotationsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\"Z go.ngrok.com/lib/pb_private_dialb\x06proto3"
 
 var (
@@ -984,7 +1074,7 @@ func file_lib_private_dial_private_dial_proto_rawDescGZIP() []byte {
 	return file_lib_private_dial_private_dial_proto_rawDescData
 }
 
-var file_lib_private_dial_private_dial_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
+var file_lib_private_dial_private_dial_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
 var file_lib_private_dial_private_dial_proto_goTypes = []any{
 	(*SessionReq)(nil),          // 0: private_dial.SessionReq
 	(*SessionAck)(nil),          // 1: private_dial.SessionAck
@@ -1001,30 +1091,34 @@ var file_lib_private_dial_private_dial_proto_goTypes = []any{
 	(*GetHostResp)(nil),         // 12: private_dial.GetHostResp
 	(*GetHostPortReq)(nil),      // 13: private_dial.GetHostPortReq
 	(*GetHostPortResp)(nil),     // 14: private_dial.GetHostPortResp
-	nil,                         // 15: private_dial.SessionReq.MetadataEntry
-	nil,                         // 16: private_dial.DialReq.MetadataEntry
-	nil,                         // 17: private_dial.DialResp.MetadataEntry
-	nil,                         // 18: private_dial.GetHostPortResp.MetadataEntry
-	(*durationpb.Duration)(nil), // 19: google.protobuf.Duration
+	(*PodIdentity)(nil),         // 15: private_dial.PodIdentity
+	nil,                         // 16: private_dial.SessionReq.MetadataEntry
+	nil,                         // 17: private_dial.DialReq.MetadataEntry
+	nil,                         // 18: private_dial.DialResp.MetadataEntry
+	nil,                         // 19: private_dial.GetHostPortResp.MetadataEntry
+	nil,                         // 20: private_dial.PodIdentity.AnnotationsEntry
+	(*durationpb.Duration)(nil), // 21: google.protobuf.Duration
 }
 var file_lib_private_dial_private_dial_proto_depIdxs = []int32{
-	15, // 0: private_dial.SessionReq.metadata:type_name -> private_dial.SessionReq.MetadataEntry
-	19, // 1: private_dial.SessionAck.ping_interval:type_name -> google.protobuf.Duration
+	16, // 0: private_dial.SessionReq.metadata:type_name -> private_dial.SessionReq.MetadataEntry
+	21, // 1: private_dial.SessionAck.ping_interval:type_name -> google.protobuf.Duration
 	2,  // 2: private_dial.ControlFrame.ping:type_name -> private_dial.Ping
 	4,  // 3: private_dial.ControlFrame.please_drain:type_name -> private_dial.PleaseDrain
 	5,  // 4: private_dial.ControlFrame.session_error:type_name -> private_dial.SessionError
 	3,  // 5: private_dial.ControlFrame.pong:type_name -> private_dial.Pong
-	16, // 6: private_dial.DialReq.metadata:type_name -> private_dial.DialReq.MetadataEntry
+	17, // 6: private_dial.DialReq.metadata:type_name -> private_dial.DialReq.MetadataEntry
 	0,  // 7: private_dial.DialReq.session_req:type_name -> private_dial.SessionReq
-	17, // 8: private_dial.DialResp.metadata:type_name -> private_dial.DialResp.MetadataEntry
-	10, // 9: private_dial.GetHostResp.error:type_name -> private_dial.Error
-	10, // 10: private_dial.GetHostPortResp.error:type_name -> private_dial.Error
-	18, // 11: private_dial.GetHostPortResp.metadata:type_name -> private_dial.GetHostPortResp.MetadataEntry
-	12, // [12:12] is the sub-list for method output_type
-	12, // [12:12] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	15, // 8: private_dial.DialReq.pod_identity:type_name -> private_dial.PodIdentity
+	18, // 9: private_dial.DialResp.metadata:type_name -> private_dial.DialResp.MetadataEntry
+	10, // 10: private_dial.GetHostResp.error:type_name -> private_dial.Error
+	10, // 11: private_dial.GetHostPortResp.error:type_name -> private_dial.Error
+	19, // 12: private_dial.GetHostPortResp.metadata:type_name -> private_dial.GetHostPortResp.MetadataEntry
+	20, // 13: private_dial.PodIdentity.annotations:type_name -> private_dial.PodIdentity.AnnotationsEntry
+	14, // [14:14] is the sub-list for method output_type
+	14, // [14:14] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_lib_private_dial_private_dial_proto_init() }
@@ -1044,7 +1138,7 @@ func file_lib_private_dial_private_dial_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lib_private_dial_private_dial_proto_rawDesc), len(file_lib_private_dial_private_dial_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   19,
+			NumMessages:   21,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
