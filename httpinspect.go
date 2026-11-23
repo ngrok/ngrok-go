@@ -74,9 +74,10 @@ func (e *endpointForwarder) httpServe(proxyConn net.Conn, target *upstreamTarget
 		ReadHeaderTimeout: httpReadHeaderTimeout,
 		Handler:           handler,
 	}
-	if e.upstreamProtocol == "http2" {
+	if e.usesHTTP2() {
 		// The edge sends HTTP/2 (prior knowledge, no TLS) down the tunnel for
-		// an http2 upstream. Accept it, and HTTP/1.1 for upgrades.
+		// an http2 upstream. Also accept HTTP/1.1 in case HTTP/1.1 requests
+		// arrive over the tunnel.
 		server.Protocols = new(http.Protocols)
 		server.Protocols.SetHTTP1(true)
 		server.Protocols.SetUnencryptedHTTP2(true)
@@ -105,7 +106,7 @@ func (e *endpointForwarder) buildHTTPTransport(target *upstreamTarget) *http.Tra
 
 	transport := &http.Transport{
 		TLSClientConfig:   tlsConfig,
-		ForceAttemptHTTP2: e.upstreamProtocol == "http2",
+		ForceAttemptHTTP2: e.usesHTTP2(),
 		// A hand-built Transport leaves this at zero, which net/http reads as
 		// "no limit" - unlike http.DefaultTransport, which uses 90s. Without
 		// it, an idle upstream socket survives for as long as the inbound
@@ -113,7 +114,7 @@ func (e *endpointForwarder) buildHTTPTransport(target *upstreamTarget) *http.Tra
 		// long time.
 		IdleConnTimeout: 90 * time.Second,
 	}
-	if e.upstreamProtocol == "http2" && !usesTLS(u.Scheme) {
+	if e.usesHTTP2() && !usesTLS(u.Scheme) {
 		// ForceAttemptHTTP2 only applies to TLS. An http:// upstream that
 		// speaks HTTP/2 (h2c, e.g. grpc-go) rejects HTTP/1.1, so speak
 		// HTTP/2 with prior knowledge.
