@@ -40,8 +40,10 @@ func TestListenAndTCPConnection(t *testing.T) {
 		handlerReady.Signal()
 
 		conn, err := listener.Accept()
-		assert.NoError(t, err, "Failed to accept connection")
 		if err != nil {
+			// Expected if the test fails before connecting: cleanup closes
+			// the listener to unblock Accept.
+			t.Logf("Accept returned: %v", err)
 			return
 		}
 		defer conn.Close()
@@ -58,7 +60,18 @@ func TestListenAndTCPConnection(t *testing.T) {
 		// Signal that the request is complete
 		requestComplete.Signal()
 	}()
-	t.Cleanup(func() { <-done })
+	// Close the listener before waiting for the handler. Cleanups run in LIFO
+	// order, so this runs before SetupListener's own Close cleanup; without
+	// closing here, a test that fails before connecting would leave Accept
+	// blocked and this wait would hang until the go test timeout.
+	t.Cleanup(func() {
+		_ = listener.Close()
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			t.Error("timed out waiting for TCP handler to exit")
+		}
+	})
 
 	// Wait for the handler to be ready to accept connections
 	handlerReady.Wait(t)
