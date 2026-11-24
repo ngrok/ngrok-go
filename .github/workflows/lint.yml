@@ -13,11 +13,11 @@ jobs:
     name: lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4.3.1
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 2
-      - uses: cachix/install-nix-action@v27
-      - uses: HatsuneMiku3939/direnv-action@v1.3.5
+      - uses: cachix/install-nix-action@v31
+      - uses: HatsuneMiku3939/direnv-action@v1.4.11
       - name: direnv allow
         run: direnv allow .
       - name: Run goimports

@@ -10,9 +10,9 @@ jobs:
     env:
       NGROK_TEST_FLAKEY: 1
     steps:
-    - uses: actions/checkout@v4.3.1
-    - uses: cachix/install-nix-action@v27
-    - uses: HatsuneMiku3939/direnv-action@v1.3.5
+    - uses: actions/checkout@v7.0.1
+    - uses: cachix/install-nix-action@v31
+    - uses: HatsuneMiku3939/direnv-action@v1.4.11
     - name: direnv allow
       run: direnv allow .
     - name: go mod tidy
@@ -37,8 +37,8 @@ jobs:
       GOTOOLCHAIN: local
       NGROK_TEST_FLAKEY: 1
     steps:
-    - uses: actions/checkout@v4.3.1
-    - uses: actions/setup-go@v7.0.0
+    - uses: actions/checkout@v7.0.1
+    - uses: actions/setup-go@v7.1.0
       with:
         go-version: ${{ matrix.go }}
     - name: Build
@@ -56,9 +56,9 @@ jobs:
       NGROK_TEST_FLAKEY: 1
       NGROK_AUTHTOKEN: ${{ secrets.NGROK_AUTHTOKEN }}
     steps:
-    - uses: actions/checkout@v4.3.1
-    - uses: cachix/install-nix-action@v27
-    - uses: HatsuneMiku3939/direnv-action@v1.3.5
+    - uses: actions/checkout@v7.0.1
+    - uses: cachix/install-nix-action@v31
+    - uses: HatsuneMiku3939/direnv-action@v1.4.11
     - name: direnv allow
       run: direnv allow .
     - name: Test

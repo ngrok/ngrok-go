@@ -4,34 +4,34 @@
 version: 'v0.0.3'
 workflows:
     '.github/workflows/actions.yml':
-        - 'actions/checkout@v4.3.1'
+        - 'actions/checkout@v7.0.1'
     '.github/workflows/buildandtest.yml':
-        - 'actions/checkout@v4.3.1'
-        - 'actions/setup-go@v7.0.0'
-        - 'cachix/install-nix-action@v27'
-        - 'hatsunemiku3939/direnv-action@v1.3.5'
+        - 'actions/checkout@v7.0.1'
+        - 'actions/setup-go@v7.1.0'
+        - 'cachix/install-nix-action@v31'
+        - 'hatsunemiku3939/direnv-action@v1.4.11'
     '.github/workflows/lint.yml':
-        - 'actions/checkout@v4.3.1'
-        - 'cachix/install-nix-action@v27'
-        - 'hatsunemiku3939/direnv-action@v1.3.5'
+        - 'actions/checkout@v7.0.1'
+        - 'cachix/install-nix-action@v31'
+        - 'hatsunemiku3939/direnv-action@v1.4.11'
 dependencies:
-    'actions/checkout@v4.3.1':
-        ref: 'v4.3.1'
-        commit: 'sha1-34e114876b0b11c390a56381ad16ebd13914f8d5'
+    'actions/checkout@v7.0.1':
+        ref: 'v7.0.1'
+        commit: 'sha1-3d3c42e5aac5ba805825da76410c181273ba90b1'
         owner_id: 44036562
         repo_id: 197814629
-    'actions/setup-go@v7.0.0':
-        ref: 'v7.0.0'
-        commit: 'sha1-b7ad1dad31e06c5925ef5d2fc7ad053ef454303e'
+    'actions/setup-go@v7.1.0':
+        ref: 'v7.1.0'
+        commit: 'sha1-d8cbb8045d7f43706b9177cceb36c1f91a6644d5'
         owner_id: 44036562
         repo_id: 192624594
-    'cachix/install-nix-action@v27':
-        ref: 'v27'
-        commit: 'sha1-ba0dd844c9180cbf77aa72a116d6fbc515d0e87b'
+    'cachix/install-nix-action@v31':
+        ref: 'v31'
+        commit: 'sha1-3dc140bfc76c49fbd4dd958429132e3746bcb086'
         owner_id: 36824654
         repo_id: 212301524
-    'hatsunemiku3939/direnv-action@v1.3.5':
-        ref: 'v1.3.5'
-        commit: 'sha1-fe6ca688de409566c44001c1e65ad6925f0e9cbb'
+    'hatsunemiku3939/direnv-action@v1.4.11':
+        ref: 'v1.4.11'
+        commit: 'sha1-be141d0ba5b8fecd849a166ff5a9e0b482582175'
         owner_id: 580053
         repo_id: 281068564
