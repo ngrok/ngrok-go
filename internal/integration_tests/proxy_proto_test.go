@@ -265,7 +265,7 @@ func connectTCPClient(ctx context.Context, t *testing.T, endpointURL string) {
 }
 
 // connectTLSClient connects to a TLS endpoint using a TLS client
-func connectTLSClient(t *testing.T, endpointURL string) {
+func connectTLSClient(ctx context.Context, t *testing.T, endpointURL string) {
 	// For TLS, use TLS client
 	u, err := url.Parse(endpointURL)
 	require.NoError(t, err, "Failed to parse URL")
@@ -281,8 +281,14 @@ func connectTLSClient(t *testing.T, endpointURL string) {
 		InsecureSkipVerify: true, // Skip verification for testing
 	}
 
-	// Establish a proper TLS connection
-	clientConn, err := tls.Dial("tcp", host, config)
+	// Establish a proper TLS connection, retrying while the endpoint becomes routable
+	clientConn, err := dialWithRetry(ctx, t, host, dialRetryWindow, func(ctx context.Context) (net.Conn, error) {
+		dialer := &tls.Dialer{
+			NetDialer: &net.Dialer{Timeout: 5 * time.Second},
+			Config:    config,
+		}
+		return dialer.DialContext(ctx, "tcp", host)
+	})
 	require.NoError(t, err, "Failed to connect with TLS")
 	defer clientConn.Close()
 
@@ -415,7 +421,7 @@ func TestProxyProtoIntegration(t *testing.T) {
 			case strings.HasPrefix(scheme, "https"):
 				connectHTTPSClient(ctx, t, endpointURL)
 			case strings.HasPrefix(scheme, "tls"):
-				connectTLSClient(t, endpointURL)
+				connectTLSClient(ctx, t, endpointURL)
 			default: // TCP
 				connectTCPClient(ctx, t, endpointURL)
 			}

@@ -244,18 +244,49 @@ func WaitForForwarderReady(t *testing.T, url string) {
 	t.Logf("Forwarder endpoint didn't become ready in expected time, continuing anyway")
 }
 
-// MakeTCPConnection establishes a TCP connection to the given address
+// dialRetryWindow bounds how long MakeTCPConnection and other helpers keep
+// retrying a dial to a freshly-created endpoint. Right after an endpoint is
+// bound, ngrok's edge can briefly refuse connections (for example
+// "connect: connection refused") until the new address is routable.
+const dialRetryWindow = 10 * time.Second
+
+// dialWithRetry calls dial until it succeeds, ctx is done, or window elapses,
+// backing off between attempts. It returns the last dial error if it gives up.
+func dialWithRetry[C io.Closer](ctx context.Context, tb testing.TB, address string, window time.Duration, dial func(context.Context) (C, error)) (C, error) {
+	tb.Helper()
+
+	ctx, cancel := context.WithTimeout(ctx, window)
+	defer cancel()
+
+	const maxBackoff = time.Second
+	backoff := 100 * time.Millisecond
+	for attempt := 1; ; attempt++ {
+		conn, err := dial(ctx)
+		if err == nil {
+			return conn, nil
+		}
+
+		tb.Logf("dial %s: attempt %d failed: %v", address, attempt, err)
+		timer := time.NewTimer(backoff)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			var zero C
+			return zero, fmt.Errorf("dial %s: gave up after %d attempts: %w", address, attempt, err)
+		case <-timer.C:
+		}
+		backoff = min(backoff*2, maxBackoff)
+	}
+}
+
+// MakeTCPConnection establishes a TCP connection to the given address,
+// retrying for a short bounded window while a new endpoint becomes routable.
 func MakeTCPConnection(t *testing.T, ctx context.Context, address string) (io.ReadWriteCloser, error) {
 	t.Helper()
-	// Use a simple net.Dialer to connect to the TCP address
-	dialer := &net.Dialer{
-		Timeout: 500 * time.Millisecond,
-	}
-	conn, err := dialer.DialContext(ctx, "tcp", address)
-	if err != nil {
-		return nil, err
-	}
-	return conn, nil
+	return dialWithRetry(ctx, t, address, dialRetryWindow, func(ctx context.Context) (net.Conn, error) {
+		dialer := &net.Dialer{Timeout: 2 * time.Second}
+		return dialer.DialContext(ctx, "tcp", address)
+	})
 }
 
 // HandleHTTPRequest processes an HTTP request from a connection and sends a response
