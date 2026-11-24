@@ -22,6 +22,7 @@ type endpointOpts struct {
 	trafficPolicy     string
 	url               string
 	proxyProtoVersion config.ProxyProtoVersion
+	upstreamProtocol  string
 }
 
 // defaultEndpointOpts returns the default options for an endpoint.
@@ -172,6 +173,12 @@ func configureHTTPEndpoint(endpointOpts *endpointOpts) (config.Tunnel, error) {
 	// Set proxy protocol if specified
 	if endpointOpts.proxyProtoVersion != config.ProxyProtoNone {
 		configOpts = append(configOpts, config.WithProxyProto(endpointOpts.proxyProtoVersion))
+	}
+
+	// Tell the edge what the upstream speaks. With "http2", the edge sends
+	// HTTP/2 down the tunnel, which gRPC needs for trailers and streaming.
+	if endpointOpts.upstreamProtocol != "" {
+		configOpts = append(configOpts, config.WithAppProtocol(endpointOpts.upstreamProtocol))
 	}
 
 	// Note: upstreamVerifyTLSCAs is not currently supported in the legacy SDK

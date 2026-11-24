@@ -74,6 +74,14 @@ func (e *endpointForwarder) httpServe(proxyConn net.Conn, target *upstreamTarget
 		ReadHeaderTimeout: httpReadHeaderTimeout,
 		Handler:           handler,
 	}
+	if e.usesHTTP2() {
+		// The edge sends HTTP/2 (prior knowledge, no TLS) down the tunnel for
+		// an http2 upstream. Also accept HTTP/1.1 in case HTTP/1.1 requests
+		// arrive over the tunnel.
+		server.Protocols = new(http.Protocols)
+		server.Protocols.SetHTTP1(true)
+		server.Protocols.SetUnencryptedHTTP2(true)
+	}
 
 	srv := httpx.NewServeConnServer(server, slog.Default())
 
@@ -98,13 +106,20 @@ func (e *endpointForwarder) buildHTTPTransport(target *upstreamTarget) *http.Tra
 
 	transport := &http.Transport{
 		TLSClientConfig:   tlsConfig,
-		ForceAttemptHTTP2: e.upstreamProtocol == "http2",
+		ForceAttemptHTTP2: e.usesHTTP2(),
 		// A hand-built Transport leaves this at zero, which net/http reads as
 		// "no limit" - unlike http.DefaultTransport, which uses 90s. Without
 		// it, an idle upstream socket survives for as long as the inbound
 		// connection that created it, which the ngrok edge may hold open for a
 		// long time.
 		IdleConnTimeout: 90 * time.Second,
+	}
+	if e.usesHTTP2() && !usesTLS(u.Scheme) {
+		// ForceAttemptHTTP2 only applies to TLS. An http:// upstream that
+		// speaks HTTP/2 (h2c, e.g. grpc-go) rejects HTTP/1.1, so speak
+		// HTTP/2 with prior knowledge.
+		transport.Protocols = new(http.Protocols)
+		transport.Protocols.SetUnencryptedHTTP2(true)
 	}
 
 	// A zero net.Dialer dials the same way as a Transport with no DialContext.
